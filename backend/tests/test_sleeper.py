@@ -8,6 +8,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from config import SLEEPER_USERNAME
 from services.sleeper_service import (
     get_user_id,
     get_leagues,
@@ -17,7 +18,8 @@ from services.sleeper_service import (
     CURRENT_SEASON,
 )
 
-USERNAME = "benjikataoka"
+assert SLEEPER_USERNAME, "SLEEPER_USERNAME must be set in .env"
+USERNAME = SLEEPER_USERNAME
 
 
 async def run_tests():

@@ -8,7 +8,8 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-SLEEPER_USERNAME = "benjikataoka"
+from config import SLEEPER_USERNAME
+assert SLEEPER_USERNAME, "SLEEPER_USERNAME must be set in .env"
 # From test_sleeper.py output — confirmed redraft PPR league
 LEAGUE_ID = "1221322522297901056"
 INVALID_LEAGUE_ID = "1180196968005595136"  # Dynasty league — should be rejected
