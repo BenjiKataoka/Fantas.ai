@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+sqlalchemy[asyncio]
+asyncpg
+alembic
+psycopg2-binary
+httpx
+requests
+beautifulsoup4
+pandas
+google-generativeai
+sleeper-api-wrapper
+espn-api

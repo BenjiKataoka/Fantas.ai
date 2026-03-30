@@ -1,0 +1,119 @@
+"""
+Verify the /api/leagues and /api/roster endpoints work end-to-end.
+Usage: python3 tests/test_roster_router.py
+Note: Requires the venv to be active and Neon DB to be reachable.
+"""
+import asyncio
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+SLEEPER_USERNAME = "benjikataoka"
+# From test_sleeper.py output — confirmed redraft PPR league
+LEAGUE_ID = "1221322522297901056"
+INVALID_LEAGUE_ID = "1180196968005595136"  # Dynasty league — should be rejected
+
+
+async def run_tests():
+    print("=" * 50)
+    print("ROSTER ROUTER TEST")
+    print("=" * 50)
+
+    # Test 1: /api/leagues returns eligible leagues
+    print(f"\n[1] GET /api/leagues?sleeper_username={SLEEPER_USERNAME}")
+    try:
+        from services.sleeper_service import get_user_id, get_eligible_leagues
+        user_id = await get_user_id(SLEEPER_USERNAME)
+        assert user_id, "Could not resolve user_id"
+        leagues = await get_eligible_leagues(user_id)
+        assert isinstance(leagues, list), "Expected a list"
+        assert len(leagues) >= 1, "Expected at least 1 eligible league"
+        print(f"    PASS — {len(leagues)} eligible league(s):")
+        for l in leagues:
+            print(f"           • {l['name']} ({l['league_id']})")
+    except Exception as e:
+        print(f"    FAIL — {e}")
+        return
+
+    # Test 2: Dynasty league is filtered out
+    print(f"\n[2] Confirming dynasty league is excluded...")
+    try:
+        ids = {l["league_id"] for l in leagues}
+        assert INVALID_LEAGUE_ID not in ids, "Dynasty league should not appear in eligible list"
+        print(f"    PASS — dynasty league correctly excluded")
+    except Exception as e:
+        print(f"    FAIL — {e}")
+
+    # Test 3: /api/roster syncs to DB and returns roster
+    print(f"\n[3] GET /api/roster?sleeper_username={SLEEPER_USERNAME}&league_id={LEAGUE_ID}")
+    try:
+        from fastapi.testclient import TestClient
+        from main import app
+        client = TestClient(app)
+        resp = client.get(f"/api/roster?sleeper_username={SLEEPER_USERNAME}&league_id={LEAGUE_ID}")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        data = resp.json()
+        assert "roster" in data, "Missing 'roster' key"
+        assert len(data["roster"]) > 0, "Roster is empty"
+        print(f"    PASS — {data['total_players']} players returned, {data['starters']} starters")
+        print(f"           First 3 players:")
+        for p in data["roster"][:3]:
+            print(f"             {p['name']} | {p['position']} | {p['nfl_team']} | starter={p['is_starter']}")
+    except Exception as e:
+        print(f"    FAIL — {e}")
+        return
+
+    # Test 6: Invalid league ID is rejected
+    print(f"\n[6] GET /api/roster with dynasty league_id (expect 400)...")
+    try:
+        resp = client.get(f"/api/roster?sleeper_username={SLEEPER_USERNAME}&league_id={INVALID_LEAGUE_ID}")
+        assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
+        print(f"    PASS — dynasty league correctly rejected with 400")
+    except Exception as e:
+        print(f"    FAIL — {e}")
+
+    print("\n" + "=" * 50)
+    print("ROSTER ROUTER TEST COMPLETE")
+    print("=" * 50)
+
+
+def verify_db():
+    """Verify DB state using a sync psycopg2 connection to avoid event loop conflicts."""
+    print("\n--- DB VERIFICATION ---")
+    import psycopg2
+    from config import DATABASE_URL
+
+    # Convert asyncpg URL to psycopg2 format
+    sync_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+
+    try:
+        conn = psycopg2.connect(sync_url, sslmode="require")
+        cur = conn.cursor()
+
+        # Test 4: Players persisted
+        print(f"\n[4] Verifying players were saved to Neon...")
+        cur.execute("SELECT COUNT(*) FROM players WHERE sleeper_id IS NOT NULL")
+        count = cur.fetchone()[0]
+        if count > 0:
+            print(f"    PASS — {count} players saved in Neon")
+        else:
+            print(f"    FAIL — no players found in DB")
+
+        # Test 5: my_roster populated
+        print(f"\n[5] Verifying my_roster was populated in Neon...")
+        cur.execute("SELECT COUNT(*) FROM my_roster WHERE user_id = 1")
+        count = cur.fetchone()[0]
+        if count > 0:
+            print(f"    PASS — {count} roster rows saved in Neon")
+        else:
+            print(f"    FAIL — no roster rows found")
+
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"    FAIL — {e}")
+
+
+if __name__ == "__main__":
+    asyncio.run(run_tests())
+    verify_db()
