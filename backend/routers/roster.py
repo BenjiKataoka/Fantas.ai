@@ -1,9 +1,9 @@
 import logging
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.player import Player
@@ -14,8 +14,8 @@ from services.sleeper_service import (
     get_eligible_leagues,
     get_roster,
     get_all_players,
-    CURRENT_SEASON,
 )
+from services.projection_service import get_nfl_state, sync_projections
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -55,6 +55,9 @@ async def get_my_roster(
     Fetches the user's roster from Sleeper, syncs players + roster into Neon,
     and returns the full roster with player details.
     """
+    # Fetch NFL state first — used for season/week throughout this handler
+    nfl_state = await get_nfl_state()
+
     # Resolve username → user_id
     sleeper_user_id = await get_user_id(sleeper_username)
     if not sleeper_user_id:
@@ -134,7 +137,6 @@ async def get_my_roster(
         await db.flush()
 
     # --- Upsert this league into user_leagues and mark as primary ---
-    from sqlalchemy import select
     result = await db.execute(
         select(UserLeague).where(
             UserLeague.user_id == PLACEHOLDER_USER_ID,
@@ -144,9 +146,11 @@ async def get_my_roster(
     )
     existing_league = result.scalar_one_or_none()
     if not existing_league:
-        # Clear any existing primary flag before setting new one
+        # Clear primary flag on any existing leagues before setting the new one
         await db.execute(
-            select(UserLeague).where(UserLeague.user_id == PLACEHOLDER_USER_ID)
+            update(UserLeague)
+            .where(UserLeague.user_id == PLACEHOLDER_USER_ID)
+            .values(is_primary=False)
         )
         db.add(UserLeague(
             user_id=PLACEHOLDER_USER_ID,
@@ -154,7 +158,7 @@ async def get_my_roster(
             league_id=league_id,
             league_name=next((l["name"] for l in eligible if l["league_id"] == league_id), None),
             total_rosters=next((l.get("total_rosters") for l in eligible if l["league_id"] == league_id), None),
-            season=CURRENT_SEASON,
+            season=nfl_state["season"],
             is_primary=True,
         ))
         await db.flush()
@@ -176,6 +180,22 @@ async def get_my_roster(
             acquisition_date=date.today(),
         ))
 
+    # --- Sync projections if in-season ---
+    projections: dict = {}
+    if nfl_state["season_type"] in ("regular", "post"):
+        espn_id_map = {
+            p["player_id"]: p["espn_id"]
+            for p in players_to_upsert
+            if p.get("espn_id")
+        }
+        projections = await sync_projections(
+            player_ids=list(valid_pids),
+            espn_id_map=espn_id_map,
+            season=nfl_state["season"],
+            week=nfl_state["week"],
+            db=db,
+        )
+
     await db.commit()
 
     # --- Build response ---
@@ -185,6 +205,7 @@ async def get_my_roster(
         position = p.get("position", "")
         if position not in RELEVANT_POSITIONS:
             continue
+        proj = projections.get(pid, {})
         roster_out.append({
             "player_id": pid,
             "name": _full_name(p),
@@ -193,6 +214,10 @@ async def get_my_roster(
             "injury_status": p.get("injury_status", "Active"),
             "is_starter": pid in starters,
             "slot": _guess_slot(pid, starters, all_players),
+            "sleeper_proj": proj.get("sleeper_proj"),
+            "espn_proj": proj.get("espn_proj"),
+            "weighted_proj": proj.get("weighted_proj"),
+            "confidence_flag": proj.get("confidence_flag"),
         })
 
     position_order = {"QB": 0, "RB": 1, "WR": 2, "TE": 3, "K": 4}
@@ -203,7 +228,9 @@ async def get_my_roster(
         "total_players": len(roster_out),
         "starters": len([p for p in roster_out if p["is_starter"]]),
         "source": "sleeper",
-        "season": CURRENT_SEASON,
+        "season": nfl_state["season"],
+        "week": nfl_state["week"],
+        "season_type": nfl_state["season_type"],
         "league_id": league_id,
     }
 
@@ -215,7 +242,7 @@ def _full_name(player: dict) -> str:
 
 
 def _guess_slot(pid: str, starters: set, all_players: dict) -> str:
-    """Best-effort slot label based on position. Exact slots come from ESPN in Phase 2."""
+    """Best-effort slot label based on position for Sleeper rosters."""
     if pid not in starters:
         return "BN"
     p = all_players.get(pid, {})

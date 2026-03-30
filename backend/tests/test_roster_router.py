@@ -56,9 +56,20 @@ async def run_tests():
         assert "roster" in data, "Missing 'roster' key"
         assert len(data["roster"]) > 0, "Roster is empty"
         print(f"    PASS — {data['total_players']} players returned, {data['starters']} starters")
+        print(f"           season_type={data.get('season_type')} week={data.get('week')}")
         print(f"           First 3 players:")
         for p in data["roster"][:3]:
             print(f"             {p['name']} | {p['position']} | {p['nfl_team']} | starter={p['is_starter']}")
+
+        # Verify projection fields are present on every player (values may be null in offseason)
+        proj_keys = {"sleeper_proj", "espn_proj", "weighted_proj", "confidence_flag"}
+        missing = [k for p in data["roster"] for k in proj_keys if k not in p]
+        if not missing:
+            sample = data["roster"][0]
+            print(f"    PASS — projection fields present on all players")
+            print(f"           Sample: sleeper={sample['sleeper_proj']} espn={sample['espn_proj']} weighted={sample['weighted_proj']} confidence={sample['confidence_flag']}")
+        else:
+            print(f"    FAIL — missing projection keys: {set(missing)}")
     except Exception as e:
         print(f"    FAIL — {e}")
         return
