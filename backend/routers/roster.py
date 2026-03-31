@@ -15,7 +15,7 @@ from services.sleeper_service import (
     get_roster,
     get_all_players,
 )
-from services.projection_service import get_nfl_state, sync_projections
+from services.projection_service import get_nfl_state, normalize_name, sync_projections
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -188,9 +188,14 @@ async def get_my_roster(
             for p in players_to_upsert
             if p.get("espn_id")
         }
+        name_map = {
+            p["player_id"]: normalize_name(p["name"])
+            for p in players_to_upsert
+        }
         projections = await sync_projections(
             player_ids=list(valid_pids),
             espn_id_map=espn_id_map,
+            name_map=name_map,
             season=nfl_state["season"],
             week=nfl_state["week"],
             db=db,

@@ -7,7 +7,6 @@ Projection orchestration service.
 """
 import asyncio
 import logging
-import re
 from datetime import datetime, timedelta
 
 import httpx
@@ -16,31 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import DEFAULT_WEIGHTS
 from models.projection import Projection
-from services import espn_service, sleeper_service
+from services import espn_service, fp_service, sleeper_service
+from services.utils import normalize_name  # re-exported for external use
 
 logger = logging.getLogger(__name__)
-
-SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
 
 # Cache for NFL state — avoids hitting Sleeper on every roster request
 _nfl_state_cache: dict = {}
 
-
-def normalize_name(name: str) -> str:
-    """
-    Normalize a player name for cross-source matching.
-    Lowercases, removes punctuation, strips name suffixes.
-    Examples:
-      "Ja'Marr Chase"   → "jamarr chase"
-      "Calvin Ridley Jr." → "calvin ridley"
-      "O'Dell Beckham"  → "odell beckham"
-      "Mark Andrews II" → "mark andrews"
-    """
-    name = name.lower().strip()
-    name = re.sub(r"['\.\-]", "", name)       # strip apostrophes, dots, hyphens
-    name = re.sub(r"\s+", " ", name)           # collapse whitespace
-    parts = [p for p in name.split() if p not in SUFFIXES]
-    return " ".join(parts)
 
 
 async def get_nfl_state() -> dict:
@@ -74,28 +56,30 @@ async def get_nfl_state() -> dict:
 
 async def sync_projections(
     player_ids: list[str],
-    espn_id_map: dict[str, str],   # sleeper player_id → espn_id
+    espn_id_map: dict[str, str],       # player_id → espn_id
+    name_map: dict[str, str],          # player_id → normalized_name (for FP matching)
     season: int,
     week: int,
     db: AsyncSession,
 ) -> dict[str, dict]:
     """
-    Fetches Sleeper + ESPN projections concurrently for the given players,
+    Fetches Sleeper + ESPN + FantasyPros projections concurrently for the given players,
     computes weighted average (redistributing weight if a source is missing),
     deletes stale rows and inserts fresh ones into the projections table.
 
-    Returns {player_id: {sleeper_proj, espn_proj, weighted_proj, confidence_flag}}.
-    Returns empty dict during offseason (no projection data available).
+    Returns {player_id: {sleeper_proj, espn_proj, fp_proj, weighted_proj, confidence_flag}}.
+    All projection values will be None during the offseason.
     """
-    # Fetch both sources concurrently
-    sleeper_raw, espn_raw = await asyncio.gather(
+    # Fetch all three sources concurrently
+    sleeper_raw, espn_raw, fp_raw = await asyncio.gather(
         sleeper_service.get_projections(season, week),
         espn_service.get_espn_projections(season, week),
+        fp_service.get_fp_projections(week),
     )
 
     w_sleeper = DEFAULT_WEIGHTS["sleeper"]   # 0.35
     w_espn = DEFAULT_WEIGHTS["espn"]         # 0.30
-    # fp weight (0.35) added in Phase 3
+    w_fp = DEFAULT_WEIGHTS["fp"]             # 0.35
 
     rows_to_insert = []
     result: dict[str, dict] = {}
@@ -103,12 +87,15 @@ async def sync_projections(
     for pid in player_ids:
         sleeper_pts = _extract_sleeper_pts(sleeper_raw.get(pid))
         espn_pts = espn_raw.get(espn_id_map.get(pid, ""))
+        fp_pts = fp_raw.get(name_map.get(pid, ""))
 
         sources: dict[str, float] = {}
         if sleeper_pts is not None:
             sources["sleeper"] = w_sleeper
         if espn_pts is not None:
             sources["espn"] = w_espn
+        if fp_pts is not None:
+            sources["fp"] = w_fp
 
         weighted_proj = None
         sources_used = None
@@ -124,6 +111,8 @@ async def sync_projections(
                 weighted_proj += sleeper_pts * normalized.get("sleeper", 0)
             if espn_pts is not None:
                 weighted_proj += espn_pts * normalized.get("espn", 0)
+            if fp_pts is not None:
+                weighted_proj += fp_pts * normalized.get("fp", 0)
             weighted_proj = round(weighted_proj, 2)
 
             sources_used = normalized
@@ -135,7 +124,7 @@ async def sync_projections(
             "season": season,
             "sleeper_proj": sleeper_pts,
             "espn_proj": espn_pts,
-            "fp_proj": None,           # Phase 3
+            "fp_proj": fp_pts,
             "weighted_proj": weighted_proj,
             "sources_used": sources_used,
             "confidence_flag": confidence_flag,
