@@ -64,7 +64,7 @@ async def get_my_roster(
         raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
 
     # Validate this is a redraft PPR league owned by this user
-    eligible = await get_eligible_leagues(sleeper_user_id)
+    eligible = await get_eligible_leagues(sleeper_user_id, season=nfl_state["season"])
     eligible_ids = {l["league_id"] for l in eligible}
     if league_id not in eligible_ids:
         raise HTTPException(
@@ -221,6 +221,7 @@ async def get_my_roster(
             "slot": _guess_slot(pid, starters, all_players),
             "sleeper_proj": proj.get("sleeper_proj"),
             "espn_proj": proj.get("espn_proj"),
+            "fp_proj": proj.get("fp_proj"),
             "weighted_proj": proj.get("weighted_proj"),
             "confidence_flag": proj.get("confidence_flag"),
         })
