@@ -13,9 +13,9 @@ import httpx
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import DEFAULT_WEIGHTS
 from models.projection import Projection
 from services import espn_service, fp_service, sleeper_service
+from services.projection_engine import compute_weighted_projection
 from services.utils import normalize_name  # re-exported for external use
 
 logger = logging.getLogger(__name__)
@@ -61,10 +61,11 @@ async def sync_projections(
     season: int,
     week: int,
     db: AsyncSession,
+    weights: dict[str, float] | None = None,  # per-user weights; defaults to DEFAULT_WEIGHTS
 ) -> dict[str, dict]:
     """
     Fetches Sleeper + ESPN + FantasyPros projections concurrently for the given players,
-    computes weighted average (redistributing weight if a source is missing),
+    computes weighted average via projection_engine (redistributing weight if a source is missing),
     deletes stale rows and inserts fresh ones into the projections table.
 
     Returns {player_id: {sleeper_proj, espn_proj, fp_proj, weighted_proj, confidence_flag}}.
@@ -77,10 +78,6 @@ async def sync_projections(
         fp_service.get_fp_projections(week),
     )
 
-    w_sleeper = DEFAULT_WEIGHTS["sleeper"]   # 0.35
-    w_espn = DEFAULT_WEIGHTS["espn"]         # 0.30
-    w_fp = DEFAULT_WEIGHTS["fp"]             # 0.35
-
     rows_to_insert = []
     result: dict[str, dict] = {}
 
@@ -89,34 +86,7 @@ async def sync_projections(
         espn_pts = espn_raw.get(espn_id_map.get(pid, ""))
         fp_pts = fp_raw.get(name_map.get(pid, ""))
 
-        sources: dict[str, float] = {}
-        if sleeper_pts is not None:
-            sources["sleeper"] = w_sleeper
-        if espn_pts is not None:
-            sources["espn"] = w_espn
-        if fp_pts is not None:
-            sources["fp"] = w_fp
-
-        weighted_proj = None
-        sources_used = None
-        confidence_flag = None
-
-        if sources:
-            # Redistribute weight proportionally among available sources
-            total = sum(sources.values())
-            normalized = {k: round(v / total, 4) for k, v in sources.items()}
-
-            weighted_proj = 0.0
-            if sleeper_pts is not None:
-                weighted_proj += sleeper_pts * normalized.get("sleeper", 0)
-            if espn_pts is not None:
-                weighted_proj += espn_pts * normalized.get("espn", 0)
-            if fp_pts is not None:
-                weighted_proj += fp_pts * normalized.get("fp", 0)
-            weighted_proj = round(weighted_proj, 2)
-
-            sources_used = normalized
-            confidence_flag = {3: "HIGH", 2: "MEDIUM", 1: "LOW"}.get(len(sources), "LOW")
+        computed = compute_weighted_projection(sleeper_pts, espn_pts, fp_pts, weights)
 
         row = {
             "player_id": pid,
@@ -125,9 +95,9 @@ async def sync_projections(
             "sleeper_proj": sleeper_pts,
             "espn_proj": espn_pts,
             "fp_proj": fp_pts,
-            "weighted_proj": weighted_proj,
-            "sources_used": sources_used,
-            "confidence_flag": confidence_flag,
+            "weighted_proj": computed["weighted_proj"],
+            "sources_used": computed["sources_used"],
+            "confidence_flag": computed["confidence_flag"],
         }
         rows_to_insert.append(row)
         result[pid] = row

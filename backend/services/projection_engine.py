@@ -1,0 +1,82 @@
+"""
+Standalone weighted projection engine.
+
+compute_weighted_projection: pure function, no DB calls.
+Takes raw values from each source + a weights dict.
+Returns weighted result, normalized source weights, and confidence flag.
+
+Used by both sync_projections (bulk DB sync) and the /api/projections endpoint
+(on-demand, per-user weights).
+"""
+from config import DEFAULT_WEIGHTS
+
+
+def compute_weighted_projection(
+    sleeper: float | None,
+    espn: float | None,
+    fp: float | None,
+    weights: dict[str, float] | None = None,
+) -> dict:
+    """
+    Computes a weighted average across available projection sources.
+
+    weights: {"sleeper": float, "espn": float, "fp": float} — must sum to 1.0.
+    If None, DEFAULT_WEIGHTS from config is used.
+
+    If a source value is None, its weight is redistributed proportionally
+    to the remaining sources.
+
+    Returns:
+        {
+            "weighted_proj": float | None,
+            "sources_used": dict | None,   # normalized weights actually applied
+            "confidence_flag": str | None, # "HIGH" | "MEDIUM" | "LOW"
+        }
+    """
+    if weights is None:
+        weights = DEFAULT_WEIGHTS
+
+    w_sleeper = weights.get("sleeper", DEFAULT_WEIGHTS["sleeper"])
+    w_espn = weights.get("espn", DEFAULT_WEIGHTS["espn"])
+    w_fp = weights.get("fp", DEFAULT_WEIGHTS["fp"])
+
+    available: dict[str, tuple[float, float]] = {}  # name → (value, raw_weight)
+    if sleeper is not None:
+        available["sleeper"] = (sleeper, w_sleeper)
+    if espn is not None:
+        available["espn"] = (espn, w_espn)
+    if fp is not None:
+        available["fp"] = (fp, w_fp)
+
+    if not available:
+        return {"weighted_proj": None, "sources_used": None, "confidence_flag": None}
+
+    # Redistribute weight proportionally among available sources
+    total_weight = sum(w for _, w in available.values())
+    normalized = {k: round(v / total_weight, 4) for k, (_, v) in available.items()}
+
+    weighted_proj = sum(val * normalized[k] for k, (val, _) in available.items())
+    weighted_proj = round(weighted_proj, 2)
+
+    confidence_flag = {3: "HIGH", 2: "MEDIUM", 1: "LOW"}.get(len(available), "LOW")
+
+    return {
+        "weighted_proj": weighted_proj,
+        "sources_used": normalized,
+        "confidence_flag": confidence_flag,
+    }
+
+
+def weights_from_user(user) -> dict[str, float]:
+    """
+    Extracts projection weights from a User ORM object.
+    Falls back to DEFAULT_WEIGHTS if any weight is missing.
+    """
+    try:
+        return {
+            "sleeper": float(user.weight_sleeper),
+            "espn": float(user.weight_espn),
+            "fp": float(user.weight_fp),
+        }
+    except (AttributeError, TypeError):
+        return DEFAULT_WEIGHTS

@@ -15,6 +15,7 @@ from services.sleeper_service import (
     get_roster,
     get_all_players,
 )
+from services.projection_engine import weights_from_user
 from services.projection_service import get_nfl_state, normalize_name, sync_projections
 
 router = APIRouter()
@@ -64,7 +65,10 @@ async def get_my_roster(
         raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
 
     # Validate this is a redraft PPR league owned by this user
-    eligible = await get_eligible_leagues(sleeper_user_id, season=nfl_state["season"])
+    # During offseason, Sleeper reports the upcoming season (e.g. 2026) but leagues
+    # haven't been created yet — fall back to the completed season.
+    league_season = nfl_state["season"] - 1 if nfl_state["season_type"] == "off" else nfl_state["season"]
+    eligible = await get_eligible_leagues(sleeper_user_id, season=league_season)
     eligible_ids = {l["league_id"] for l in eligible}
     if league_id not in eligible_ids:
         raise HTTPException(
@@ -158,7 +162,7 @@ async def get_my_roster(
             league_id=league_id,
             league_name=next((l["name"] for l in eligible if l["league_id"] == league_id), None),
             total_rosters=next((l.get("total_rosters") for l in eligible if l["league_id"] == league_id), None),
-            season=nfl_state["season"],
+            season=league_season,
             is_primary=True,
         ))
         await db.flush()
@@ -192,6 +196,9 @@ async def get_my_roster(
             p["player_id"]: normalize_name(p["name"])
             for p in players_to_upsert
         }
+        # Use per-user weights if the user row exists, otherwise fall back to defaults
+        user_row = await db.get(User, PLACEHOLDER_USER_ID)
+        user_weights = weights_from_user(user_row) if user_row else None
         projections = await sync_projections(
             player_ids=list(valid_pids),
             espn_id_map=espn_id_map,
@@ -199,6 +206,7 @@ async def get_my_roster(
             season=nfl_state["season"],
             week=nfl_state["week"],
             db=db,
+            weights=user_weights,
         )
 
     await db.commit()

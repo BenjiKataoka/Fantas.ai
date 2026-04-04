@@ -16,16 +16,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from routers import roster
+from routers import roster, projections, settings
 app.include_router(roster.router, prefix="/api")
+app.include_router(projections.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
 
 # Routers added as each phase is built
-# from routers import projections, news, tracker, startsit, settings
-# app.include_router(projections.router, prefix="/api")
+# from routers import news, tracker, startsit
 # app.include_router(news.router, prefix="/api")
 # app.include_router(tracker.router, prefix="/api")
 # app.include_router(startsit.router, prefix="/api")
-# app.include_router(settings.router, prefix="/api")
 
 
 @app.get("/health")
