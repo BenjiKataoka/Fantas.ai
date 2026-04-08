@@ -83,11 +83,15 @@ async def get_fp_projections(week: int) -> dict[str, float]:
 
 
 async def _scrape_position(pos: str, week: int) -> dict[str, float]:
-    """Scrapes a single position page. Returns {normalized_name: pts}."""
+    """Scrapes a single position page. Returns {normalized_name: pts}. Returns {} on failure."""
     url = f"{FP_BASE}/{pos}.php"
     params = {"scoring": "PPR", "week": week}
-    resp = await _fetch_with_retry(url, params)
-    return _parse_projection_table(resp.text, pos)
+    try:
+        resp = await _fetch_with_retry(url, params)
+        return _parse_projection_table(resp.text, pos)
+    except Exception as e:
+        logger.error(f"[FP] _scrape_position failed for {pos.upper()} week {week}: {e}")
+        return {}
 
 
 async def _fetch_with_retry(

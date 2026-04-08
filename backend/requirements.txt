@@ -9,5 +9,6 @@ httpx
 requests
 beautifulsoup4
 pandas
-google-generativeai
+pyarrow
+google-genai
 sleeper-api-wrapper

@@ -92,5 +92,55 @@ async def run_tests():
     print("=" * 50)
 
 
+async def run_failure_tests():
+    print("\n" + "=" * 50)
+    print("FANTASYPROS — FAILURE MODE TESTS")
+    print("=" * 50)
+
+    from unittest.mock import patch, AsyncMock, MagicMock
+    from services import fp_service
+
+    # [5] 403 response returns {} without raising
+    print("\n[5] 403 response returns {} without raising...")
+    mock_403 = MagicMock()
+    mock_403.status_code = 403
+    mock_403.raise_for_status.side_effect = Exception("403 Forbidden")
+
+    async def mock_get_403(*args, **kwargs):
+        return mock_403
+
+    # Clear cache so we actually hit the mock
+    fp_service._cache.clear()
+
+    with patch("services.fp_service.httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = mock_get_403
+        mock_cls.return_value = mock_client
+
+        result = await fp_service._scrape_position("qb", week=1)
+        assert result == {}, f"Expected {{}} on 403, got {result}"
+        print(f"    PASS — 403 returns {{}} gracefully")
+
+    # [6] Network timeout returns {} without raising
+    print("\n[6] Network timeout returns {} without raising...")
+    fp_service._cache.clear()
+
+    with patch("services.fp_service.httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(side_effect=Exception("Connection timeout"))
+        mock_cls.return_value = mock_client
+
+        result = await fp_service._scrape_position("rb", week=1)
+        assert result == {}, f"Expected {{}} on timeout, got {result}"
+        print(f"    PASS — timeout returns {{}} gracefully")
+
+    print("\n✅ All failure mode tests passed.")
+
+
 if __name__ == "__main__":
     asyncio.run(run_tests())
+    asyncio.run(run_failure_tests())
