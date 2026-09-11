@@ -12,15 +12,106 @@ user_id is a placeholder until Clerk auth is wired in Phase 5.
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from models.player import Player
 from services import tracker_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 PLACEHOLDER_USER_ID = 1  # replaced with real Clerk auth in Phase 5
+
+
+@router.get("/players/search")
+async def search_players(
+    q: str = Query(..., min_length=2, description="Player name search query"),
+    limit: int = Query(default=25, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Search all NFL players by name (case-insensitive partial match).
+
+    Primary source: Sleeper's full player map (~10k players, cached 24h).
+    Falls back to local DB if the Sleeper cache is cold (roster not yet loaded).
+    Ensures the matched players exist in the local DB so they can be starred.
+    """
+    from services.sleeper_service import get_all_players
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    q_lower = q.lower()
+
+    RELEVANT_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
+
+    # --- Try Sleeper's full player map first (cached 24h) ---
+    all_players = await get_all_players()
+    matched = []
+    if all_players:
+        for pid, p in all_players.items():
+            name = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
+            pos  = p.get("position", "")
+            if pos not in RELEVANT_POSITIONS:
+                continue
+            if q_lower in name.lower():
+                matched.append({
+                    "player_id": pid,
+                    "name":      name,
+                    "position":  pos,
+                    "nfl_team":  p.get("team") or p.get("nfl_team"),
+                    "espn_id":   str(p["espn_id"]) if p.get("espn_id") is not None else None,
+                })
+        # Sort by relevance: last name starts with query > name contains query, then alpha
+        def relevance(m: dict) -> tuple:
+            name_lower = m["name"].lower()
+            last = name_lower.split()[-1] if name_lower else ""
+            starts_with = last.startswith(q_lower) or name_lower.startswith(q_lower)
+            return (0 if starts_with else 1, name_lower)
+
+        matched.sort(key=relevance)
+        matched = matched[:limit]
+
+        # Upsert matched players so they're star-able
+        if matched:
+            stmt = pg_insert(Player).values([
+                {
+                    "player_id":      m["player_id"],
+                    "name":           m["name"],
+                    "position":       m["position"],
+                    "nfl_team":       m["nfl_team"],
+                    "sleeper_id":     m["player_id"],
+                    "espn_id":        m["espn_id"],
+                    "espn_athlete_id": m["espn_id"],
+                }
+                for m in matched
+            ])
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["player_id"],
+                set_={"name": stmt.excluded.name, "nfl_team": stmt.excluded.nfl_team},
+            )
+            await db.execute(stmt)
+            await db.commit()
+
+        return {"players": matched, "total": len(matched), "query": q, "source": "sleeper_cache"}
+
+    # --- Fallback: local DB (only rostered players) ---
+    result = await db.execute(
+        select(Player)
+        .where(Player.name.ilike(f"%{q}%"))
+        .order_by(Player.name)
+        .limit(limit)
+    )
+    db_players = result.scalars().all()
+    return {
+        "players": [
+            {"player_id": p.player_id, "name": p.name, "position": p.position, "nfl_team": p.nfl_team}
+            for p in db_players
+        ],
+        "total": len(db_players),
+        "query": q,
+        "source": "db_fallback",
+    }
 
 
 @router.post("/tracker/star/{player_id}")

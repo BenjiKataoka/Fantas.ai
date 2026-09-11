@@ -21,9 +21,11 @@ def _get_seasons(completed_season: int, n: int = 3) -> list[int]:
     return list(range(completed_season - n + 1, completed_season + 1))
 
 
-def _normalize_for_match(name: str) -> str:
+def _normalize_for_match(name) -> str:
     """Lowercase, strip punctuation — used to match nflreadpy names to ours."""
     import re
+    if not isinstance(name, str):
+        return ""
     return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
@@ -54,9 +56,15 @@ async def get_historical_stats(player_name: str, position: str) -> dict[int, dic
 
         norm_target = _normalize_for_match(player_name)
 
-        # nflreadpy uses 'player_display_name' or 'player_name'
-        name_col = "player_display_name" if "player_display_name" in df.columns else "player_name"
-        df["_norm_name"] = df[name_col].astype(str).apply(_normalize_for_match)
+        # nflreadpy player stats uses 'player_display_name' or 'player_name'
+        for candidate in ("player_display_name", "player_name", "player"):
+            if candidate in df.columns:
+                name_col = candidate
+                break
+        else:
+            logger.warning(f"[nflreadpy] No name column found in player stats DataFrame")
+            return {}
+        df["_norm_name"] = df[name_col].apply(_normalize_for_match)
         matches = df[df["_norm_name"] == norm_target]
 
         # Further filter by position if column exists
@@ -125,8 +133,16 @@ async def get_recent_snap_share(player_name: str) -> dict:
         snap_df: pd.DataFrame = nfl.load_snap_counts([completed_season]).to_pandas()
 
         norm_target = _normalize_for_match(player_name)
-        name_col = "player_name" if "player_name" in snap_df.columns else "player_display_name"
-        snap_df["_norm"] = snap_df[name_col].astype(str).apply(_normalize_for_match)
+
+        # nflreadpy snap counts uses 'player' (not player_name or player_display_name)
+        for candidate in ("player", "player_name", "player_display_name"):
+            if candidate in snap_df.columns:
+                name_col = candidate
+                break
+        else:
+            logger.warning(f"[nflreadpy] No name column found in snap counts DataFrame")
+            return {}
+        snap_df["_norm"] = snap_df[name_col].apply(_normalize_for_match)
         player_snaps = snap_df[snap_df["_norm"] == norm_target]
 
         if player_snaps.empty:

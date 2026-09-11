@@ -188,63 +188,69 @@ async def _run_analysis_for_player(
     user_id: int,
     player_id: str,
     player: Player,
-    db: AsyncSession,
+    db: AsyncSession,  # kept for signature compatibility but NOT used — session is closed by the time this task runs
 ) -> None:
     """
     Assembles context and runs the 4-pass Gemini pipeline.
     Writes results to player_stock_profile (upsert).
+
+    Opens its own DB session because this runs as a fire-and-forget background
+    task; the request session passed by the caller is closed before this executes.
     """
+    from database import AsyncSessionLocal
+
     try:
-        # 1. Build stats context string for Gemini
-        stats_context = await nflreadpy_service.build_stats_context(
-            player.name, player.position or ""
-        )
+        async with AsyncSessionLocal() as task_db:
+            # 1. Build stats context string for Gemini
+            stats_context = await nflreadpy_service.build_stats_context(
+                player.name, player.position or ""
+            )
 
-        # 2. Sync historical stats to DB
-        await historical_stats_service.sync_historical_stats(
-            player_id, player.name, player.position or "", db
-        )
+            # 2. Sync historical stats to DB
+            await historical_stats_service.sync_historical_stats(
+                player_id, player.name, player.position or "", task_db
+            )
 
-        # 3. Get ADP snapshot + trend
-        adp_snapshot = await adp_service.fetch_and_store_adp(player_id, player.name, db)
-        adp_trend_data = await adp_service.compute_adp_trend(player_id, db)
-        adp_trend = adp_trend_data.get("trend", "STABLE")
-        adp_delta = adp_trend_data.get("delta", 0.0)
+            # 3. Get ADP snapshot + trend
+            adp_snapshot = await adp_service.fetch_and_store_adp(player_id, player.name, task_db)
+            adp_trend_data = await adp_service.compute_adp_trend(player_id, task_db)
+            adp_trend = adp_trend_data.get("trend", "STABLE")
+            adp_delta = adp_trend_data.get("delta", 0.0)
 
-        # 4. Assemble recent news context (last 10 items)
-        recent_news = await _get_recent_news_context(player_id, db)
+            # 4. Assemble recent news context (last 10 items)
+            recent_news = await _get_recent_news_context(player_id, task_db)
 
-        # 5. Get current projection
-        weighted_proj = await _get_current_projection(player_id, db)
+            # 5. Get current projection
+            weighted_proj = await _get_current_projection(player_id, task_db)
 
-        # 6. Get TrackedPlayer metadata
-        tracked = await db.get(TrackedPlayer, (user_id, player_id))
+            # 6. Get TrackedPlayer metadata
+            tracked = await task_db.get(TrackedPlayer, (user_id, player_id))
 
-        # 7. Run 4-pass analysis
-        result = await sentiment_service.run_full_analysis(
-            player_name=player.name,
-            position=player.position or "N/A",
-            nfl_team=player.nfl_team or "N/A",
-            age=tracked.age if tracked else None,
-            years_exp=tracked.years_exp if tracked else None,
-            contract_year=tracked.contract_year if tracked else False,
-            stats_context=stats_context,
-            recent_news=recent_news,
-            ffc_adp=adp_snapshot.get("ffc_adp"),
-            fp_adp=adp_snapshot.get("fp_adp"),
-            adp_trend=adp_trend,
-            adp_delta=adp_delta,
-            weighted_proj=weighted_proj,
-        )
+            # 7. Run 4-pass analysis
+            result = await sentiment_service.run_full_analysis(
+                player_name=player.name,
+                position=player.position or "N/A",
+                nfl_team=player.nfl_team or "N/A",
+                age=tracked.age if tracked else None,
+                years_exp=tracked.years_exp if tracked else None,
+                contract_year=tracked.contract_year if tracked else False,
+                stats_context=stats_context,
+                recent_news=recent_news,
+                ffc_adp=adp_snapshot.get("ffc_adp"),
+                fp_adp=adp_snapshot.get("fp_adp"),
+                adp_trend=adp_trend,
+                adp_delta=adp_delta,
+                weighted_proj=weighted_proj,
+            )
 
-        if not result:
-            logger.error(f"[Tracker] Sentiment analysis returned None for player={player_id}")
-            return
+            if not result:
+                logger.error(f"[Tracker] Sentiment analysis returned None for player={player_id}")
+                return
 
-        # 8. Upsert player_stock_profile
-        await _upsert_stock_profile(player_id, user_id, result, adp_trend, adp_delta, db)
-        await db.flush()
-        logger.info(f"[Tracker] Profile written for player={player_id}")
+            # 8. Upsert player_stock_profile
+            await _upsert_stock_profile(player_id, user_id, result, adp_trend, adp_delta, task_db)
+            await task_db.commit()
+            logger.info(f"[Tracker] Profile written for player={player_id}")
 
     except Exception as e:
         logger.error(f"[Tracker] _run_analysis_for_player failed player={player_id}: {e}")

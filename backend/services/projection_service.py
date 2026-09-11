@@ -31,6 +31,7 @@ async def get_nfl_state() -> dict:
     season_type values: "pre", "regular", "post", "off"
     Cached for 1 hour — avoids a live API call on every roster request.
     Defaults to {week: 1, season: 2025, season_type: "off"} if unavailable.
+
     """
     cached = _nfl_state_cache.get("state")
     if cached and datetime.utcnow() < cached["expires"]:

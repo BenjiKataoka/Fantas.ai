@@ -1,7 +1,8 @@
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+# find_dotenv() walks up from this file's location to find .env — works regardless of CWD
+load_dotenv(find_dotenv())
 
 DATABASE_URL: str = os.environ["DATABASE_URL"]
 GEMINI_API_KEY: str = os.environ["GEMINI_API_KEY"]
@@ -19,8 +20,10 @@ DEFAULT_WEIGHTS = {
 }
 
 # Gemini models
-GEMINI_PRIMARY = "gemini-2.5-flash-lite"
-GEMINI_FALLBACK = "gemini-2.5-flash"
+# gemini-2.0-flash-lite: 1,500 RPD free tier (vs 20 for 2.5-flash-lite preview)
+# gemini-2.0-flash:      1,500 RPD free tier fallback
+GEMINI_PRIMARY = "gemini-2.0-flash-lite"
+GEMINI_FALLBACK = "gemini-2.0-flash"
 
 # Max Gemini calls per 30-minute window
 GEMINI_CALLS_PER_WINDOW = 10
