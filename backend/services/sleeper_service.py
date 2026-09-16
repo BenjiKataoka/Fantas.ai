@@ -6,6 +6,9 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 SLEEPER_BASE = "https://api.sleeper.app/v1"
+# Stats/projections live on a different host and return a LIST with populated stats;
+# the app/v1 projections endpoint returns player shells with empty stats.
+SLEEPER_STATS_BASE = "https://api.sleeper.com"
 CURRENT_SEASON = 2025
 
 # Simple in-memory cache: { cache_key: (data, expires_at) }
@@ -126,7 +129,13 @@ async def get_all_players() -> dict:
 
 
 async def get_projections(season: int, week: int) -> dict:
-    """Returns Sleeper projections for all players for a given week."""
+    """
+    Returns Sleeper projections keyed by player_id: {player_id: stats_dict}.
+
+    Uses api.sleeper.com (not api.sleeper.app/v1) — the app host returns player shells
+    with empty stats. The stats host returns a LIST of {player_id, stats, ...} which we
+    reshape into a dict so callers can look up by player_id.
+    """
     cache_key = f"sleeper_projections_{season}_{week}"
     cached = _get_cache(cache_key)
     if cached:
@@ -135,12 +144,26 @@ async def get_projections(season: int, week: int) -> dict:
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             resp = await client.get(
-                f"{SLEEPER_BASE}/projections/nfl/{season}/{week}",
-                params={"season_type": "regular", "position[]": ["QB", "RB", "WR", "TE", "K"]},
+                f"{SLEEPER_STATS_BASE}/projections/nfl/{season}/{week}",
+                params={
+                    "season_type": "regular",
+                    "position[]": ["QB", "RB", "WR", "TE", "K"],
+                    "order_by": "pts_ppr",
+                },
+                headers={"User-Agent": "Mozilla/5.0"},
                 timeout=20,
             )
             resp.raise_for_status()
-            data = resp.json()
+            raw = resp.json()
+            # Reshape list → {player_id: stats}. Tolerate an unexpected dict response.
+            if isinstance(raw, list):
+                data = {
+                    str(item["player_id"]): (item.get("stats") or {})
+                    for item in raw
+                    if item.get("player_id") is not None
+                }
+            else:
+                data = raw
             _set_cache(cache_key, data, ttl_hours=6)
             return data
     except Exception as e:

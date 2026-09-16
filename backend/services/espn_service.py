@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 
 import httpx
 
+from services.utils import normalize_name
+
 logger = logging.getLogger(__name__)
 
 ESPN_BASE = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl"
@@ -35,30 +37,58 @@ def _set_cache(key: str, data, ttl_hours: int = 6):
     _cache[key] = (data, datetime.utcnow() + timedelta(hours=ttl_hours))
 
 
-async def get_espn_projections(season: int, week: int) -> dict[str, float]:
+# ESPN stat entry discriminators (in player.stats[])
+_ESPN_STAT_PROJECTED = 1   # statSourceId: 1=projected, 0=actual
+_ESPN_SPLIT_WEEKLY = 1     # statSplitTypeId: 1=single week, 0=season total
+
+
+def _extract_espn_proj(player: dict, season: int, week: int) -> float | None:
+    """
+    Pulls the projected weekly fantasy points for a player from ESPN's stats array.
+
+    Each player carries dozens of stat entries; the projection for a given week is the
+    one with statSourceId=1 (projected), statSplitTypeId=1 (weekly), and matching
+    scoringPeriodId/seasonId. appliedTotal is already scored under the league format
+    (leaguedefaults/3 = PPR). Returns None if no projection exists yet for that week.
+    """
+    for s in player.get("stats", []):
+        if (
+            s.get("statSourceId") == _ESPN_STAT_PROJECTED
+            and s.get("statSplitTypeId") == _ESPN_SPLIT_WEEKLY
+            and s.get("scoringPeriodId") == week
+            and s.get("seasonId") == season
+        ):
+            pts = s.get("appliedTotal")
+            return round(float(pts), 2) if pts is not None else None
+    return None
+
+
+async def get_espn_projections_full(
+    season: int, week: int
+) -> tuple[dict[str, float], dict[str, float]]:
     """
     Fetches ESPN public projected fantasy points for all skill-position players.
-    No authentication required.
-    Returns {espn_player_id_str: projected_points}.
+    No authentication required. Single fetch, cached — returns TWO views:
+      (by_espn_id, by_normalized_name)
 
-    ESPN stat period format: "00{season}{week:02d}" (e.g. "00202501" = 2025 Week 1).
-    During the offseason ESPN returns no projected values — empty dict is expected.
+    The name map is a fallback for players whose Sleeper record has no espn_id
+    (Sleeper returns None for some players, which would otherwise drop ESPN entirely
+    for them). Callers match on espn_id first, then fall back to normalized name.
+
+    Sorted by PPR draft rank so the returned pool is the fantasy-relevant players
+    (an unplayed week has no applied totals to sort on). Projections are read from
+    each player's stats array — see _extract_espn_proj.
     """
     cache_key = f"espn_proj_{season}_{week}"
     cached = _get_cache(cache_key)
     if cached is not None:
         return cached
 
-    stat_period = f"00{season}{week:02d}"
     filter_header = json.dumps({
         "players": {
-            "limit": 1000,
-            "filterSlotIds": {"value": [0, 2, 4, 6, 17, 16]},
-            "sortAppliedStatTotal": {
-                "sortAsc": False,
-                "sortPriority": 3,
-                "value": stat_period,
-            },
+            "limit": 500,
+            "filterSlotIds": {"value": [0, 2, 4, 6, 17]},  # QB/RB/WR/TE/K
+            "sortDraftRanks": {"sortPriority": 100, "sortAsc": True, "value": "PPR"},
         }
     })
 
@@ -75,26 +105,39 @@ async def get_espn_projections(season: int, week: int) -> dict[str, float]:
             data = resp.json()
     except Exception as e:
         logger.error(f"[ESPN] get_espn_projections failed season={season} week={week}: {e}")
-        return {}
+        return {}, {}
 
-    projections: dict[str, float] = {}
+    by_id: dict[str, float] = {}
+    by_name: dict[str, float] = {}
     for entry in data.get("players", []):
-        pool = entry.get("playerPoolEntry", {})
-        player = pool.get("player", {})
+        # The player object is at entry["player"] (entry itself IS the player pool entry)
+        player = entry.get("player", {})
         espn_id = str(player.get("id", ""))
-        pts = pool.get("appliedStatTotal") or 0.0
-        if espn_id and float(pts) > 0:
-            projections[espn_id] = round(float(pts), 2)
+        pts = _extract_espn_proj(player, season, week)
+        if pts is None or pts <= 0:
+            continue
+        if espn_id:
+            by_id[espn_id] = pts
+        full_name = player.get("fullName")
+        if full_name:
+            by_name[normalize_name(full_name)] = pts
 
-    if not projections:
+    if not by_id:
         logger.warning(
-            f"[ESPN] No projections returned for season={season} week={week} "
-            f"(stat_period={stat_period}). Expected during offseason."
+            f"[ESPN] No projections returned for season={season} week={week}. "
+            "Source may not have posted projections for this week yet."
         )
 
-    _set_cache(cache_key, projections, ttl_hours=6)
-    logger.info(f"[ESPN] Loaded {len(projections)} projections for week {week}")
-    return projections
+    result = (by_id, by_name)
+    _set_cache(cache_key, result, ttl_hours=6)
+    logger.info(f"[ESPN] Loaded {len(by_id)} projections for week {week}")
+    return result
+
+
+async def get_espn_projections(season: int, week: int) -> dict[str, float]:
+    """Backward-compatible id-keyed view: {espn_player_id_str: projected_points}."""
+    by_id, _ = await get_espn_projections_full(season, week)
+    return by_id
 
 
 async def get_espn_roster(

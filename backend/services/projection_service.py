@@ -72,19 +72,24 @@ async def sync_projections(
     Returns {player_id: {sleeper_proj, espn_proj, fp_proj, weighted_proj, confidence_flag}}.
     All projection values will be None during the offseason.
     """
-    # Fetch all three sources concurrently
-    sleeper_raw, espn_raw, fp_raw = await asyncio.gather(
+    # Fetch all three sources concurrently. ESPN returns both id- and name-keyed maps.
+    sleeper_raw, espn_pair, fp_raw = await asyncio.gather(
         sleeper_service.get_projections(season, week),
-        espn_service.get_espn_projections(season, week),
+        espn_service.get_espn_projections_full(season, week),
         fp_service.get_fp_projections(week),
     )
+    espn_by_id, espn_by_name = espn_pair
 
     rows_to_insert = []
     result: dict[str, dict] = {}
 
     for pid in player_ids:
         sleeper_pts = _extract_sleeper_pts(sleeper_raw.get(pid))
-        espn_pts = espn_raw.get(espn_id_map.get(pid, ""))
+        # Match ESPN by espn_id first; fall back to normalized name when Sleeper
+        # has no espn_id for this player (otherwise ESPN would be dropped for them).
+        espn_pts = espn_by_id.get(espn_id_map.get(pid, ""))
+        if espn_pts is None:
+            espn_pts = espn_by_name.get(name_map.get(pid, ""))
         fp_pts = fp_raw.get(name_map.get(pid, ""))
 
         computed = compute_weighted_projection(sleeper_pts, espn_pts, fp_pts, weights)
