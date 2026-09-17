@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext'
 import Spinner from '../components/Spinner'
 import StockBadge from '../components/StockBadge'
 import ContradictionAlert from '../components/ContradictionAlert'
+import PlayerAvatar from '../components/PlayerAvatar'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -34,14 +35,17 @@ const FILTERS = [
 
 // ── Full analysis card (starred player, Gemini ran) ───────────────────────────
 
-function FullCard({ item, playerLabel }) {
+function FullCard({ item, playerLabel, playerName }) {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <span className="text-xs font-semibold text-blue-400">{playerLabel}</span>
-          <p className="text-sm font-semibold text-white mt-0.5 leading-snug">{item.headline}</p>
+        <div className="flex items-start gap-3 min-w-0">
+          <PlayerAvatar playerId={item.player_id} name={playerName} size="lg" />
+          <div className="min-w-0">
+            <span className="text-xs font-semibold text-blue-400">{playerLabel}</span>
+            <p className="text-sm font-semibold text-white mt-0.5 leading-snug">{item.headline}</p>
+          </div>
         </div>
         <div className="text-right shrink-0">
           <p className="text-xs text-gray-500">{formatSource(item.source)}</p>
@@ -100,13 +104,16 @@ function FullCard({ item, playerLabel }) {
 
 // ── Signal-only card (rostered player or rule-filter result) ──────────────────
 
-function SignalCard({ item, playerLabel }) {
+function SignalCard({ item, playerLabel, playerName }) {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-2">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <span className="text-xs font-semibold text-gray-500">{playerLabel}</span>
-          <p className="text-sm text-gray-300 mt-0.5 leading-snug">{item.headline}</p>
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <PlayerAvatar playerId={item.player_id} name={playerName} size="md" />
+          <div className="min-w-0">
+            <span className="text-xs font-semibold text-gray-500">{playerLabel}</span>
+            <p className="text-sm text-gray-300 mt-0.5 leading-snug">{item.headline}</p>
+          </div>
         </div>
         <div className="text-right shrink-0">
           <p className="text-xs text-gray-600">{formatSource(item.source)}</p>
@@ -127,13 +134,16 @@ function SignalCard({ item, playerLabel }) {
 
 // ── Pending card ──────────────────────────────────────────────────────────────
 
-function PendingCard({ item, playerLabel }) {
+function PendingCard({ item, playerLabel, playerName }) {
   return (
     <div className="bg-gray-900 border border-gray-800/50 rounded-xl p-4 opacity-60">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <span className="text-xs font-semibold text-gray-600">{playerLabel}</span>
-          <p className="text-sm text-gray-400 mt-0.5">{item.headline}</p>
+        <div className="flex items-start gap-3 min-w-0">
+          <PlayerAvatar playerId={item.player_id} name={playerName} size="md" />
+          <div className="min-w-0">
+            <span className="text-xs font-semibold text-gray-600">{playerLabel}</span>
+            <p className="text-sm text-gray-400 mt-0.5">{item.headline}</p>
+          </div>
         </div>
         <span className="text-xs text-gray-600 shrink-0">{relativeTime(item.published_at)}</span>
       </div>
@@ -254,13 +264,14 @@ export default function NewsHub() {
         <div className="flex flex-col gap-3">
           {filtered.map(item => {
             const label = getPlayerLabel(item)
+            const pname = playerMap[item.player_id]?.name || ''
             if (item.analysis_tier === 'full') {
-              return <FullCard key={item.news_id} item={item} playerLabel={label} />
+              return <FullCard key={item.news_id} item={item} playerLabel={label} playerName={pname} />
             }
             if (item.analysis_tier === 'signal_only') {
-              return <SignalCard key={item.news_id} item={item} playerLabel={label} />
+              return <SignalCard key={item.news_id} item={item} playerLabel={label} playerName={pname} />
             }
-            return <PendingCard key={item.news_id} item={item} playerLabel={label} />
+            return <PendingCard key={item.news_id} item={item} playerLabel={label} playerName={pname} />
           })}
         </div>
       )}

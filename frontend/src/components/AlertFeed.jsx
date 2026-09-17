@@ -1,4 +1,5 @@
 import StockBadge from './StockBadge'
+import PlayerAvatar from './PlayerAvatar'
 
 function relativeTime(isoStr) {
   if (!isoStr) return ''
@@ -37,15 +38,18 @@ export default function AlertFeed({ items = [], playerMap = {}, maxItems = 8 }) 
         const player = playerMap[item.player_id]
         const label  = player ? `${player.name} · ${player.position}` : `Player ${item.player_id}`
         return (
-          <div key={item.news_id} className="flex flex-col gap-1 py-2 border-b border-gray-800/60 last:border-0">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium text-gray-300 truncate">{label}</span>
-              <span className="text-xs text-gray-600 shrink-0">{relativeTime(item.published_at)}</span>
+          <div key={item.news_id} className="flex gap-2 py-2 border-b border-gray-800/60 last:border-0">
+            <PlayerAvatar playerId={item.player_id} name={player?.name} size="sm" />
+            <div className="flex flex-col gap-1 min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-gray-300 truncate">{label}</span>
+                <span className="text-xs text-gray-600 shrink-0">{relativeTime(item.published_at)}</span>
+              </div>
+              <p className="text-xs text-gray-500 leading-snug line-clamp-2">{item.headline}</p>
+              {item.stock_direction && (
+                <StockBadge direction={item.stock_direction} magnitude={item.stock_magnitude} size="sm" />
+              )}
             </div>
-            <p className="text-xs text-gray-500 leading-snug line-clamp-2">{item.headline}</p>
-            {item.stock_direction && (
-              <StockBadge direction={item.stock_direction} magnitude={item.stock_magnitude} size="sm" />
-            )}
           </div>
         )
       })}

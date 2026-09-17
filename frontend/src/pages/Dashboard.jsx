@@ -159,6 +159,7 @@ export default function Dashboard() {
     credentials, saveCredentials, clearCredentials,
     rosterData, rosterLoading, rosterError, lastRefresh, fetchRoster,
     newsData, newsLoading,
+    startSitData,
   } = useApp()
 
   // { player_id → most recent news card } for RosterTable Latest News column
@@ -170,6 +171,16 @@ export default function Dashboard() {
     }
     return map
   }, [newsData])
+
+  // { player_id → { slot } } for RosterTable Start/Sit column.
+  // Recommended starters carry their slot; bench players get slot:null (→ SIT badge).
+  const startSitMap = useMemo(() => {
+    if (!startSitData) return {}
+    const map = {}
+    for (const p of startSitData.starters || []) map[p.player_id] = { slot: p.slot }
+    for (const p of startSitData.bench || [])    map[p.player_id] = { slot: null }
+    return map
+  }, [startSitData])
 
   // { player_id → { name, position } } for AlertFeed player labels
   const playerMap = useMemo(() => {
@@ -204,7 +215,7 @@ export default function Dashboard() {
       <div className="flex gap-6 items-start">
         <div className="flex-1 min-w-0">
           {rosterLoading && !rosterData && <Spinner label="Loading roster…" />}
-          {rosterData && <RosterTable players={rosterData.roster} newsMap={newsMap} />}
+          {rosterData && <RosterTable players={rosterData.roster} newsMap={newsMap} startSitMap={startSitMap} />}
         </div>
 
         <div className="w-64 shrink-0 flex flex-col gap-4">

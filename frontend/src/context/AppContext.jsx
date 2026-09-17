@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { getRoster, getSettings, updateSettings, getNews } from '../services/api'
+import { getRoster, getSettings, updateSettings, getNews, getStartSit } from '../services/api'
 import { balanceWeights } from '../utils/weights'
 
 const LS_USERNAME = 'fantasai_sleeper_username'
@@ -26,6 +26,8 @@ export function AppProvider({ children }) {
     localStorage.removeItem(LS_LEAGUE)
     setCredentials(null)
     setRosterData(null)
+    setStartSitData(null)
+    setNewsData(null)
   }, [])
 
   // ── Roster ─────────────────────────────────────────────────────────────────
@@ -75,6 +77,29 @@ export function AppProvider({ children }) {
     if (credentials && rosterData && !newsData) fetchNews()
   }, [credentials, rosterData]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Start/Sit ──────────────────────────────────────────────────────────────
+  const [startSitData, setStartSitData]       = useState(null)
+  const [startSitLoading, setStartSitLoading] = useState(false)
+
+  const fetchStartSit = useCallback(async (week) => {
+    // Offseason short-circuits server-side regardless of week; fall back to 1 if unknown
+    const wk = Number.isInteger(week) ? week : 1
+    setStartSitLoading(true)
+    try {
+      const res = await getStartSit(wk)
+      setStartSitData(res.data)
+    } catch {
+      // silently fail — start/sit is optional (e.g. no projections synced yet)
+    } finally {
+      setStartSitLoading(false)
+    }
+  }, [])
+
+  // Auto-fetch start/sit once the roster (and its week) is available
+  useEffect(() => {
+    if (credentials && rosterData && !startSitData) fetchStartSit(rosterData.week)
+  }, [credentials, rosterData]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Settings (weights) ─────────────────────────────────────────────────────
   const [weights, setWeights]       = useState({ weight_sleeper: 0.35, weight_espn: 0.30, weight_fp: 0.35 })
   const [weightsLoaded, setWeightsLoaded] = useState(false)
@@ -97,7 +122,10 @@ export function AppProvider({ children }) {
     setSaveError(null)
     try {
       const res = await updateSettings(newWeights)
-      setWeights(res.data)
+      // Store ONLY the weight keys — any extra field (e.g. a message) would pollute
+      // the weights object and break balanceWeights' proportional math (→ NaN).
+      const { weight_sleeper, weight_espn, weight_fp } = res.data
+      setWeights({ weight_sleeper, weight_espn, weight_fp })
     } catch (err) {
       setSaveError(err.response?.data?.detail || 'Failed to save weights.')
     } finally {
@@ -115,6 +143,8 @@ export function AppProvider({ children }) {
       weights, weightsLoaded, saving, saveError, updateWeight, saveWeights, setWeights,
       // News
       newsData, newsLoading, fetchNews,
+      // Start/Sit
+      startSitData, startSitLoading, fetchStartSit,
     }}>
       {children}
     </AppContext.Provider>
