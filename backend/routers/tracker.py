@@ -169,6 +169,33 @@ async def get_tracker(
     }
 
 
+# Static /tracker/* paths must precede the /tracker/{player_id} catch-all below,
+# or FastAPI matches them as a player_id and shadows them.
+@router.post("/tracker/analyze-roster")
+async def analyze_roster(
+    force: bool = False,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Deep-dive every player on the user's roster in the background (skipping any with a
+    fresh profile). Returns immediately with queued/skipped counts — poll
+    GET /api/tracker/roster-analysis to watch it complete. Pass force=true to re-run
+    even fresh profiles.
+    """
+    result = await tracker_service.analyze_roster(user.id, db, force=force)
+    return result
+
+
+@router.get("/tracker/roster-analysis")
+async def roster_analysis_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Progress of a roster deep-dive: how many rostered players have a ready profile."""
+    return await tracker_service.roster_analysis_status(user.id, db)
+
+
 @router.get("/tracker/{player_id}")
 async def get_tracker_player(
     player_id: str,

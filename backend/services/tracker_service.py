@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.news import PlayerNews, NewsAnalysis
 from models.player import Player
+from models.roster import MyRoster
 from models.tracker import TrackedPlayer, PlayerStockProfile
 from services import adp_service, historical_stats_service, nflreadpy_service, sentiment_service
 from services.projection_service import get_nfl_state
@@ -24,6 +25,12 @@ logger = logging.getLogger(__name__)
 
 # News types that trigger a profile re-analysis
 MAJOR_NEWS_TYPES = {"INJURY", "CONTRACT", "TRANSACTION", "DEPTH_CHART"}
+
+# Seconds to wait between players in a batch roster analysis. Each player is 4 Flash-Lite
+# calls; Flash-Lite's free tier allows ~15 requests/minute, so ~16s/player (4 calls per
+# ~16s ≈ 15 RPM) keeps a full roster run safely under the rate limit. Network latency for
+# the 4 sequential passes usually covers most of this, so the added sleep is small.
+ROSTER_PACE_SECONDS = 16.0
 
 
 # ── Star / Unstar ─────────────────────────────────────────────────────────────
@@ -180,6 +187,108 @@ async def refresh_profile(
     except Exception as e:
         logger.error(f"[Tracker] refresh_profile failed player={player_id}: {e}")
         return False
+
+
+# ── Batch roster analysis ─────────────────────────────────────────────────────
+
+async def _season_ttl_hours(db: AsyncSession) -> float:
+    """Freshness window for a stock profile, by season state.
+
+    Offseason moves slowly (24h); in-season/preseason news turns over fast (6h).
+    """
+    try:
+        state = await get_nfl_state()
+        return 24.0 if state.get("season_type") == "off" else 6.0
+    except Exception:
+        return 24.0  # conservative default — avoids needless re-analysis on a state miss
+
+
+async def _profile_is_fresh(player_id: str, db: AsyncSession, ttl_hours: float) -> bool:
+    """True if a completed stock profile exists and is younger than the TTL."""
+    profile = await db.get(PlayerStockProfile, player_id)
+    if not profile or not profile.last_full_analysis:
+        return False
+    age = datetime.utcnow() - profile.last_full_analysis
+    return age.total_seconds() < ttl_hours * 3600
+
+
+async def analyze_roster(user_id: int, db: AsyncSession, force: bool = False) -> dict:
+    """
+    Deep-dive every player on this user's roster, skipping any with a fresh profile.
+
+    Profiles are global (keyed by player_id), so this reuses analysis another user
+    already paid for. Runs as a single paced background worker to respect the
+    Flash-Lite rate limit — returns immediately with the queued/skipped counts.
+    """
+    player_ids = (
+        await db.execute(select(MyRoster.player_id).where(MyRoster.user_id == user_id))
+    ).scalars().all()
+
+    if not player_ids:
+        return {"status": "empty", "queued": 0, "skipped_fresh": 0, "total": 0}
+
+    ttl = await _season_ttl_hours(db)
+    to_analyze: list[str] = []
+    for pid in player_ids:
+        if force or not await _profile_is_fresh(pid, db, ttl):
+            to_analyze.append(pid)
+
+    if to_analyze:
+        # One background worker drains the list at a paced rate (see ROSTER_PACE_SECONDS).
+        asyncio.create_task(_analyze_roster_worker(user_id, to_analyze))
+
+    return {
+        "status": "started" if to_analyze else "all_fresh",
+        "queued": len(to_analyze),
+        "skipped_fresh": len(player_ids) - len(to_analyze),
+        "total": len(player_ids),
+    }
+
+
+async def roster_analysis_status(user_id: int, db: AsyncSession) -> dict:
+    """How many of the user's rostered players have a completed stock profile.
+
+    Lets the frontend poll a batch run to completion and fill gauges in as they land.
+    """
+    player_ids = (
+        await db.execute(select(MyRoster.player_id).where(MyRoster.user_id == user_id))
+    ).scalars().all()
+    if not player_ids:
+        return {"total": 0, "ready": 0, "pending": 0}
+
+    rows = (
+        await db.execute(
+            select(PlayerStockProfile.player_id).where(
+                PlayerStockProfile.player_id.in_(player_ids),
+                PlayerStockProfile.last_full_analysis.isnot(None),
+            )
+        )
+    ).scalars().all()
+    ready = len(set(rows))
+    return {"total": len(player_ids), "ready": ready, "pending": len(player_ids) - ready}
+
+
+async def _analyze_roster_worker(user_id: int, player_ids: list[str]) -> None:
+    """Sequentially deep-dive each player, paced to stay under the Flash-Lite RPM limit."""
+    from database import AsyncSessionLocal
+
+    logger.info(f"[Tracker] Roster analysis started user={user_id} players={len(player_ids)}")
+    loop = asyncio.get_event_loop()
+    for pid in player_ids:
+        start = loop.time()
+        try:
+            async with AsyncSessionLocal() as s:
+                player = await s.get(Player, pid)
+            if player is None:
+                continue
+            # player is detached here but only its already-loaded scalar attrs are read.
+            await _run_analysis_for_player(user_id, pid, player, None)
+        except Exception as e:
+            logger.error(f"[Tracker] roster worker failed player={pid}: {e}")
+        # Pace the next player so 4 calls/player stays within ~15 RPM.
+        elapsed = loop.time() - start
+        await asyncio.sleep(max(0.0, ROSTER_PACE_SECONDS - elapsed))
+    logger.info(f"[Tracker] Roster analysis finished user={user_id}")
 
 
 # ── Analysis pipeline ─────────────────────────────────────────────────────────

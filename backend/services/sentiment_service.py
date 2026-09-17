@@ -1,9 +1,14 @@
 """
 4-pass Gemini player stock analysis pipeline (Player Tracker).
 
+All 4 passes run on Flash-Lite (GEMINI_PRIMARY). Full Flash's free-tier limit is ~20
+requests/day — too small to analyze even one roster — while Flash-Lite allows ~500/day,
+so it is the only viable model for batch roster analysis. Flash is kept as a rare
+escalation fallback (see _run_pass) and hard-capped via GEMINI_RPD_LIMITS.
+
 Pass 1 (flash-lite): Historical profile → baseline tier, career summary, ADP assessment
-Pass 2 (flash):      News integration → stock direction, news vs history, ADP alignment
-Pass 3 (flash):      Concern score → concern_level (1-10), bullish/bearish factors, outlook
+Pass 2 (flash-lite): News integration → stock direction, news vs history, ADP alignment
+Pass 3 (flash-lite): Concern score → concern_level (1-10), bullish/bearish factors, outlook
 Pass 4 (flash-lite): Sentiment → sentiment_score (-1 to 1), worry_score (1-10), contrarian flag
 
 Combined score formula:
@@ -153,6 +158,9 @@ async def run_full_analysis(
         return None
 
     # Pass 2 — news integration
+    # Runs on Flash-Lite (GEMINI_PRIMARY), not full Flash: Flash's free-tier RPD is ~20/day,
+    # far too small to analyze a full roster. Flash-Lite (~500 RPD) is the only model with
+    # the daily headroom; _run_pass still escalates to Flash on a hard failure.
     pass2 = await _run_pass(
         PASS2_PROMPT.format(
             pass1_json=json.dumps(pass1, indent=2),
@@ -163,19 +171,19 @@ async def run_full_analysis(
             adp_delta=adp_delta,
             weighted_proj=weighted_proj or "N/A (offseason)",
         ),
-        model=GEMINI_FALLBACK,
+        model=GEMINI_PRIMARY,
         pass_num=2,
     )
     if pass2 is None:
         return None
 
-    # Pass 3 — concern score
+    # Pass 3 — concern score (Flash-Lite; see Pass 2 note on RPD)
     pass3 = await _run_pass(
         PASS3_PROMPT.format(
             pass1_json=json.dumps(pass1, indent=2),
             pass2_json=json.dumps(pass2, indent=2),
         ),
-        model=GEMINI_FALLBACK,
+        model=GEMINI_PRIMARY,
         pass_num=3,
     )
 
@@ -259,10 +267,10 @@ async def _call_gemini_text(prompt: str, model: str) -> Optional[str]:
     if not LLM_ENABLED:
         logger.info(f"[Sentiment] LLM disabled (LLM_ENABLED=false) — skipping {model} call")
         return None
-    if not llm_budget.can_spend():
-        logger.warning(f"[Sentiment] Daily LLM cap reached — skipping {model} call")
+    if not llm_budget.can_spend(model):
+        logger.warning(f"[Sentiment] Daily budget exhausted for {model} — skipping call")
         return None
-    llm_budget.record_call()
+    llm_budget.record_call(model)
     try:
         response = _genai_client.models.generate_content(
             model=model,

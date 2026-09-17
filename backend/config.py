@@ -42,6 +42,15 @@ LLM_ENABLED: bool = os.environ.get("LLM_ENABLED", "true").strip().lower() not in
 # Free tier is ~1,500 requests/day; default leaves headroom.
 LLM_DAILY_CALL_CAP: int = int(os.environ.get("LLM_DAILY_CALL_CAP", "1200"))
 
+# Per-model daily request ceilings (RPD). The free tier meters each model separately:
+# Flash-Lite is generous (~500 RPD) while full Flash is tiny (~20 RPD). We run the whole
+# 4-pass pipeline on Flash-Lite and keep Flash as a rare fallback only, so its budget is
+# set just under its true limit to leave a safety margin. Keyed by model ID.
+GEMINI_RPD_LIMITS: dict[str, int] = {
+    GEMINI_PRIMARY: int(os.environ.get("GEMINI_PRIMARY_RPD", "450")),   # Flash-Lite (limit ~500)
+    GEMINI_FALLBACK: int(os.environ.get("GEMINI_FALLBACK_RPD", "18")),  # Flash (limit ~20)
+}
+
 # ── Clerk auth ─────────────────────────────────────────────────────────────────
 # When CLERK_SECRET_KEY is unset, the backend runs in DEV-FALLBACK mode: all requests
 # resolve to a single local dev user (no real auth). Setting the keys switches on real
