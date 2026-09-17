@@ -202,6 +202,8 @@ def run_router_tests():
     fake_user = MagicMock(id=1, is_approved=True, clerk_id="test")
     def override_current_user():
         return fake_user
+    # Apply up front so case [1] (which uses the real DB, not a mocked one) is authed too.
+    app.dependency_overrides[get_current_user] = override_current_user
 
     # [1] Offseason → returns offseason_note, no starters
     print("\n[1] Offseason → offseason_note returned, starters empty...")

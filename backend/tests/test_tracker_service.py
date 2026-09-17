@@ -241,6 +241,11 @@ def run_router_tests():
 
     from fastapi.testclient import TestClient
     from main import app
+    from auth import get_current_user
+
+    # Fixed authenticated user so auth doesn't consult the (unmocked) DB in these tests.
+    fake_user = MagicMock(id=1, is_approved=True, clerk_id="test")
+    app.dependency_overrides[get_current_user] = lambda: fake_user
 
     with TestClient(app) as client:
 
@@ -289,7 +294,120 @@ def run_router_tests():
         assert resp.json()["status"] == "refresh_triggered"
         print(f"    PASS — refresh returned {resp.json()}")
 
+        # [6] POST /api/tracker/analyze-roster — kicks off batch, returns counts
+        print("\n[6] POST /api/tracker/analyze-roster returns queued counts...")
+        with patch("routers.tracker.tracker_service.analyze_roster",
+                   new=AsyncMock(return_value={"status": "started", "queued": 12,
+                                               "skipped_fresh": 3, "total": 15})):
+            resp = client.post("/api/tracker/analyze-roster")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["queued"] == 12 and body["total"] == 15
+        print(f"    PASS — analyze-roster returned {body}")
+
+        # [7] GET /api/tracker/roster-analysis — static path not shadowed by {player_id}
+        print("\n[7] GET /api/tracker/roster-analysis returns progress...")
+        with patch("routers.tracker.tracker_service.roster_analysis_status",
+                   new=AsyncMock(return_value={"total": 15, "ready": 9, "pending": 6})):
+            resp = client.get("/api/tracker/roster-analysis")
+        assert resp.status_code == 200, f"static route shadowed? got {resp.status_code}"
+        assert resp.json()["ready"] == 9
+        print(f"    PASS — roster-analysis returned {resp.json()}")
+
+    app.dependency_overrides.clear()
     print("\n✅ All router tests passed.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 4.5 — Batch roster analysis (freshness skip + queueing)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def run_batch_analysis_tests():
+    print("\n" + "=" * 50)
+    print("TRACKER — BATCH ROSTER ANALYSIS")
+    print("=" * 50)
+
+    async def _test():
+        from services import tracker_service
+
+        def roster_of(*pids):
+            result = MagicMock()
+            result.scalars.return_value.all.return_value = list(pids)
+            return result
+
+        # [1] Mixed freshness: only stale/missing profiles get queued
+        print("\n[1] Mixed freshness → fresh skipped, stale+missing queued...")
+        fresh = MagicMock(last_full_analysis=datetime.utcnow())
+        stale = MagicMock(last_full_analysis=datetime.utcnow() - timedelta(days=3))
+        profiles = {"p1": fresh, "p2": stale, "p3": None}
+
+        async def get_profile(model, pid):
+            return profiles[pid]
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=roster_of("p1", "p2", "p3"))
+        mock_db.get = get_profile
+
+        captured = {}
+        async def fake_worker(user_id, player_ids):
+            captured["ids"] = player_ids
+
+        with patch("services.tracker_service.get_nfl_state",
+                   new=AsyncMock(return_value={"season_type": "regular"})), \
+             patch("services.tracker_service._analyze_roster_worker", new=fake_worker):
+            result = await tracker_service.analyze_roster(1, mock_db)
+            await asyncio.sleep(0)  # let the fire-and-forget worker task run
+
+        assert result == {"status": "started", "queued": 2, "skipped_fresh": 1, "total": 3}, result
+        assert set(captured["ids"]) == {"p2", "p3"}, captured
+        print(f"    PASS — {result}, queued ids={sorted(captured['ids'])}")
+
+        # [2] All fresh → nothing queued, no worker spawned
+        print("\n[2] All profiles fresh → all_fresh, queued=0...")
+        profiles_all_fresh = {"p1": fresh, "p2": fresh}
+        async def get_fresh(model, pid):
+            return profiles_all_fresh[pid]
+        mock_db2 = AsyncMock()
+        mock_db2.execute = AsyncMock(return_value=roster_of("p1", "p2"))
+        mock_db2.get = get_fresh
+        spawned = {"called": False}
+        async def worker_flag(user_id, player_ids):
+            spawned["called"] = True
+        with patch("services.tracker_service.get_nfl_state",
+                   new=AsyncMock(return_value={"season_type": "regular"})), \
+             patch("services.tracker_service._analyze_roster_worker", new=worker_flag):
+            result = await tracker_service.analyze_roster(1, mock_db2)
+            await asyncio.sleep(0)
+        assert result["status"] == "all_fresh" and result["queued"] == 0, result
+        assert spawned["called"] is False, "worker should not spawn when all fresh"
+        print(f"    PASS — {result}")
+
+        # [3] force=True re-queues even fresh players
+        print("\n[3] force=True → all players queued despite fresh profiles...")
+        mock_db3 = AsyncMock()
+        mock_db3.execute = AsyncMock(return_value=roster_of("p1", "p2"))
+        mock_db3.get = get_fresh
+        cap3 = {}
+        async def worker3(user_id, player_ids):
+            cap3["ids"] = player_ids
+        with patch("services.tracker_service.get_nfl_state",
+                   new=AsyncMock(return_value={"season_type": "regular"})), \
+             patch("services.tracker_service._analyze_roster_worker", new=worker3):
+            result = await tracker_service.analyze_roster(1, mock_db3, force=True)
+            await asyncio.sleep(0)
+        assert result["queued"] == 2 and result["skipped_fresh"] == 0, result
+        print(f"    PASS — {result}")
+
+        # [4] Empty roster → empty status, no crash
+        print("\n[4] Empty roster → status=empty...")
+        mock_db4 = AsyncMock()
+        mock_db4.execute = AsyncMock(return_value=roster_of())
+        result = await tracker_service.analyze_roster(1, mock_db4)
+        assert result == {"status": "empty", "queued": 0, "skipped_fresh": 0, "total": 0}, result
+        print(f"    PASS — {result}")
+
+    asyncio.run(_test())
+    print("\n✅ All batch analysis tests passed.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -349,6 +467,7 @@ if __name__ == "__main__":
     run_adp_trend_tests()
     run_star_unstar_tests()
     run_combined_score_tests()
+    run_batch_analysis_tests()
     run_router_tests()
     run_failure_tests()
     print("\n" + "=" * 50)

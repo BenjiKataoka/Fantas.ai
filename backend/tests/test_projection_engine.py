@@ -101,8 +101,24 @@ def run_endpoint_tests():
     print("SETTINGS + PROJECTIONS ENDPOINT TESTS")
     print("=" * 50)
 
+    from fastapi import Depends
     from fastapi.testclient import TestClient
     from main import app
+    from database import get_db
+    from auth import get_current_user
+    from models.user import User
+
+    # These endpoints read AND mutate/commit the user's weights, so the override must
+    # return a real session-attached placeholder row (id=1), not a MagicMock.
+    async def _override_user(db=Depends(get_db)):
+        user = await db.get(User, 1)
+        if user is None:
+            user = User(id=1, clerk_id="placeholder", is_approved=True,
+                        weight_sleeper=0.35, weight_espn=0.30, weight_fp=0.35)
+            db.add(user)
+            await db.flush()
+        return user
+    app.dependency_overrides[get_current_user] = _override_user
 
     with TestClient(app) as client:
         # ------------------------------------------------------------------ #
@@ -211,6 +227,7 @@ def run_endpoint_tests():
             "weight_fp": 0.35,
         })
 
+    app.dependency_overrides.clear()
     print("\n" + "=" * 50)
     print("PROJECTION ENGINE TEST COMPLETE")
     print("=" * 50)

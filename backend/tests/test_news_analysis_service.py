@@ -274,6 +274,10 @@ def run_router_tests():
     from unittest.mock import AsyncMock, patch, MagicMock
     from fastapi.testclient import TestClient
     from main import app
+    from auth import get_current_user
+
+    # The /api/news router only reads user.id, so a fixed authed user is enough.
+    app.dependency_overrides[get_current_user] = lambda: MagicMock(id=1, is_approved=True, clerk_id="test")
 
     print("\n" + "=" * 50)
     print("/api/news ROUTER — INTEGRATION TESTS (mocked scraper)")
@@ -315,6 +319,7 @@ def run_router_tests():
             assert resp.status_code == 200
             print(f"    PASS — force_refresh accepted")
 
+    app.dependency_overrides.clear()
     print("\n✅ All router tests passed.")
 
 

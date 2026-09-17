@@ -58,8 +58,24 @@ async def run_tests():
 def run_client_tests(league_id):
     """TestClient phase — runs after the async loop has closed. Uses the context-manager
     form so one anyio portal stays alive across both requests."""
+    from fastapi import Depends
     from fastapi.testclient import TestClient
     from main import app
+    from database import get_db
+    from auth import get_current_user
+    from models.user import User
+
+    # /api/roster reads and mutates the user (credentials, weights), so return a real
+    # session-attached placeholder row (id=1) — the pre-auth behavior.
+    async def _override_user(db=Depends(get_db)):
+        user = await db.get(User, 1)
+        if user is None:
+            user = User(id=1, clerk_id="placeholder", is_approved=True,
+                        weight_sleeper=0.35, weight_espn=0.30, weight_fp=0.35)
+            db.add(user)
+            await db.flush()
+        return user
+    app.dependency_overrides[get_current_user] = _override_user
 
     # Test 3: /api/roster syncs to DB and returns roster
     print(f"\n[3] GET /api/roster?sleeper_username={SLEEPER_USERNAME}&league_id={league_id}")
@@ -98,6 +114,7 @@ def run_client_tests(league_id):
         except Exception as e:
             print(f"    FAIL — {e}")
 
+    app.dependency_overrides.clear()
     print("\n" + "=" * 50)
     print("ROSTER ROUTER TEST COMPLETE")
     print("=" * 50)
