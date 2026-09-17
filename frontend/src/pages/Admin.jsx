@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
+import { toast } from 'sonner'
 import { getAdminUsers, approveUser, revokeUser } from '../services/api'
-import Spinner from '../components/Spinner'
+import { TableSkeleton } from '../components/Skeletons'
 
 export default function Admin() {
   const [users, setUsers]     = useState([])
@@ -26,68 +27,71 @@ export default function Admin() {
     setBusyId(userId)
     try {
       await (approve ? approveUser(userId) : revokeUser(userId))
+      toast.success(approve ? 'User approved' : 'Access revoked')
       await load()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Action failed.')
+      const msg = err.response?.data?.detail || 'Action failed.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setBusyId(null)
     }
   }
 
-  if (loading) return <Spinner label="Loading users…" />
+  if (loading) return <TableSkeleton rows={5} />
 
   const pending = users.filter(u => !u.is_approved)
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-4 pb-4 border-b border-gray-800">
-        <h1 className="text-2xl font-bold">Admin</h1>
-        <span className="text-sm text-gray-500">
+      <div className="flex items-baseline justify-between mb-4 pb-4 border-b border-line">
+        <h1 className="text-2xl font-display font-bold text-content">Admin</h1>
+        <span className="text-sm text-subtle font-mono">
           {users.length} users · {pending.length} pending
         </span>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">{error}</div>
+        <div className="mb-4 p-3 bg-bear/10 border border-bear/30 rounded-lg text-bear text-sm">{error}</div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-gray-800">
+      <div className="overflow-x-auto rounded-xl border border-line bg-surface">
         <table className="w-full text-left">
-          <thead className="bg-gray-900 border-b border-gray-800">
+          <thead className="bg-raised border-b border-line">
             <tr>
               {['User', 'Status', 'Joined', ''].map((h, i) => (
-                <th key={i} className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                <th key={i} className="px-4 py-2.5 text-[11px] font-semibold text-subtle uppercase tracking-wider">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="bg-gray-950 divide-y divide-gray-800/40">
+          <tbody className="divide-y divide-line/40">
             {users.map(u => (
-              <tr key={u.id} className="hover:bg-gray-800/30 transition-colors">
+              <tr key={u.id} className="hover:bg-raised/50 transition-colors">
                 <td className="px-4 py-3">
-                  <div className="text-sm text-white font-medium">
+                  <div className="text-sm text-content font-medium">
                     {u.username}
-                    {u.is_admin && <span className="ml-2 text-xs text-blue-400">admin</span>}
+                    {u.is_admin && <span className="ml-2 text-xs text-brand">admin</span>}
                   </div>
-                  <div className="text-xs text-gray-500">{u.email}</div>
+                  <div className="text-xs text-subtle">{u.email}</div>
                 </td>
                 <td className="px-4 py-3">
                   {u.is_approved ? (
-                    <span className="text-xs px-2 py-0.5 rounded bg-green-900/40 text-green-400 border border-green-800/50">Approved</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-bull/10 text-bull border border-bull/30">Approved</span>
                   ) : (
-                    <span className="text-xs px-2 py-0.5 rounded bg-yellow-900/40 text-yellow-400 border border-yellow-800/50">Pending</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-warn/10 text-warn border border-warn/30">Pending</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-500">
+                <td className="px-4 py-3 text-xs text-subtle font-mono">
                   {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
                 </td>
                 <td className="px-4 py-3 text-right">
                   {u.is_admin ? (
-                    <span className="text-xs text-gray-600">—</span>
+                    <span className="text-xs text-subtle/60">—</span>
                   ) : u.is_approved ? (
                     <button
                       onClick={() => act(u.id, false)}
                       disabled={busyId === u.id}
-                      className="px-3 py-1 text-xs font-medium rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 disabled:opacity-40"
+                      className="px-3 py-1 text-xs font-medium rounded-md bg-raised hover:bg-line text-subtle hover:text-content border border-line disabled:opacity-40 transition-colors"
                     >
                       {busyId === u.id ? '…' : 'Revoke'}
                     </button>
@@ -95,7 +99,7 @@ export default function Admin() {
                     <button
                       onClick={() => act(u.id, true)}
                       disabled={busyId === u.id}
-                      className="px-3 py-1 text-xs font-semibold rounded-md bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40"
+                      className="px-3 py-1 text-xs font-semibold rounded-md bg-brand hover:brightness-110 text-brand-fg disabled:opacity-40 transition-all"
                     >
                       {busyId === u.id ? '…' : 'Approve'}
                     </button>

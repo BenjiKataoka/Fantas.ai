@@ -3,8 +3,11 @@ import { getLeagues } from '../services/api'
 import { useApp } from '../context/AppContext'
 import RosterTable from '../components/RosterTable'
 import WeightSlider from '../components/WeightSlider'
-import Spinner from '../components/Spinner'
 import AlertFeed from '../components/AlertFeed'
+import { TableSkeleton } from '../components/Skeletons'
+
+const btnPrimary = 'bg-brand hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-brand-fg font-semibold rounded-lg transition-all'
+const field = 'bg-raised border border-line rounded-lg px-3 py-2 text-sm text-content placeholder-subtle/60 focus:outline-none focus:border-brand'
 
 // ── Setup form shown when no credentials in context ───────────────────────────
 function SetupForm({ onComplete }) {
@@ -35,9 +38,9 @@ function SetupForm({ onComplete }) {
   }
 
   return (
-    <div className="max-w-md mx-auto mt-16 bg-gray-900 border border-gray-700 rounded-xl p-8">
-      <h2 className="text-xl font-bold mb-1">Connect your league</h2>
-      <p className="text-gray-400 text-sm mb-6">Enter your Sleeper username to get started.</p>
+    <div className="max-w-md mx-auto mt-16 bg-surface border border-line rounded-xl p-8">
+      <h2 className="text-xl font-display font-semibold text-content mb-1">Connect your league</h2>
+      <p className="text-subtle text-sm mb-6">Enter your Sleeper username to get started.</p>
 
       <div className="flex gap-2 mb-4">
         <input
@@ -46,34 +49,21 @@ function SetupForm({ onComplete }) {
           value={username}
           onChange={e => setUsername(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && findLeagues()}
-          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+          className={`flex-1 ${field}`}
         />
-        <button
-          onClick={findLeagues}
-          disabled={loading || !username.trim()}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-        >
+        <button onClick={findLeagues} disabled={loading || !username.trim()} className={`px-4 py-2 text-sm ${btnPrimary}`}>
           {loading ? '...' : 'Find'}
         </button>
       </div>
 
-      {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+      {error && <p className="text-bear text-sm mb-4">{error}</p>}
 
       {leagues.length > 0 && (
         <>
-          <select
-            value={leagueId}
-            onChange={e => setLeagueId(e.target.value)}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white mb-4 focus:outline-none focus:border-blue-500"
-          >
-            {leagues.map(l => (
-              <option key={l.league_id} value={l.league_id}>{l.name}</option>
-            ))}
+          <select value={leagueId} onChange={e => setLeagueId(e.target.value)} className={`w-full mb-4 ${field}`}>
+            {leagues.map(l => <option key={l.league_id} value={l.league_id}>{l.name}</option>)}
           </select>
-          <button
-            onClick={() => onComplete(username.trim(), leagueId)}
-            className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
-          >
+          <button onClick={() => onComplete(username.trim(), leagueId)} className={`w-full py-2 text-sm ${btnPrimary}`}>
             Load Roster
           </button>
         </>
@@ -93,26 +83,25 @@ function TopBar({ rosterData, lastRefresh, onRefresh, loading }) {
   const refreshLabel = lastRefresh ? lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null
 
   return (
-    <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-800">
-      <div className="flex items-center gap-4">
-        <span className="text-lg font-semibold text-white">{weekLabel}</span>
+    <div className="flex items-end justify-between mb-6 pb-4 border-b border-line">
+      <div className="flex items-baseline gap-4">
+        <span className="text-xl font-display font-semibold text-content tracking-tight">{weekLabel}</span>
         {rosterData && (
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-subtle">
             {rosterData.total_players} players · {rosterData.starters} starters
             {totalPts > 0 && (
-              <span className="text-green-400 ml-2 font-mono">{totalPts.toFixed(1)} pts projected</span>
+              <span className="text-bull ml-3 font-mono text-base font-bold tabular-nums">{totalPts.toFixed(1)}</span>
             )}
+            {totalPts > 0 && <span className="text-subtle/60 ml-1 text-xs uppercase tracking-wide">proj pts</span>}
           </span>
         )}
       </div>
       <div className="flex items-center gap-3">
-        {refreshLabel && (
-          <span className="text-xs text-gray-600">Updated {refreshLabel}</span>
-        )}
+        {refreshLabel && <span className="text-xs text-subtle/70 font-mono">Updated {refreshLabel}</span>}
         <button
           onClick={onRefresh}
           disabled={loading}
-          className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-gray-300 text-xs font-medium rounded-lg border border-gray-700 transition-colors"
+          className="px-3 py-1.5 bg-raised hover:bg-line disabled:opacity-40 text-subtle hover:text-content text-xs font-medium rounded-lg border border-line transition-colors"
         >
           {loading ? 'Loading…' : 'Refresh'}
         </button>
@@ -129,26 +118,20 @@ function WeightSidebar() {
   const sumOk = sum === 100
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <h3 className="text-sm font-semibold text-white mb-4">Projection Weights</h3>
+    <div className="bg-surface border border-line rounded-xl p-5">
+      <h3 className="text-sm font-display font-semibold text-content mb-4">Projection Weights</h3>
       <div className="flex flex-col gap-5">
         <WeightSlider label="Sleeper"     value={weights.weight_sleeper} onChange={v => updateWeight('weight_sleeper', v)} />
         <WeightSlider label="ESPN"        value={weights.weight_espn}    onChange={v => updateWeight('weight_espn', v)} />
         <WeightSlider label="FantasyPros" value={weights.weight_fp}      onChange={v => updateWeight('weight_fp', v)} />
       </div>
-      <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-800">
-        <span className={`text-xs font-mono ${sumOk ? 'text-gray-500' : 'text-red-400'}`}>
-          Total: {sum}%
-        </span>
-        <button
-          onClick={() => saveWeights(weights)}
-          disabled={!sumOk || saving}
-          className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-md transition-colors"
-        >
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-line">
+        <span className={`text-xs font-mono ${sumOk ? 'text-subtle' : 'text-bear'}`}>Total: {sum}%</span>
+        <button onClick={() => saveWeights(weights)} disabled={!sumOk || saving} className={`px-3 py-1 text-xs ${btnPrimary}`}>
           {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
-      {saveError && <p className="text-red-400 text-xs mt-2">{saveError}</p>}
+      {saveError && <p className="text-bear text-xs mt-2">{saveError}</p>}
     </div>
   )
 }
@@ -162,18 +145,15 @@ export default function Dashboard() {
     startSitData,
   } = useApp()
 
-  // { player_id → most recent news card } for RosterTable Latest News column
+  // { player_id → most recent news card } for the roster's News column
   const newsMap = useMemo(() => {
     if (!newsData?.news) return {}
     const map = {}
-    for (const item of newsData.news) {
-      if (!map[item.player_id]) map[item.player_id] = item
-    }
+    for (const item of newsData.news) if (!map[item.player_id]) map[item.player_id] = item
     return map
   }, [newsData])
 
-  // { player_id → { slot } } for RosterTable Start/Sit column.
-  // Recommended starters carry their slot; bench players get slot:null (→ SIT badge).
+  // { player_id → { slot } } for the roster's Start/Sit column (bench → slot:null → SIT)
   const startSitMap = useMemo(() => {
     if (!startSitData) return {}
     const map = {}
@@ -182,13 +162,11 @@ export default function Dashboard() {
     return map
   }, [startSitData])
 
-  // { player_id → { name, position } } for AlertFeed player labels
+  // { player_id → { name, position } } for AlertFeed labels
   const playerMap = useMemo(() => {
     if (!rosterData?.roster) return {}
     const map = {}
-    for (const p of rosterData.roster) {
-      map[p.player_id] = { name: p.name, position: p.position }
-    }
+    for (const p of rosterData.roster) map[p.player_id] = { name: p.name, position: p.position }
     return map
   }, [rosterData])
 
@@ -198,15 +176,11 @@ export default function Dashboard() {
 
   return (
     <div>
-      <TopBar
-        rosterData={rosterData}
-        lastRefresh={lastRefresh}
-        onRefresh={fetchRoster}
-        loading={rosterLoading}
-      />
+      {/* Wrap so the click event isn't passed as `creds` (would break the fetch). */}
+      <TopBar rosterData={rosterData} lastRefresh={lastRefresh} onRefresh={() => fetchRoster()} loading={rosterLoading} />
 
       {rosterError && (
-        <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">
+        <div className="mb-4 p-3 bg-bear/10 border border-bear/30 rounded-lg text-bear text-sm">
           {rosterError}{' '}
           <button onClick={clearCredentials} className="underline ml-1">Reset credentials</button>
         </div>
@@ -214,23 +188,20 @@ export default function Dashboard() {
 
       <div className="flex gap-6 items-start">
         <div className="flex-1 min-w-0">
-          {rosterLoading && !rosterData && <Spinner label="Loading roster…" />}
+          {rosterLoading && !rosterData && <TableSkeleton rows={9} />}
           {rosterData && <RosterTable players={rosterData.roster} newsMap={newsMap} startSitMap={startSitMap} />}
         </div>
 
         <div className="w-64 shrink-0 flex flex-col gap-4">
           <WeightSidebar />
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-white mb-3">Alerts</h3>
+          <div className="bg-surface border border-line rounded-xl p-5">
+            <h3 className="text-sm font-display font-semibold text-content mb-3">Alerts</h3>
             {newsLoading && !newsData
-              ? <p className="text-xs text-gray-600">Loading news…</p>
+              ? <p className="text-xs text-subtle">Loading news…</p>
               : <AlertFeed items={newsData?.news ?? []} playerMap={playerMap} />
             }
           </div>
-          <button
-            onClick={clearCredentials}
-            className="text-xs text-gray-600 hover:text-gray-400 transition-colors text-left"
-          >
+          <button onClick={clearCredentials} className="text-xs text-subtle/70 hover:text-content transition-colors text-left">
             Switch league
           </button>
         </div>

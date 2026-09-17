@@ -3,8 +3,8 @@ export default function WeightSlider({ label, value, onChange }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex justify-between items-center">
-        <span className="text-sm text-gray-400">{label}</span>
-        <span className="font-mono text-sm text-white w-10 text-right">{pct}%</span>
+        <span className="text-sm text-subtle">{label}</span>
+        <span className="font-mono text-sm text-content w-10 text-right tabular-nums">{pct}%</span>
       </div>
       <input
         type="range"
@@ -12,7 +12,7 @@ export default function WeightSlider({ label, value, onChange }) {
         max={100}
         value={pct}
         onChange={e => onChange(parseInt(e.target.value) / 100)}
-        className="w-full h-1.5 accent-blue-500 cursor-pointer"
+        className="w-full h-1.5 accent-brand cursor-pointer"
       />
     </div>
   )

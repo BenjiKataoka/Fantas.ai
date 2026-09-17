@@ -33,7 +33,7 @@ export default function PlayerAvatar({ playerId, name = '', size = 'md' }) {
   if (!url || failed) {
     return (
       <span
-        className="inline-flex items-center justify-center rounded-full bg-gray-800 border border-gray-700 text-gray-400 font-semibold shrink-0"
+        className="inline-flex items-center justify-center rounded-full bg-raised border border-line text-subtle font-semibold shrink-0"
         style={{ width: px, height: px, fontSize: px * 0.36 }}
         aria-label={name}
       >
@@ -48,7 +48,7 @@ export default function PlayerAvatar({ playerId, name = '', size = 'md' }) {
       alt={name}
       loading="lazy"
       onError={() => setFailed(true)}
-      className="rounded-full object-cover object-top bg-gray-800 border border-gray-700 shrink-0"
+      className="rounded-full object-cover object-top bg-raised border border-line shrink-0"
       style={{ width: px, height: px }}
     />
   )

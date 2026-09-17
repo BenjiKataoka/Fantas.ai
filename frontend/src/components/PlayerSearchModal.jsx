@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { searchPlayers, starPlayer } from '../services/api'
 
 const POS_COLORS = {
-  QB: 'text-red-400', RB: 'text-green-400',
-  WR: 'text-blue-400', TE: 'text-yellow-400', K: 'text-gray-400',
+  QB: 'text-violet-300', RB: 'text-teal-300',
+  WR: 'text-sky-300', TE: 'text-amber-300', K: 'text-subtle',
 }
 
 /**
@@ -80,39 +80,35 @@ export default function PlayerSearchModal({ starredIds, onStar, onClose }) {
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center pt-24 z-50 px-4"
       onClick={handleBackdrop}
     >
-      <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md shadow-2xl">
+      <div className="bg-surface border border-line rounded-xl w-full max-w-md shadow-2xl">
         {/* Search input */}
-        <div className="p-4 border-b border-gray-800">
+        <div className="p-4 border-b border-line">
           <div className="flex items-center gap-3">
-            <span className="text-gray-500 text-sm">🔍</span>
+            <span className="text-subtle text-sm">🔍</span>
             <input
               ref={inputRef}
               type="text"
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Search player name…"
-              className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none"
+              className="flex-1 bg-transparent text-sm text-content placeholder-subtle/60 focus:outline-none"
             />
             {searching && (
-              <div className="w-4 h-4 border-2 border-gray-700 border-t-blue-500 rounded-full animate-spin shrink-0" />
+              <div className="w-4 h-4 border-2 border-line border-t-brand rounded-full animate-spin shrink-0" />
             )}
           </div>
         </div>
 
         {/* Results */}
         <div className="max-h-80 overflow-y-auto">
-          {error && (
-            <p className="text-xs text-red-400 px-4 py-3">{error}</p>
-          )}
+          {error && <p className="text-xs text-bear px-4 py-3">{error}</p>}
 
           {!error && query.length < 2 && (
-            <p className="text-xs text-gray-600 px-4 py-4 text-center">
-              Type at least 2 characters to search
-            </p>
+            <p className="text-xs text-subtle/70 px-4 py-4 text-center">Type at least 2 characters to search</p>
           )}
 
           {!error && query.length >= 2 && !searching && results.length === 0 && (
-            <p className="text-xs text-gray-600 px-4 py-4 text-center">
+            <p className="text-xs text-subtle/70 px-4 py-4 text-center">
               No players found. Try loading your roster first to warm the player cache.
             </p>
           )}
@@ -124,22 +120,22 @@ export default function PlayerSearchModal({ starredIds, onStar, onClose }) {
             return (
               <div
                 key={p.player_id}
-                className="flex items-center justify-between px-4 py-3 border-b border-gray-800/50 last:border-0 hover:bg-gray-800/40 transition-colors"
+                className="flex items-center justify-between px-4 py-3 border-b border-line/50 last:border-0 hover:bg-raised transition-colors"
               >
                 <div>
-                  <span className="text-sm text-white font-medium">{p.name}</span>
-                  <span className="text-xs text-gray-500 ml-2">
-                    <span className={POS_COLORS[p.position] || 'text-gray-400'}>{p.position}</span>
+                  <span className="text-sm text-content font-medium">{p.name}</span>
+                  <span className="text-xs text-subtle ml-2 font-mono">
+                    <span className={POS_COLORS[p.position] || 'text-subtle'}>{p.position}</span>
                     {p.nfl_team && <span className="ml-1">{p.nfl_team}</span>}
                   </span>
                 </div>
                 <button
                   onClick={() => handleStar(p)}
                   disabled={alreadyStarred || isStarring}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg border transition-colors shrink-0 ml-3 ${
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg border transition-all shrink-0 ml-3 ${
                     alreadyStarred
-                      ? 'bg-yellow-900/20 border-yellow-800/50 text-yellow-500 cursor-default'
-                      : 'bg-blue-600 hover:bg-blue-500 border-blue-500 text-white disabled:opacity-50'
+                      ? 'bg-warn/10 border-warn/30 text-warn cursor-default'
+                      : 'bg-brand hover:brightness-110 border-brand text-brand-fg disabled:opacity-50'
                   }`}
                 >
                   {isStarring ? '…' : alreadyStarred ? '★ Starred' : '+ Star'}
@@ -149,10 +145,8 @@ export default function PlayerSearchModal({ starredIds, onStar, onClose }) {
           })}
         </div>
 
-        <div className="px-4 py-2.5 border-t border-gray-800">
-          <p className="text-xs text-gray-700">
-            Searches all NFL players. Hit Escape to close.
-          </p>
+        <div className="px-4 py-2.5 border-t border-line">
+          <p className="text-xs text-subtle/60">Searches all NFL players. Hit Escape to close.</p>
         </div>
       </div>
     </div>

@@ -4,11 +4,14 @@ import { useApp } from '../context/AppContext'
 import WeightSlider from '../components/WeightSlider'
 import Spinner from '../components/Spinner'
 
+const field = 'bg-raised border border-line rounded-lg px-3 py-2 text-sm text-content placeholder-subtle/60 focus:outline-none focus:border-brand'
+const btnPrimary = 'bg-brand hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-brand-fg text-sm font-semibold rounded-lg transition-all'
+
 function Section({ title, description, children }) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-      <h2 className="text-base font-semibold text-white mb-1">{title}</h2>
-      {description && <p className="text-sm text-gray-500 mb-5">{description}</p>}
+    <div className="bg-surface border border-line rounded-xl p-6">
+      <h2 className="text-base font-display font-semibold text-content mb-1">{title}</h2>
+      {description && <p className="text-sm text-subtle mb-5">{description}</p>}
       {children}
     </div>
   )
@@ -21,11 +24,7 @@ function WeightsSection() {
   const sum   = Math.round((weights.weight_sleeper + weights.weight_espn + weights.weight_fp) * 100)
   const sumOk = sum === 100
 
-  const handleChange = (key, value) => {
-    setSaved(false)
-    updateWeight(key, value)
-  }
-
+  const handleChange = (key, value) => { setSaved(false); updateWeight(key, value) }
   const handleSave = async () => {
     await saveWeights(weights)
     setSaved(true)
@@ -35,7 +34,7 @@ function WeightsSection() {
   return (
     <Section
       title="Projection Weights"
-      description="Controls how Sleeper, ESPN, and FantasyPros projections are blended into the weighted score. Must total 100%."
+      description="How Sleeper, ESPN, and FantasyPros projections are blended into the weighted score. Must total 100%."
     >
       {!weightsLoaded ? <Spinner label="Loading weights…" /> : (
         <div className="flex flex-col gap-5 max-w-sm">
@@ -45,18 +44,12 @@ function WeightsSection() {
         </div>
       )}
       <div className="flex items-center gap-4 mt-6">
-        <button
-          onClick={handleSave}
-          disabled={!sumOk || saving}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-        >
+        <button onClick={handleSave} disabled={!sumOk || saving} className={`px-4 py-2 ${btnPrimary}`}>
           {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Weights'}
         </button>
-        <span className={`text-sm font-mono ${sumOk ? 'text-gray-500' : 'text-red-400'}`}>
-          Total: {sum}%
-        </span>
+        <span className={`text-sm font-mono tabular-nums ${sumOk ? 'text-subtle' : 'text-bear'}`}>Total: {sum}%</span>
       </div>
-      {saveError && <p className="text-red-400 text-sm mt-2">{saveError}</p>}
+      {saveError && <p className="text-bear text-sm mt-2">{saveError}</p>}
     </Section>
   )
 }
@@ -83,10 +76,7 @@ function LeagueSection() {
       const res = await getLeagues(u.trim())
       const list = res.data.leagues || []
       setLeagues(list)
-      // Keep current leagueId if it's still valid, else default to first
-      if (!list.find(l => l.league_id === leagueId) && list.length) {
-        setLeagueId(list[0].league_id)
-      }
+      if (!list.find(l => l.league_id === leagueId) && list.length) setLeagueId(list[0].league_id)
     } catch (err) {
       setError(err.response?.data?.detail || 'Sleeper user not found.')
       setLeagues([])
@@ -103,13 +93,10 @@ function LeagueSection() {
   }
 
   return (
-    <Section
-      title="League Setup"
-      description="Your Sleeper username and the league to track on the Dashboard."
-    >
+    <Section title="League Setup" description="Your Sleeper username and the league to track on the Dashboard.">
       <div className="flex flex-col gap-3 max-w-sm">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Sleeper Username</label>
+          <label className="block text-xs text-subtle uppercase tracking-wide mb-1">Sleeper Username</label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -117,40 +104,30 @@ function LeagueSection() {
               onChange={e => { setUsername(e.target.value); setLeagues([]); setSaved(false) }}
               onKeyDown={e => e.key === 'Enter' && loadLeagues(username)}
               placeholder="your username"
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className={`flex-1 ${field}`}
             />
             <button
               onClick={() => loadLeagues(username)}
               disabled={loading || !username.trim()}
-              className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-white text-sm rounded-lg transition-colors"
+              className="px-3 py-2 bg-raised hover:bg-line disabled:opacity-40 text-content text-sm rounded-lg border border-line transition-colors"
             >
               {loading ? '…' : 'Find'}
             </button>
           </div>
         </div>
 
-        {error && <p className="text-red-400 text-sm">{error}</p>}
+        {error && <p className="text-bear text-sm">{error}</p>}
 
         {leagues.length > 0 && (
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Active League</label>
-            <select
-              value={leagueId}
-              onChange={e => { setLeagueId(e.target.value); setSaved(false) }}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-            >
-              {leagues.map(l => (
-                <option key={l.league_id} value={l.league_id}>{l.name}</option>
-              ))}
+            <label className="block text-xs text-subtle uppercase tracking-wide mb-1">Active League</label>
+            <select value={leagueId} onChange={e => { setLeagueId(e.target.value); setSaved(false) }} className={`w-full ${field}`}>
+              {leagues.map(l => <option key={l.league_id} value={l.league_id}>{l.name}</option>)}
             </select>
           </div>
         )}
 
-        <button
-          onClick={handleSave}
-          disabled={!username || !leagueId}
-          className="w-fit px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-        >
+        <button onClick={handleSave} disabled={!username || !leagueId} className={`w-fit px-4 py-2 ${btnPrimary}`}>
           {saved ? 'Saved!' : 'Save League'}
         </button>
       </div>
@@ -165,11 +142,11 @@ function ESPNSection() {
       title="ESPN Credentials"
       description="ESPN S2 cookie and SWID are required to sync your ESPN roster and projections."
     >
-      <div className="flex items-start gap-3 p-3 bg-gray-800/50 border border-gray-700/50 rounded-lg max-w-sm">
-        <span className="text-yellow-500 text-sm mt-0.5">⚠</span>
-        <p className="text-sm text-gray-400">
-          ESPN credentials are stored in server config until user authentication is set up in Phase 5.
-          Your current credentials are active and working.
+      <div className="flex items-start gap-3 p-3 bg-warn/10 border border-warn/30 rounded-lg max-w-sm">
+        <span className="text-warn text-sm mt-0.5">⚠</span>
+        <p className="text-sm text-content/80">
+          ESPN credentials currently live in server config. Per-user ESPN entry is coming soon —
+          your current credentials are active and working.
         </p>
       </div>
     </Section>
@@ -180,7 +157,7 @@ function ESPNSection() {
 export default function Settings() {
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+      <h1 className="text-2xl font-display font-bold text-content mb-6">Settings</h1>
       <div className="flex flex-col gap-5">
         <WeightsSection />
         <LeagueSection />

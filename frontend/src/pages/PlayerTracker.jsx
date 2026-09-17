@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { toast } from 'sonner'
 import { getTrackerList, unstarPlayer, refreshPlayer } from '../services/api'
 import { useApp } from '../context/AppContext'
 import TrackerCard from '../components/TrackerCard'
 import PlayerSearchModal from '../components/PlayerSearchModal'
-import Spinner from '../components/Spinner'
+import { CardListSkeleton } from '../components/Skeletons'
 
 const POLL_INTERVAL_MS = 5000  // re-fetch every 5s while any profile is generating
 
@@ -52,13 +53,10 @@ export default function PlayerTracker() {
   )
 
   const handleStar = (playerId) => {
-    // Add an optimistic placeholder immediately so the card appears right away
-    setPlayers(prev => [
-      ...prev,
-      { player_id: playerId, player_name: '…', profile_ready: false },
-    ])
+    // Optimistic placeholder so the card appears immediately; re-fetch fills in real data.
+    setPlayers(prev => [...prev, { player_id: playerId, player_name: '…', profile_ready: false }])
     setShowModal(false)
-    // Then re-fetch to get actual name/position
+    toast.success('Player starred — generating profile…')
     setTimeout(() => fetchList(true), 800)
   }
 
@@ -66,8 +64,9 @@ export default function PlayerTracker() {
     try {
       await unstarPlayer(playerId)
       setPlayers(prev => prev.filter(p => p.player_id !== playerId))
+      toast('Removed from watchlist')
     } catch {
-      // silently ignore — player stays in list
+      toast.error('Could not remove player')
     }
   }
 
@@ -75,12 +74,10 @@ export default function PlayerTracker() {
     setRefreshingId(playerId)
     try {
       await refreshPlayer(playerId)
-      // Mark as generating so polling picks it up
-      setPlayers(prev =>
-        prev.map(p => p.player_id === playerId ? { ...p, profile_ready: false } : p)
-      )
+      setPlayers(prev => prev.map(p => p.player_id === playerId ? { ...p, profile_ready: false } : p))
+      toast.success('Re-running analysis…')
     } catch {
-      // silently ignore
+      toast.error('Refresh failed')
     } finally {
       setRefreshingId(null)
     }
@@ -88,7 +85,7 @@ export default function PlayerTracker() {
 
   if (!credentials) {
     return (
-      <div className="text-center py-16 text-gray-600">
+      <div className="text-center py-16 text-subtle/70">
         <p className="text-sm">Set up your league in Settings first.</p>
       </div>
     )
@@ -99,17 +96,17 @@ export default function PlayerTracker() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Player Tracker</h1>
+          <h1 className="text-2xl font-display font-bold text-content">Player Tracker</h1>
           {players.length > 0 && (
-            <p className="text-sm text-gray-500 mt-0.5">
+            <p className="text-sm text-subtle mt-0.5">
               {players.length} player{players.length !== 1 ? 's' : ''} starred
-              {anyGenerating && <span className="ml-2 text-blue-400">· generating profiles…</span>}
+              {anyGenerating && <span className="ml-2 text-brand">· generating profiles…</span>}
             </p>
           )}
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
+          className="px-4 py-2 bg-brand hover:brightness-110 text-brand-fg text-sm font-semibold rounded-lg transition-all"
         >
           + Add Player
         </button>
@@ -117,22 +114,22 @@ export default function PlayerTracker() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">
+        <div className="mb-4 p-3 bg-bear/10 border border-bear/30 rounded-lg text-bear text-sm">
           {error}
         </div>
       )}
 
       {/* Loading */}
-      {loading && !players.length && <Spinner label="Loading watchlist…" />}
+      {loading && !players.length && <CardListSkeleton count={3} />}
 
       {/* Empty state */}
       {!loading && !error && players.length === 0 && (
-        <div className="text-center py-20 text-gray-600">
-          <p className="text-sm mb-1">Your watchlist is empty.</p>
+        <div className="text-center py-20 text-subtle/70">
+          <p className="text-sm mb-1 text-subtle">Your watchlist is empty.</p>
           <p className="text-xs mb-5">Star players to get AI stock profiles, ADP trends, and sentiment analysis.</p>
           <button
             onClick={() => setShowModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
+            className="px-4 py-2 bg-brand hover:brightness-110 text-brand-fg text-sm font-semibold rounded-lg transition-all"
           >
             + Add your first player
           </button>

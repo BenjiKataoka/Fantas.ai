@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import {
-  Show, SignInButton, SignUpButton, UserButton, useAuth,
+  Show, SignInButton, SignUpButton, UserButton,
   ClerkLoading, ClerkLoaded,
 } from '@clerk/react'
 import Dashboard from './pages/Dashboard'
@@ -11,7 +11,8 @@ import StartSit from './pages/StartSit'
 import Settings from './pages/Settings'
 import Admin from './pages/Admin'
 import Spinner from './components/Spinner'
-import { setTokenGetter, getMe } from './services/api'
+import Ticker from './components/Ticker'
+import { getMe } from './services/api'
 
 const NAV_LINKS = [
   { to: '/',         label: 'Dashboard' },
@@ -21,19 +22,29 @@ const NAV_LINKS = [
   { to: '/settings', label: 'Settings' },
 ]
 
+function BrandMark({ className = '' }) {
+  return (
+    <span className={`font-display font-bold tracking-tight select-none ${className}`}>
+      <span className="text-brand">◆</span> <span className="text-content">FANTAS</span><span className="text-brand">.</span><span className="text-content">AI</span>
+    </span>
+  )
+}
+
 function NavBar({ isAdmin }) {
   const links = isAdmin ? [...NAV_LINKS, { to: '/admin', label: 'Admin' }] : NAV_LINKS
   return (
-    <nav className="bg-gray-900 border-b border-gray-700 px-6 py-3 flex items-center gap-6">
-      <span className="text-white font-bold text-lg tracking-tight mr-4">Fantas.ai</span>
+    <nav className="bg-surface/80 backdrop-blur border-b border-line px-6 h-14 flex items-center gap-7">
+      <BrandMark className="text-lg mr-3" />
       {links.map(({ to, label }) => (
         <NavLink
           key={to}
           to={to}
           end={to === '/'}
           className={({ isActive }) =>
-            `text-sm font-medium transition-colors ${
-              isActive ? 'text-white' : 'text-gray-400 hover:text-white'
+            `text-sm font-medium h-14 flex items-center border-b-2 transition-colors ${
+              isActive
+                ? 'text-content border-brand'
+                : 'text-subtle border-transparent hover:text-content'
             }`
           }
         >
@@ -51,7 +62,7 @@ function NavBar({ isAdmin }) {
 
 function CenteredShell({ children }) {
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center px-6">
+    <div className="min-h-screen bg-ink flex items-center justify-center px-6">
       <div className="max-w-md w-full text-center">{children}</div>
     </div>
   )
@@ -60,38 +71,39 @@ function CenteredShell({ children }) {
 function Landing() {
   return (
     <CenteredShell>
-      <h1 className="text-3xl font-bold text-white mb-2">Fantas.ai</h1>
-      <p className="text-gray-400 mb-8">
-        Multi-source fantasy football analytics — projections, AI news analysis, and start/sit.
+      <BrandMark className="text-4xl" />
+      <p className="text-content text-lg font-display mt-5 mb-1">The player stock exchange.</p>
+      <p className="text-subtle text-sm mb-8">
+        Multi-source projections, AI news &amp; sentiment analysis, and weekly start/sit — for your redraft PPR league.
       </p>
       <div className="flex items-center justify-center gap-3">
         <SignInButton mode="modal">
-          <button className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors">
+          <button className="px-5 py-2.5 bg-brand hover:brightness-110 text-brand-fg text-sm font-semibold rounded-lg transition-all">
             Sign in
           </button>
         </SignInButton>
         <SignUpButton mode="modal">
-          <button className="px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm font-semibold rounded-lg border border-gray-700 transition-colors">
+          <button className="px-5 py-2.5 bg-raised hover:bg-line text-content text-sm font-semibold rounded-lg border border-line transition-colors">
             Create account
           </button>
         </SignUpButton>
       </div>
-      <p className="text-xs text-gray-600 mt-6">New accounts require admin approval before access.</p>
+      <p className="text-xs text-subtle/70 mt-6">New accounts require admin approval before access.</p>
     </CenteredShell>
   )
 }
 
 function PendingScreen() {
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      <div className="bg-gray-900 border-b border-gray-700 px-6 py-3 flex items-center">
-        <span className="text-white font-bold text-lg tracking-tight">Fantas.ai</span>
+    <div className="min-h-screen bg-ink">
+      <div className="bg-surface/80 border-b border-line px-6 h-14 flex items-center">
+        <BrandMark className="text-lg" />
         <div className="ml-auto"><UserButton afterSignOutUrl="/" /></div>
       </div>
       <CenteredShell>
         <div className="text-5xl mb-4">⏳</div>
-        <h2 className="text-xl font-bold text-white mb-2">Awaiting approval</h2>
-        <p className="text-gray-400">
+        <h2 className="text-xl font-display font-semibold text-content mb-2">Awaiting approval</h2>
+        <p className="text-subtle">
           Your account was created and is pending admin approval. You'll have access as soon as
           you're approved.
         </p>
@@ -104,11 +116,11 @@ function ErrorScreen() {
   return (
     <CenteredShell>
       <div className="text-5xl mb-4">⚠️</div>
-      <h2 className="text-xl font-bold text-white mb-2">Couldn't reach the server</h2>
-      <p className="text-gray-400 mb-6">Something went wrong verifying your account. Try again.</p>
+      <h2 className="text-xl font-display font-semibold text-content mb-2">Couldn't reach the server</h2>
+      <p className="text-subtle mb-6">Something went wrong verifying your account. Try again.</p>
       <button
         onClick={() => window.location.reload()}
-        className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm rounded-lg border border-gray-700"
+        className="px-4 py-2 bg-raised hover:bg-line text-content text-sm rounded-lg border border-line"
       >
         Reload
       </button>
@@ -119,11 +131,7 @@ function ErrorScreen() {
 // ── Authenticated app (post sign-in) ──────────────────────────────────────────
 
 function AuthedApp() {
-  const { getToken } = useAuth()
-  // Register the token getter synchronously (before any child API call fires) so every
-  // request carries the Clerk JWT. Idempotent module-level assignment.
-  setTokenGetter(() => getToken())
-
+  // Token getter is registered in AppProvider (a parent), so requests here are authed.
   const [me, setMe] = useState(null)
   const [status, setStatus] = useState('loading') // loading | approved | pending | error
 
@@ -146,8 +154,9 @@ function AuthedApp() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-950 text-gray-100">
+      <div className="min-h-screen bg-ink text-content">
         <NavBar isAdmin={me?.is_admin} />
+        <Ticker />
         <main className="max-w-7xl mx-auto px-6 py-8">
           <Routes>
             <Route path="/"         element={<Dashboard />} />
