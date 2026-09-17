@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { getRoster, getSettings, updateSettings, getNews, getStartSit } from '../services/api'
+import { useAuth } from '@clerk/react'
+import { toast } from 'sonner'
+import { getRoster, getSettings, updateSettings, getNews, getStartSit, setTokenGetter } from '../services/api'
 import { balanceWeights } from '../utils/weights'
 
 const LS_USERNAME = 'fantasai_sleeper_username'
@@ -8,6 +10,15 @@ const LS_LEAGUE   = 'fantasai_league_id'
 const AppContext = createContext(null)
 
 export function AppProvider({ children }) {
+  // ── Auth readiness ───────────────────────────────────────────────────────────
+  // Register the Clerk JWT getter and gate all auto-fetches on it, so requests never
+  // fire before a token exists (avoids 401 "Missing bearer token" on startup).
+  const { isLoaded, isSignedIn, getToken } = useAuth()
+  const authed = isLoaded && isSignedIn
+  // Register synchronously during render (parent renders before any child effect fires)
+  // so the token is available before the approval gate or auto-fetches call the API.
+  setTokenGetter(() => getToken())
+
   // ── Credentials ────────────────────────────────────────────────────────────
   const [credentials, setCredentials] = useState(() => {
     const username = localStorage.getItem(LS_USERNAME)
@@ -51,10 +62,10 @@ export function AppProvider({ children }) {
     }
   }, [credentials])
 
-  // Auto-fetch roster when credentials become available
+  // Auto-fetch roster once signed in and credentials are available
   useEffect(() => {
-    if (credentials && !rosterData) fetchRoster(credentials)
-  }, [credentials]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (authed && credentials && !rosterData) fetchRoster(credentials)
+  }, [authed, credentials]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── News ───────────────────────────────────────────────────────────────────
   const [newsData, setNewsData]       = useState(null)
@@ -74,8 +85,8 @@ export function AppProvider({ children }) {
 
   // Auto-fetch news after roster loads
   useEffect(() => {
-    if (credentials && rosterData && !newsData) fetchNews()
-  }, [credentials, rosterData]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (authed && credentials && rosterData && !newsData) fetchNews()
+  }, [authed, credentials, rosterData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Start/Sit ──────────────────────────────────────────────────────────────
   const [startSitData, setStartSitData]       = useState(null)
@@ -97,8 +108,8 @@ export function AppProvider({ children }) {
 
   // Auto-fetch start/sit once the roster (and its week) is available
   useEffect(() => {
-    if (credentials && rosterData && !startSitData) fetchStartSit(rosterData.week)
-  }, [credentials, rosterData]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (authed && credentials && rosterData && !startSitData) fetchStartSit(rosterData.week)
+  }, [authed, credentials, rosterData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Settings (weights) ─────────────────────────────────────────────────────
   const [weights, setWeights]       = useState({ weight_sleeper: 0.35, weight_espn: 0.30, weight_fp: 0.35 })
@@ -107,11 +118,12 @@ export function AppProvider({ children }) {
   const [saveError, setSaveError]   = useState(null)
 
   useEffect(() => {
+    if (!authed) return
     getSettings()
       .then(res => setWeights(res.data))
       .catch(() => {})
       .finally(() => setWeightsLoaded(true))
-  }, [])
+  }, [authed])
 
   const updateWeight = useCallback((key, value) => {
     setWeights(prev => balanceWeights(key, value, prev))
@@ -122,16 +134,22 @@ export function AppProvider({ children }) {
     setSaveError(null)
     try {
       const res = await updateSettings(newWeights)
-      // Store ONLY the weight keys — any extra field (e.g. a message) would pollute
-      // the weights object and break balanceWeights' proportional math (→ NaN).
+      // Store ONLY weight keys — a stray response field would corrupt balanceWeights (→ NaN).
       const { weight_sleeper, weight_espn, weight_fp } = res.data
       setWeights({ weight_sleeper, weight_espn, weight_fp })
+      toast.success('Projection weights saved')
+      // Projections are computed server-side from the weights, so re-sync the roster
+      // (recomputes them) and reset start/sit to refetch off the updated numbers.
+      await fetchRoster()
+      setStartSitData(null)
     } catch (err) {
-      setSaveError(err.response?.data?.detail || 'Failed to save weights.')
+      const msg = err.response?.data?.detail || 'Failed to save weights.'
+      setSaveError(msg)
+      toast.error(msg)
     } finally {
       setSaving(false)
     }
-  }, [])
+  }, [fetchRoster])
 
   return (
     <AppContext.Provider value={{
