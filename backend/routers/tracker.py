@@ -17,18 +17,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.player import Player
+from models.user import User
+from auth import get_current_user
 from services import tracker_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-PLACEHOLDER_USER_ID = 1  # replaced with real Clerk auth in Phase 5
 
 
 @router.get("/players/search")
 async def search_players(
     q: str = Query(..., min_length=2, description="Player name search query"),
     limit: int = Query(default=25, le=100),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -117,7 +118,7 @@ async def search_players(
 @router.post("/tracker/star/{player_id}")
 async def star_player(
     player_id: str,
-    user_id: int = Query(default=PLACEHOLDER_USER_ID),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -125,7 +126,7 @@ async def star_player(
     The profile may take 15-30 seconds to generate — poll GET /api/tracker/{player_id}
     and check profile_ready=true.
     """
-    result = await tracker_service.star_player(user_id, player_id, db)
+    result = await tracker_service.star_player(user.id, player_id, db)
     await db.commit()
 
     if result.get("status") == "error":
@@ -137,11 +138,11 @@ async def star_player(
 @router.delete("/tracker/star/{player_id}")
 async def unstar_player(
     player_id: str,
-    user_id: int = Query(default=PLACEHOLDER_USER_ID),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Unstar a player (soft delete — stock profile is retained)."""
-    result = await tracker_service.unstar_player(user_id, player_id, db)
+    result = await tracker_service.unstar_player(user.id, player_id, db)
     await db.commit()
 
     if result.get("status") == "not_found":
@@ -152,7 +153,7 @@ async def unstar_player(
 
 @router.get("/tracker")
 async def get_tracker(
-    user_id: int = Query(default=PLACEHOLDER_USER_ID),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -160,25 +161,25 @@ async def get_tracker(
     Sorted by combined_score DESC (highest concern first).
     Players with profile_ready=false have been starred but analysis hasn't completed yet.
     """
-    players = await tracker_service.get_tracked_players(user_id, db)
+    players = await tracker_service.get_tracked_players(user.id, db)
     return {
         "tracked_players": players,
         "total": len(players),
-        "user_id": user_id,
+        "user_id": user.id,
     }
 
 
 @router.get("/tracker/{player_id}")
 async def get_tracker_player(
     player_id: str,
-    user_id: int = Query(default=PLACEHOLDER_USER_ID),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Returns full detail for a single tracked player, including historical stats
     by season and the full ADP trend history.
     """
-    detail = await tracker_service.get_tracked_player_detail(user_id, player_id, db)
+    detail = await tracker_service.get_tracked_player_detail(user.id, player_id, db)
     if not detail:
         raise HTTPException(status_code=404, detail="Player not found in tracker")
     return detail
@@ -187,14 +188,14 @@ async def get_tracker_player(
 @router.post("/tracker/refresh/{player_id}")
 async def refresh_tracker_player(
     player_id: str,
-    user_id: int = Query(default=PLACEHOLDER_USER_ID),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Manually re-run the 4-pass Gemini analysis for a starred player.
     Use sparingly — each call consumes 4 Gemini API requests.
     """
-    success = await tracker_service.refresh_profile(user_id, player_id, db, reason="manual")
+    success = await tracker_service.refresh_profile(user.id, player_id, db, reason="manual")
     await db.commit()
 
     if not success:

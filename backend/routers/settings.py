@@ -11,12 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.user import User
+from auth import get_current_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# Placeholder until Clerk auth is wired in (Phase 5)
-PLACEHOLDER_USER_ID = 1
 
 
 class WeightUpdate(BaseModel):
@@ -40,16 +38,8 @@ class WeightUpdate(BaseModel):
 
 
 @router.get("/settings")
-async def get_settings(db: AsyncSession = Depends(get_db)):
+async def get_settings(user: User = Depends(get_current_user)):
     """Returns the current projection weights for the active user."""
-    user = await db.get(User, PLACEHOLDER_USER_ID)
-    if not user:
-        # Return defaults if user row doesn't exist yet
-        return {
-            "weight_sleeper": 0.35,
-            "weight_espn": 0.30,
-            "weight_fp": 0.35,
-        }
     return {
         "weight_sleeper": user.weight_sleeper,
         "weight_espn": user.weight_espn,
@@ -60,31 +50,25 @@ async def get_settings(db: AsyncSession = Depends(get_db)):
 @router.put("/settings")
 async def update_settings(
     body: WeightUpdate,
-    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     Updates projection weights for the active user.
     Weights must be non-negative and sum to exactly 1.0.
     """
-    user = await db.get(User, PLACEHOLDER_USER_ID)
-    if not user:
-        raise HTTPException(
-            status_code=404,
-            detail="User not found. Call /api/roster first to initialize the user.",
-        )
-
     user.weight_sleeper = body.weight_sleeper
     user.weight_espn = body.weight_espn
     user.weight_fp = body.weight_fp
 
     logger.info(
-        f"[Settings] Updated weights for user {PLACEHOLDER_USER_ID}: "
+        f"[Settings] Updated weights for user {user.id}: "
         f"sleeper={body.weight_sleeper} espn={body.weight_espn} fp={body.weight_fp}"
     )
 
+    # Return the same shape as GET (weights only) — a mixed-in message field would
+    # pollute the frontend weights object and break slider redistribution.
     return {
         "weight_sleeper": user.weight_sleeper,
         "weight_espn": user.weight_espn,
         "weight_fp": user.weight_fp,
-        "message": "Weights updated successfully.",
     }

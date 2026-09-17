@@ -15,6 +15,7 @@ from services.sleeper_service import (
     get_roster,
     get_all_players,
 )
+from auth import get_current_user
 from services.projection_engine import weights_from_user
 from services.projection_service import get_nfl_state, normalize_name, sync_projections
 
@@ -24,9 +25,23 @@ logger = logging.getLogger(__name__)
 RELEVANT_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 
 
+def _resolve_league_season(nfl_state: dict) -> int:
+    """
+    The season whose Sleeper leagues we should look at.
+
+    Sleeper always reports the upcoming season in `nfl_state` (e.g. 2026), but during
+    the offseason those leagues don't exist yet — so fall back to the completed season.
+    Both /api/leagues and /api/roster MUST use this so the dropdown and the roster
+    validation agree on which season's leagues are eligible. Never hardcode the year.
+    """
+    season = nfl_state["season"]
+    return season - 1 if nfl_state["season_type"] == "off" else season
+
+
 @router.get("/leagues")
 async def list_eligible_leagues(
     sleeper_username: str = Query(..., description="Sleeper username"),
+    user: User = Depends(get_current_user),
 ):
     """
     Returns the user's redraft PPR leagues from Sleeper.
@@ -36,7 +51,9 @@ async def list_eligible_leagues(
     if not user_id:
         raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
 
-    leagues = await get_eligible_leagues(user_id)
+    nfl_state = await get_nfl_state()
+    league_season = _resolve_league_season(nfl_state)
+    leagues = await get_eligible_leagues(user_id, season=league_season)
     if not leagues:
         return {
             "leagues": [],
@@ -50,6 +67,7 @@ async def list_eligible_leagues(
 async def get_my_roster(
     sleeper_username: str = Query(..., description="Sleeper username"),
     league_id: str = Query(..., description="Sleeper league ID"),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -64,10 +82,10 @@ async def get_my_roster(
     if not sleeper_user_id:
         raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
 
-    # Validate this is a redraft PPR league owned by this user
-    # During offseason, Sleeper reports the upcoming season (e.g. 2026) but leagues
-    # haven't been created yet — fall back to the completed season.
-    league_season = nfl_state["season"] - 1 if nfl_state["season_type"] == "off" else nfl_state["season"]
+    # Validate this is a redraft PPR league owned by this user.
+    # Uses the same season resolution as /api/leagues so the dropdown and this
+    # validation always agree (see _resolve_league_season).
+    league_season = _resolve_league_season(nfl_state)
     eligible = await get_eligible_leagues(sleeper_user_id, season=league_season)
     eligible_ids = {l["league_id"] for l in eligible}
     if league_id not in eligible_ids:
@@ -125,25 +143,14 @@ async def get_my_roster(
         )
         await db.execute(stmt)
 
-    # --- Ensure placeholder user exists (replaced with real Clerk auth in Phase 5) ---
-    PLACEHOLDER_USER_ID = 1
-    existing_user = await db.get(User, PLACEHOLDER_USER_ID)
-    if not existing_user:
-        db.add(User(
-            id=PLACEHOLDER_USER_ID,
-            clerk_id="placeholder",
-            email="placeholder@fantas.ai",
-            username=sleeper_username,
-            is_approved=True,
-            sleeper_username=sleeper_username,
-            sleeper_user_id=sleeper_user_id,
-        ))
-        await db.flush()
+    # --- Persist the Sleeper credentials on the authenticated user ---
+    user.sleeper_username = sleeper_username
+    user.sleeper_user_id = sleeper_user_id
 
     # --- Upsert this league into user_leagues and mark as primary ---
     result = await db.execute(
         select(UserLeague).where(
-            UserLeague.user_id == PLACEHOLDER_USER_ID,
+            UserLeague.user_id == user.id,
             UserLeague.league_id == league_id,
             UserLeague.platform == "SLEEPER",
         )
@@ -153,11 +160,11 @@ async def get_my_roster(
         # Clear primary flag on any existing leagues before setting the new one
         await db.execute(
             update(UserLeague)
-            .where(UserLeague.user_id == PLACEHOLDER_USER_ID)
+            .where(UserLeague.user_id == user.id)
             .values(is_primary=False)
         )
         db.add(UserLeague(
-            user_id=PLACEHOLDER_USER_ID,
+            user_id=user.id,
             platform="SLEEPER",
             league_id=league_id,
             league_name=next((l["name"] for l in eligible if l["league_id"] == league_id), None),
@@ -169,7 +176,7 @@ async def get_my_roster(
 
     # --- Clear old roster and re-sync ---
     await db.execute(
-        delete(MyRoster).where(MyRoster.user_id == PLACEHOLDER_USER_ID)
+        delete(MyRoster).where(MyRoster.user_id == user.id)
     )
 
     valid_pids = {p["player_id"] for p in players_to_upsert}
@@ -177,7 +184,7 @@ async def get_my_roster(
         if pid not in valid_pids:
             continue
         db.add(MyRoster(
-            user_id=PLACEHOLDER_USER_ID,
+            user_id=user.id,
             player_id=pid,
             is_starter=pid in starters,
             slot=_guess_slot(pid, starters, all_players),
@@ -196,9 +203,8 @@ async def get_my_roster(
             p["player_id"]: normalize_name(p["name"])
             for p in players_to_upsert
         }
-        # Use per-user weights if the user row exists, otherwise fall back to defaults
-        user_row = await db.get(User, PLACEHOLDER_USER_ID)
-        user_weights = weights_from_user(user_row) if user_row else None
+        # Use the authenticated user's saved weights
+        user_weights = weights_from_user(user)
         projections = await sync_projections(
             player_ids=list(valid_pids),
             espn_id_map=espn_id_map,

@@ -2,6 +2,12 @@
 .env
 .env.local
 .env.*.local
+# (.env.example IS committed — it documents required vars with no real values)
+
+# Agent tooling / installed skills (symlinks + local config, not app code)
+.agents/
+.claude/
+skills-lock.json
 
 # Python
 __pycache__/

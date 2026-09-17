@@ -18,7 +18,8 @@ from typing import Optional
 
 from google import genai
 
-from config import GEMINI_API_KEY, GEMINI_PRIMARY, GEMINI_FALLBACK
+from config import GEMINI_API_KEY, GEMINI_PRIMARY, GEMINI_FALLBACK, LLM_ENABLED
+from services import llm_budget
 
 logger = logging.getLogger(__name__)
 
@@ -255,6 +256,13 @@ async def _call_gemini(prompt: str, model: str) -> Optional[dict]:
 
 
 async def _call_gemini_text(prompt: str, model: str) -> Optional[str]:
+    if not LLM_ENABLED:
+        logger.info(f"[Sentiment] LLM disabled (LLM_ENABLED=false) — skipping {model} call")
+        return None
+    if not llm_budget.can_spend():
+        logger.warning(f"[Sentiment] Daily LLM cap reached — skipping {model} call")
+        return None
+    llm_budget.record_call()
     try:
         response = _genai_client.models.generate_content(
             model=model,

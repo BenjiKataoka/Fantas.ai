@@ -12,3 +12,4 @@ pandas
 pyarrow
 google-genai
 sleeper-api-wrapper
+pyjwt[crypto]

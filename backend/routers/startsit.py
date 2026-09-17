@@ -7,12 +7,12 @@ from database import get_db
 from models.player import Player
 from models.roster import MyRoster
 from models.projection import Projection
+from models.user import User
+from auth import get_current_user
 from services.projection_service import get_nfl_state
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-PLACEHOLDER_USER_ID = 1
 
 # Standard redraft PPR lineup (1 FLEX slot for RB/WR/TE)
 LINEUP_SLOTS = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1}
@@ -82,7 +82,11 @@ def _close_decision(slot: str, starter: dict, alt: dict, margin: float) -> dict:
 
 
 @router.get("/startsit/{week}")
-async def get_start_sit(week: int, db: AsyncSession = Depends(get_db)):
+async def get_start_sit(
+    week: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """
     Returns optimal start/sit recommendations for the given week.
     Ranks players by weighted_proj × injury modifier.
@@ -111,7 +115,7 @@ async def get_start_sit(week: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(MyRoster, Player)
         .join(Player, MyRoster.player_id == Player.player_id)
-        .where(MyRoster.user_id == PLACEHOLDER_USER_ID)
+        .where(MyRoster.user_id == user.id)
     )
     roster_rows = result.all()
 

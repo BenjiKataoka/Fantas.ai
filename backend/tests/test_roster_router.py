@@ -10,8 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import SLEEPER_USERNAME
 assert SLEEPER_USERNAME, "SLEEPER_USERNAME must be set in .env"
-# From test_sleeper.py output — confirmed redraft PPR league
-LEAGUE_ID = "1221322522297901056"
+# LEAGUE_ID is resolved dynamically for the current season inside run_tests()
+# (never hardcode a season-specific league — it breaks on the yearly rollover).
 INVALID_LEAGUE_ID = "1180196968005595136"  # Dynasty league — should be rejected
 
 
@@ -24,12 +24,16 @@ async def run_tests():
     print(f"\n[1] GET /api/leagues?sleeper_username={SLEEPER_USERNAME}")
     try:
         from services.sleeper_service import get_user_id, get_eligible_leagues
+        from services.projection_service import get_nfl_state
+        from routers.roster import _resolve_league_season
         user_id = await get_user_id(SLEEPER_USERNAME)
         assert user_id, "Could not resolve user_id"
-        leagues = await get_eligible_leagues(user_id)
+        season = _resolve_league_season(await get_nfl_state())
+        leagues = await get_eligible_leagues(user_id, season=season)
         assert isinstance(leagues, list), "Expected a list"
         assert len(leagues) >= 1, "Expected at least 1 eligible league"
-        print(f"    PASS — {len(leagues)} eligible league(s):")
+        LEAGUE_ID = leagues[0]["league_id"]  # dynamic — first eligible league this season
+        print(f"    PASS — {len(leagues)} eligible league(s) for season {season}:")
         for l in leagues:
             print(f"           • {l['name']} ({l['league_id']})")
     except Exception as e:
@@ -45,44 +49,54 @@ async def run_tests():
     except Exception as e:
         print(f"    FAIL — {e}")
 
+    # Async prep is done. TestClient requests run in a SEPARATE phase (run_client_tests)
+    # so they don't share this asyncio.run loop — otherwise asyncpg connections opened in
+    # the request handler get stuck on a closed loop (see CLAUDE.md testing conventions).
+    return LEAGUE_ID
+
+
+def run_client_tests(league_id):
+    """TestClient phase — runs after the async loop has closed. Uses the context-manager
+    form so one anyio portal stays alive across both requests."""
+    from fastapi.testclient import TestClient
+    from main import app
+
     # Test 3: /api/roster syncs to DB and returns roster
-    print(f"\n[3] GET /api/roster?sleeper_username={SLEEPER_USERNAME}&league_id={LEAGUE_ID}")
-    try:
-        from fastapi.testclient import TestClient
-        from main import app
-        client = TestClient(app)
-        resp = client.get(f"/api/roster?sleeper_username={SLEEPER_USERNAME}&league_id={LEAGUE_ID}")
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
-        data = resp.json()
-        assert "roster" in data, "Missing 'roster' key"
-        assert len(data["roster"]) > 0, "Roster is empty"
-        print(f"    PASS — {data['total_players']} players returned, {data['starters']} starters")
-        print(f"           season_type={data.get('season_type')} week={data.get('week')}")
-        print(f"           First 3 players:")
-        for p in data["roster"][:3]:
-            print(f"             {p['name']} | {p['position']} | {p['nfl_team']} | starter={p['is_starter']}")
+    print(f"\n[3] GET /api/roster?sleeper_username={SLEEPER_USERNAME}&league_id={league_id}")
+    with TestClient(app) as client:
+        try:
+            resp = client.get(f"/api/roster?sleeper_username={SLEEPER_USERNAME}&league_id={league_id}")
+            assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+            data = resp.json()
+            assert "roster" in data, "Missing 'roster' key"
+            assert len(data["roster"]) > 0, "Roster is empty"
+            print(f"    PASS — {data['total_players']} players returned, {data['starters']} starters")
+            print(f"           season_type={data.get('season_type')} week={data.get('week')}")
+            print(f"           First 3 players:")
+            for p in data["roster"][:3]:
+                print(f"             {p['name']} | {p['position']} | {p['nfl_team']} | starter={p['is_starter']}")
 
-        # Verify projection fields are present on every player (values may be null in offseason)
-        proj_keys = {"sleeper_proj", "espn_proj", "fp_proj", "weighted_proj", "confidence_flag"}
-        missing = [k for p in data["roster"] for k in proj_keys if k not in p]
-        if not missing:
-            sample = data["roster"][0]
-            print(f"    PASS — projection fields present on all players")
-            print(f"           Sample: sleeper={sample['sleeper_proj']} espn={sample['espn_proj']} fp={sample['fp_proj']} weighted={sample['weighted_proj']} confidence={sample['confidence_flag']}")
-        else:
-            print(f"    FAIL — missing projection keys: {set(missing)}")
-    except Exception as e:
-        print(f"    FAIL — {e}")
-        return
+            # Verify projection fields are present on every player (values may be null in offseason)
+            proj_keys = {"sleeper_proj", "espn_proj", "fp_proj", "weighted_proj", "confidence_flag"}
+            missing = [k for p in data["roster"] for k in proj_keys if k not in p]
+            if not missing:
+                sample = data["roster"][0]
+                print(f"    PASS — projection fields present on all players")
+                print(f"           Sample: sleeper={sample['sleeper_proj']} espn={sample['espn_proj']} fp={sample['fp_proj']} weighted={sample['weighted_proj']} confidence={sample['confidence_flag']}")
+            else:
+                print(f"    FAIL — missing projection keys: {set(missing)}")
+        except Exception as e:
+            print(f"    FAIL — {e}")
+            return
 
-    # Test 6: Invalid league ID is rejected
-    print(f"\n[6] GET /api/roster with dynasty league_id (expect 400)...")
-    try:
-        resp = client.get(f"/api/roster?sleeper_username={SLEEPER_USERNAME}&league_id={INVALID_LEAGUE_ID}")
-        assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
-        print(f"    PASS — dynasty league correctly rejected with 400")
-    except Exception as e:
-        print(f"    FAIL — {e}")
+        # Test 6: Invalid league ID is rejected
+        print(f"\n[6] GET /api/roster with dynasty league_id (expect 400)...")
+        try:
+            resp = client.get(f"/api/roster?sleeper_username={SLEEPER_USERNAME}&league_id={INVALID_LEAGUE_ID}")
+            assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
+            print(f"    PASS — dynasty league correctly rejected with 400")
+        except Exception as e:
+            print(f"    FAIL — {e}")
 
     print("\n" + "=" * 50)
     print("ROSTER ROUTER TEST COMPLETE")
@@ -127,5 +141,7 @@ def verify_db():
 
 
 if __name__ == "__main__":
-    asyncio.run(run_tests())
+    league_id = asyncio.run(run_tests())  # async prep; loop closes here
+    if league_id:
+        run_client_tests(league_id)       # sync TestClient phase, fresh portal
     verify_db()

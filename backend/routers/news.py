@@ -10,7 +10,6 @@ Response shapes:
   - Untracked → never returned
 
 Query params:
-  - user_id (int, default=1 — placeholder until Phase 5 Clerk auth)
   - force_refresh (bool, default=False)
 """
 
@@ -24,13 +23,13 @@ from database import get_db
 from models.news import PlayerNews, NewsAnalysis
 from models.roster import MyRoster
 from models.tracker import TrackedPlayer
+from models.user import User
+from auth import get_current_user
 from services.projection_service import get_nfl_state
 from services.news_scraper_service import scrape_and_analyze
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-PLACEHOLDER_USER_ID = 1  # replaced with real Clerk auth in Phase 5
 
 # Days of news history to return per call
 NEWS_LOOKBACK_DAYS = 7
@@ -38,8 +37,8 @@ NEWS_LOOKBACK_DAYS = 7
 
 @router.get("/news")
 async def get_news(
-    user_id: int = Query(default=PLACEHOLDER_USER_ID, description="User ID (placeholder until Phase 5)"),
     force_refresh: bool = Query(default=False, description="Bypass cache and re-scrape"),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -59,7 +58,7 @@ async def get_news(
     # Fetch this user's starred player_ids
     starred_result = await db.execute(
         select(TrackedPlayer.player_id).where(
-            TrackedPlayer.user_id == user_id,
+            TrackedPlayer.user_id == user.id,
             TrackedPlayer.is_active == True,
         )
     )
@@ -67,7 +66,7 @@ async def get_news(
 
     # Fetch this user's rostered player_ids
     rostered_result = await db.execute(
-        select(MyRoster.player_id).where(MyRoster.user_id == user_id)
+        select(MyRoster.player_id).where(MyRoster.user_id == user.id)
     )
     user_rostered_ids = {row[0] for row in rostered_result.fetchall()} - user_starred_ids
 

@@ -1,12 +1,12 @@
 """
 2-pass Gemini news analysis pipeline — runs for starred players only.
 
-Pass 1 (gemini-2.5-flash-lite):
+Pass 1 (GEMINI_PRIMARY, flash-lite):
   Input: raw news + player context + weighted projection + Sleeper trending + snap/target stats
   Output: summary, news_type, stock_direction, stock_magnitude, short_term_impact,
           long_term_impact, key_factors, confidence_score, needs_context_check
 
-Pass 2 (gemini-2.5-flash, only when needs_context_check=True):
+Pass 2 (GEMINI_FALLBACK, flash, only when needs_context_check=True):
   Input: Pass 1 JSON + 500-word rolling news_history_context for this player
   Output: context_notes, contradictions_flagged, contradiction_detail, final_confidence
 
@@ -25,7 +25,8 @@ from google.genai import types
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import GEMINI_API_KEY, GEMINI_PRIMARY, GEMINI_FALLBACK
+from config import GEMINI_API_KEY, GEMINI_PRIMARY, GEMINI_FALLBACK, LLM_ENABLED
+from services import llm_budget
 from models.news import NewsAnalysis, NewsHistoryContext, PlayerNews
 
 logger = logging.getLogger(__name__)
@@ -270,7 +271,15 @@ async def _call_gemini(prompt: str, model: str) -> Optional[dict]:
 
 
 async def _call_gemini_text(prompt: str, model: str) -> Optional[str]:
-    """Call Gemini and return raw text. Returns None on failure."""
+    """Call Gemini and return raw text. Returns None on failure, when LLM is disabled,
+    or when the daily call cap is exhausted."""
+    if not LLM_ENABLED:
+        logger.info(f"[NewsAnalysis] LLM disabled (LLM_ENABLED=false) — skipping {model} call")
+        return None
+    if not llm_budget.can_spend():
+        logger.warning(f"[NewsAnalysis] Daily LLM cap reached — skipping {model} call")
+        return None
+    llm_budget.record_call()
     try:
         response = _genai_client.models.generate_content(
             model=model,

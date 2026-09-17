@@ -15,6 +15,7 @@ from database import get_db
 from models.player import Player
 from models.roster import MyRoster
 from models.user import User
+from auth import get_current_user
 from services.projection_engine import compute_weighted_projection, weights_from_user
 from services.projection_service import get_nfl_state
 from services import espn_service, fp_service, sleeper_service
@@ -24,12 +25,11 @@ from services.utils import normalize_name
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-PLACEHOLDER_USER_ID = 1
-
 
 @router.get("/projections/{week}")
 async def get_projections(
     week: int,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -44,14 +44,13 @@ async def get_projections(
     season = nfl_state["season"]
 
     # Load user weights
-    user = await db.get(User, PLACEHOLDER_USER_ID)
-    weights = weights_from_user(user) if user else None
+    weights = weights_from_user(user)
 
     # Load rostered player IDs + player details
     result = await db.execute(
         select(MyRoster, Player)
         .join(Player, MyRoster.player_id == Player.player_id)
-        .where(MyRoster.user_id == PLACEHOLDER_USER_ID)
+        .where(MyRoster.user_id == user.id)
     )
     rows = result.all()
 

@@ -16,13 +16,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from routers import roster, projections, settings, news, tracker, startsit
+from routers import roster, projections, settings, news, tracker, startsit, admin
 app.include_router(roster.router, prefix="/api")
 app.include_router(projections.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 app.include_router(news.router, prefix="/api")
 app.include_router(tracker.router, prefix="/api")
 app.include_router(startsit.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
 
 @app.get("/health")

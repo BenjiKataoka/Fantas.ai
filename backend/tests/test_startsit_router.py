@@ -196,6 +196,12 @@ def run_router_tests():
     from fastapi.testclient import TestClient
     from main import app
     from database import get_db
+    from auth import get_current_user
+
+    # Fixed authenticated user so auth doesn't consult the mocked DB in these tests.
+    fake_user = MagicMock(id=1, is_approved=True, clerk_id="test")
+    def override_current_user():
+        return fake_user
 
     # [1] Offseason → returns offseason_note, no starters
     print("\n[1] Offseason → offseason_note returned, starters empty...")
@@ -224,6 +230,7 @@ def run_router_tests():
         yield db
 
     app.dependency_overrides[get_db] = mock_db_empty
+    app.dependency_overrides[get_current_user] = override_current_user
     with patch("routers.startsit.get_nfl_state", return_value=mock_state_regular):
         with TestClient(app) as client:
             resp = client.get("/api/startsit/5")
@@ -276,6 +283,7 @@ def run_router_tests():
         yield db
 
     app.dependency_overrides[get_db] = mock_db_no_proj
+    app.dependency_overrides[get_current_user] = override_current_user
     call_count["n"] = 0
     with patch("routers.startsit.get_nfl_state", return_value=mock_state_regular):
         with TestClient(app) as client:
