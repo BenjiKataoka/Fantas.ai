@@ -272,9 +272,13 @@ async def _call_gemini_text(prompt: str, model: str) -> Optional[str]:
         return None
     llm_budget.record_call(model)
     try:
+        # Every pass expects a JSON object back. Forcing response_mime_type makes Gemini
+        # emit raw JSON (no markdown fences / prose), which nearly eliminates the parse
+        # failures that were leaving concern/sentiment fields null on some players.
         response = _genai_client.models.generate_content(
             model=model,
             contents=prompt,
+            config={"response_mime_type": "application/json"},
         )
         return response.text
     except Exception as e:
