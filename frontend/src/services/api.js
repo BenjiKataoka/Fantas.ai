@@ -60,6 +60,8 @@ export const getTrackerDetail = (playerId) => api.get(`/tracker/${playerId}`)
 export const starPlayer = (playerId) => api.post(`/tracker/star/${playerId}`)
 export const unstarPlayer = (playerId) => api.delete(`/tracker/star/${playerId}`)
 export const refreshPlayer = (playerId) => api.post(`/tracker/refresh/${playerId}`)
+export const analyzeRoster = (force = false) => api.post('/tracker/analyze-roster', null, { params: { force } })
+export const getRosterAnalysis = () => api.get('/tracker/roster-analysis')
 
 // --- Start/Sit ---
 export const getStartSit = (week) => api.get(`/startsit/${week}`)

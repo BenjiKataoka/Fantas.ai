@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@clerk/react'
 import { toast } from 'sonner'
-import { getRoster, getSettings, updateSettings, getNews, getStartSit, setTokenGetter } from '../services/api'
+import { getRoster, getSettings, updateSettings, getNews, getStartSit, analyzeRoster, getRosterAnalysis, setTokenGetter } from '../services/api'
 import { balanceWeights } from '../utils/weights'
 
 const LS_USERNAME = 'fantasai_sleeper_username'
@@ -111,6 +111,69 @@ export function AppProvider({ children }) {
     if (authed && credentials && rosterData && !startSitData) fetchStartSit(rosterData.week)
   }, [authed, credentials, rosterData]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Roster deep-dive analysis ────────────────────────────────────────────────
+  // Lives in context (not the Dashboard) so progress survives page navigation and
+  // a refresh mid-run resumes polling. The backend guards against duplicate runs.
+  const [analysis, setAnalysis] = useState(null) // { running, ready, total, pending }
+  const analysisTimer = useRef(null)
+
+  const pollAnalysis = useCallback(function tick() {
+    getRosterAnalysis()
+      .then(async ({ data }) => {
+        setAnalysis(data)
+        if (data.running) {
+          analysisTimer.current = setTimeout(tick, 4000)
+        } else {
+          analysisTimer.current = null
+          await fetchRoster()               // surface freshly written stock profiles
+          toast.success('Roster analysis complete.')
+        }
+      })
+      .catch(() => { analysisTimer.current = setTimeout(tick, 4000) })
+  }, [fetchRoster])
+
+  const runRosterAnalysis = useCallback(async () => {
+    if (analysis?.running) return
+    try {
+      const { data } = await analyzeRoster()
+      if (data.status === 'empty') { toast.error('No roster to analyze yet.'); return }
+      if (data.status === 'already_running') {
+        toast.message('Analysis already in progress.')
+        setAnalysis({ running: true, ready: 0, total: data.total, pending: data.total })
+        pollAnalysis()
+        return
+      }
+      if (data.queued === 0) {
+        toast.success('All players already analyzed.')
+        await fetchRoster()
+        return
+      }
+      toast.success(`Analyzing ${data.queued} player${data.queued > 1 ? 's' : ''}…`)
+      setAnalysis({ running: true, ready: data.skipped_fresh, total: data.total, pending: data.queued })
+      pollAnalysis()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to start analysis.')
+    }
+  }, [analysis, fetchRoster, pollAnalysis])
+
+  // Seed status when the roster loads; resume polling if a run is already in flight
+  // (e.g. the user refreshed the page mid-analysis).
+  useEffect(() => {
+    if (!authed || !credentials || !rosterData) return
+    let cancelled = false
+    getRosterAnalysis()
+      .then(({ data }) => {
+        if (cancelled) return
+        setAnalysis(data)
+        if (data.running && !analysisTimer.current) pollAnalysis()
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [authed, credentials, rosterData]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Stop any pending poll on teardown
+  useEffect(() => () => { if (analysisTimer.current) clearTimeout(analysisTimer.current) }, [])
+
   // ── Settings (weights) ─────────────────────────────────────────────────────
   const [weights, setWeights]       = useState({ weight_sleeper: 0.35, weight_espn: 0.30, weight_fp: 0.35 })
   const [weightsLoaded, setWeightsLoaded] = useState(false)
@@ -163,6 +226,8 @@ export function AppProvider({ children }) {
       newsData, newsLoading, fetchNews,
       // Start/Sit
       startSitData, startSitLoading, fetchStartSit,
+      // Roster deep-dive analysis
+      analysis, runRosterAnalysis,
     }}>
       {children}
     </AppContext.Provider>

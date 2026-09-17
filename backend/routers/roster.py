@@ -16,6 +16,7 @@ from services.sleeper_service import (
     get_all_players,
 )
 from auth import get_current_user
+from services import tracker_service
 from services.projection_engine import weights_from_user
 from services.projection_service import get_nfl_state, normalize_name, sync_projections
 
@@ -217,6 +218,10 @@ async def get_my_roster(
 
     await db.commit()
 
+    # Current stock/sentiment profile per player (global, reused across users; absent
+    # for players nobody has deep-dived yet). Powers the roster row dropdown.
+    stock_map = await tracker_service.get_stock_profiles_for(player_ids, db)
+
     # --- Build response ---
     roster_out = []
     for pid in player_ids:
@@ -238,6 +243,7 @@ async def get_my_roster(
             "fp_proj": proj.get("fp_proj"),
             "weighted_proj": proj.get("weighted_proj"),
             "confidence_flag": proj.get("confidence_flag"),
+            "stock": stock_map.get(pid),
         })
 
     position_order = {"QB": 0, "RB": 1, "WR": 2, "TE": 3, "K": 4}

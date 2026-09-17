@@ -1,8 +1,17 @@
+import { useState } from 'react'
 import InjuryBadge from './InjuryBadge'
 import ProjectionBar from './ProjectionBar'
 import ConfidenceBadge from './ConfidenceBadge'
 import StockBadge from './StockBadge'
 import PlayerAvatar from './PlayerAvatar'
+import StockSection from './StockSection'
+
+// Small dot summarizing a player's concern level on the collapsed row (green/amber/red).
+function ConcernDot({ level }) {
+  if (level == null) return null
+  const c = level <= 3 ? 'bg-bull' : level <= 6 ? 'bg-warn' : 'bg-bear'
+  return <span className={`h-1.5 w-1.5 rounded-full ${c}`} title={`Concern ${level}/10`} />
+}
 
 // Position tints chosen to stay clear of the bull-green / bear-red market colors.
 const POS_COLORS = {
@@ -42,18 +51,25 @@ function StartSitCell({ rec }) {
   )
 }
 
-function PlayerRow({ player, latestNews, startSitRec }) {
-  const { player_id, name, position, nfl_team, injury_status, sleeper_proj, espn_proj, fp_proj, weighted_proj, confidence_flag } = player
+function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
+  const { player_id, name, position, nfl_team, injury_status, sleeper_proj, espn_proj, fp_proj, weighted_proj, confidence_flag, stock } = player
   return (
-    <tr className="hover:bg-raised/50 transition-colors">
+    <>
+    <tr
+      className="hover:bg-raised/50 transition-colors cursor-pointer"
+      onClick={onToggle}
+      aria-expanded={isOpen}
+    >
       {/* Player */}
       <td className={COL_CELL}>
         <div className="flex items-center gap-2.5">
+          <span className={`text-subtle/50 text-xs transition-transform ${isOpen ? 'rotate-90 text-brand' : ''}`}>▸</span>
           <PlayerAvatar playerId={player_id} name={name} size="md" />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-medium text-content">{name}</span>
               <InjuryBadge status={injury_status} />
+              {stock && <ConcernDot level={stock.concern_level} />}
             </div>
             <div className="text-xs text-subtle font-mono mt-0.5">{nfl_team}</div>
           </div>
@@ -97,6 +113,14 @@ function PlayerRow({ player, latestNews, startSitRec }) {
       {/* Start/Sit */}
       <td className={COL_CELL}><StartSitCell rec={startSitRec} /></td>
     </tr>
+    {isOpen && (
+      <tr>
+        <td colSpan={9} className="p-0 bg-ink/30 border-l-2 border-brand">
+          <StockSection stock={stock} />
+        </td>
+      </tr>
+    )}
+    </>
   )
 }
 
@@ -105,6 +129,8 @@ function PlayerRow({ player, latestNews, startSitRec }) {
  * startSitMap — { player_id: { slot } } for recommended starters; absent = SIT
  */
 export default function RosterTable({ players, newsMap = {}, startSitMap = {} }) {
+  const [openId, setOpenId] = useState(null)
+  const toggle = (id) => setOpenId(prev => (prev === id ? null : id))
   const starters = players.filter(p => p.is_starter)
   const bench    = players.filter(p => !p.is_starter)
 
@@ -128,13 +154,13 @@ export default function RosterTable({ players, newsMap = {}, startSitMap = {} })
           {starters.length > 0 && (
             <>
               <SectionHeader label="Starters" count={starters.length} />
-              {starters.map(p => <PlayerRow key={p.player_id} player={p} latestNews={newsMap[p.player_id]} startSitRec={startSitMap[p.player_id]} />)}
+              {starters.map(p => <PlayerRow key={p.player_id} player={p} latestNews={newsMap[p.player_id]} startSitRec={startSitMap[p.player_id]} isOpen={openId === p.player_id} onToggle={() => toggle(p.player_id)} />)}
             </>
           )}
           {bench.length > 0 && (
             <>
               <SectionHeader label="Bench" count={bench.length} />
-              {bench.map(p => <PlayerRow key={p.player_id} player={p} latestNews={newsMap[p.player_id]} startSitRec={startSitMap[p.player_id]} />)}
+              {bench.map(p => <PlayerRow key={p.player_id} player={p} latestNews={newsMap[p.player_id]} startSitRec={startSitMap[p.player_id]} isOpen={openId === p.player_id} onToggle={() => toggle(p.player_id)} />)}
             </>
           )}
         </tbody>

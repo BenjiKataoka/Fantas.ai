@@ -6,6 +6,23 @@ import WeightSlider from '../components/WeightSlider'
 import AlertFeed from '../components/AlertFeed'
 import { TableSkeleton } from '../components/Skeletons'
 
+// ── Analyze-my-roster button ──────────────────────────────────────────────────
+// State lives in AppContext so progress survives page navigation; this is just the UI.
+function AnalyzeRosterButton() {
+  const { analysis, runRosterAnalysis } = useApp()
+  const running = analysis?.running
+
+  return (
+    <button
+      onClick={runRosterAnalysis}
+      disabled={running}
+      className="px-3 py-1.5 bg-brand/15 hover:bg-brand/25 disabled:opacity-60 disabled:cursor-wait text-brand text-xs font-semibold rounded-lg border border-brand/30 transition-colors"
+    >
+      {running ? `Analyzing ${analysis.ready}/${analysis.total}` : 'Analyze roster'}
+    </button>
+  )
+}
+
 const btnPrimary = 'bg-brand hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-brand-fg font-semibold rounded-lg transition-all'
 const field = 'bg-raised border border-line rounded-lg px-3 py-2 text-sm text-content placeholder-subtle/60 focus:outline-none focus:border-brand'
 
@@ -98,6 +115,7 @@ function TopBar({ rosterData, lastRefresh, onRefresh, loading }) {
       </div>
       <div className="flex items-center gap-3">
         {refreshLabel && <span className="text-xs text-subtle/70 font-mono">Updated {refreshLabel}</span>}
+        {rosterData && <AnalyzeRosterButton />}
         <button
           onClick={onRefresh}
           disabled={loading}

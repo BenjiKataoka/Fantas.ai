@@ -351,6 +351,7 @@ def run_batch_analysis_tests():
         captured = {}
         async def fake_worker(user_id, player_ids):
             captured["ids"] = player_ids
+            tracker_service._roster_runs.discard(user_id)  # mirror the real worker's cleanup
 
         with patch("services.tracker_service.get_nfl_state",
                    new=AsyncMock(return_value={"season_type": "regular"})), \
@@ -390,6 +391,7 @@ def run_batch_analysis_tests():
         cap3 = {}
         async def worker3(user_id, player_ids):
             cap3["ids"] = player_ids
+            tracker_service._roster_runs.discard(user_id)
         with patch("services.tracker_service.get_nfl_state",
                    new=AsyncMock(return_value={"season_type": "regular"})), \
              patch("services.tracker_service._analyze_roster_worker", new=worker3):
@@ -406,8 +408,67 @@ def run_batch_analysis_tests():
         assert result == {"status": "empty", "queued": 0, "skipped_fresh": 0, "total": 0}, result
         print(f"    PASS — {result}")
 
+        # [5] Concurrency guard: a run already in flight → already_running, no 2nd worker
+        print("\n[5] Run already in flight → already_running, no duplicate worker...")
+        tracker_service._roster_runs.add(1)  # simulate an active run for user 1
+        try:
+            mock_db5 = AsyncMock()
+            mock_db5.execute = AsyncMock(return_value=roster_of("p1", "p2"))
+            mock_db5.get = get_fresh
+            spawned5 = {"called": False}
+            async def worker5(user_id, player_ids):
+                spawned5["called"] = True
+            with patch("services.tracker_service.get_nfl_state",
+                       new=AsyncMock(return_value={"season_type": "regular"})), \
+                 patch("services.tracker_service._analyze_roster_worker", new=worker5):
+                result = await tracker_service.analyze_roster(1, mock_db5)
+                await asyncio.sleep(0)
+            assert result["status"] == "already_running", result
+            assert spawned5["called"] is False, "must not spawn a second worker"
+            print(f"    PASS — {result}")
+        finally:
+            tracker_service._roster_runs.discard(1)
+
     asyncio.run(_test())
     print("\n✅ All batch analysis tests passed.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 4.6 — Stock profile serializer (roster dropdown)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def run_stock_serializer_tests():
+    print("\n" + "=" * 50)
+    print("TRACKER — STOCK PROFILE SERIALIZER")
+    print("=" * 50)
+    from services.tracker_service import serialize_stock_profile
+
+    # [1] No profile / never completed → None (frontend shows "not analyzed yet")
+    print("\n[1] None and unanalyzed profile → None...")
+    assert serialize_stock_profile(None) is None
+    unfinished = MagicMock(last_full_analysis=None)
+    assert serialize_stock_profile(unfinished) is None
+    print("    PASS — both return None")
+
+    # [2] Completed profile → flat dict with key fields + ISO timestamp
+    print("\n[2] Completed profile → serialized dict...")
+    ts = datetime.utcnow()
+    profile = MagicMock(
+        last_full_analysis=ts, overall_direction="BULLISH", overall_magnitude="MEDIUM",
+        concern_level=4, concern_summary="Workload trending up.", worry_score=3,
+        combined_score=3.5, bullish_factors=["target share up"], bearish_factors=["tough schedule"],
+        sentiment_score=0.42, sentiment_label="BULLISH", dominant_themes=["usage"],
+        contrarian_flag=False, sentiment_vs_stock="CONFIRMS",
+        short_term_outlook="Solid flex.", long_term_outlook="RB2 upside.",
+        draft_recommendation="FAIR_VALUE",
+    )
+    out = serialize_stock_profile(profile)
+    assert out["overall_direction"] == "BULLISH"
+    assert out["concern_level"] == 4
+    assert out["sentiment_score"] == 0.42
+    assert out["last_full_analysis"] == ts.isoformat()
+    assert "historical_context" not in out  # kept lean for roster payload
+    print(f"    PASS — {out['overall_direction']}/{out['overall_magnitude']}, concern={out['concern_level']}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -468,6 +529,7 @@ if __name__ == "__main__":
     run_star_unstar_tests()
     run_combined_score_tests()
     run_batch_analysis_tests()
+    run_stock_serializer_tests()
     run_router_tests()
     run_failure_tests()
     print("\n" + "=" * 50)

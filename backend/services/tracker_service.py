@@ -191,6 +191,12 @@ async def refresh_profile(
 
 # ── Batch roster analysis ─────────────────────────────────────────────────────
 
+# User IDs with a roster deep-dive currently in flight. Prevents a second click (or a
+# second browser tab) from spawning a duplicate worker and doubling Gemini spend.
+# In-memory only — cleared on process restart, which is fine for a soft guard.
+_roster_runs: set[int] = set()
+
+
 async def _season_ttl_hours(db: AsyncSession) -> float:
     """Freshness window for a stock profile, by season state.
 
@@ -204,9 +210,13 @@ async def _season_ttl_hours(db: AsyncSession) -> float:
 
 
 async def _profile_is_fresh(player_id: str, db: AsyncSession, ttl_hours: float) -> bool:
-    """True if a completed stock profile exists and is younger than the TTL."""
+    """True if a COMPLETE stock profile exists and is younger than the TTL."""
     profile = await db.get(PlayerStockProfile, player_id)
     if not profile or not profile.last_full_analysis:
+        return False
+    # A profile missing its concern/sentiment scores is incomplete (a transient Pass 3/4
+    # failure nulled them). Treat it as stale so the next run retries and repairs it.
+    if profile.concern_level is None or profile.sentiment_score is None:
         return False
     age = datetime.utcnow() - profile.last_full_analysis
     return age.total_seconds() < ttl_hours * 3600
@@ -227,6 +237,11 @@ async def analyze_roster(user_id: int, db: AsyncSession, force: bool = False) ->
     if not player_ids:
         return {"status": "empty", "queued": 0, "skipped_fresh": 0, "total": 0}
 
+    # Don't spawn a duplicate worker if one is already draining this user's roster.
+    if user_id in _roster_runs:
+        return {"status": "already_running", "queued": 0,
+                "skipped_fresh": 0, "total": len(player_ids)}
+
     ttl = await _season_ttl_hours(db)
     to_analyze: list[str] = []
     for pid in player_ids:
@@ -234,6 +249,8 @@ async def analyze_roster(user_id: int, db: AsyncSession, force: bool = False) ->
             to_analyze.append(pid)
 
     if to_analyze:
+        # Mark in-flight before spawning so a rapid second call is rejected above.
+        _roster_runs.add(user_id)
         # One background worker drains the list at a paced rate (see ROSTER_PACE_SECONDS).
         asyncio.create_task(_analyze_roster_worker(user_id, to_analyze))
 
@@ -265,7 +282,12 @@ async def roster_analysis_status(user_id: int, db: AsyncSession) -> dict:
         )
     ).scalars().all()
     ready = len(set(rows))
-    return {"total": len(player_ids), "ready": ready, "pending": len(player_ids) - ready}
+    return {
+        "total": len(player_ids),
+        "ready": ready,
+        "pending": len(player_ids) - ready,
+        "running": user_id in _roster_runs,
+    }
 
 
 async def _analyze_roster_worker(user_id: int, player_ids: list[str]) -> None:
@@ -274,21 +296,25 @@ async def _analyze_roster_worker(user_id: int, player_ids: list[str]) -> None:
 
     logger.info(f"[Tracker] Roster analysis started user={user_id} players={len(player_ids)}")
     loop = asyncio.get_event_loop()
-    for pid in player_ids:
-        start = loop.time()
-        try:
-            async with AsyncSessionLocal() as s:
-                player = await s.get(Player, pid)
-            if player is None:
-                continue
-            # player is detached here but only its already-loaded scalar attrs are read.
-            await _run_analysis_for_player(user_id, pid, player, None)
-        except Exception as e:
-            logger.error(f"[Tracker] roster worker failed player={pid}: {e}")
-        # Pace the next player so 4 calls/player stays within ~15 RPM.
-        elapsed = loop.time() - start
-        await asyncio.sleep(max(0.0, ROSTER_PACE_SECONDS - elapsed))
-    logger.info(f"[Tracker] Roster analysis finished user={user_id}")
+    try:
+        for pid in player_ids:
+            start = loop.time()
+            try:
+                async with AsyncSessionLocal() as s:
+                    player = await s.get(Player, pid)
+                if player is None:
+                    continue
+                # player is detached here but only its already-loaded scalar attrs are read.
+                await _run_analysis_for_player(user_id, pid, player, None)
+            except Exception as e:
+                logger.error(f"[Tracker] roster worker failed player={pid}: {e}")
+            # Pace the next player so 4 calls/player stays within ~15 RPM.
+            elapsed = loop.time() - start
+            await asyncio.sleep(max(0.0, ROSTER_PACE_SECONDS - elapsed))
+    finally:
+        # Always clear the in-flight flag, even if the worker errors out.
+        _roster_runs.discard(user_id)
+        logger.info(f"[Tracker] Roster analysis finished user={user_id}")
 
 
 # ── Analysis pipeline ─────────────────────────────────────────────────────────
@@ -480,6 +506,57 @@ async def _upsert_stock_profile(
             draft_recommendation=result.get("draft_recommendation"),
             last_full_analysis=now,
         ))
+
+
+# ── Stock profile serialization ───────────────────────────────────────────────
+
+def serialize_stock_profile(profile: Optional[PlayerStockProfile]) -> Optional[dict]:
+    """Flatten a completed PlayerStockProfile to the JSON shape the frontend renders.
+
+    Returns None when there's no finished analysis, so callers can show an
+    "not analyzed yet" state. Omits the 200-word historical_context to keep roster
+    payloads light — the tracker detail view fetches that separately.
+    """
+    if not profile or not profile.last_full_analysis:
+        return None
+    return {
+        "overall_direction": profile.overall_direction,
+        "overall_magnitude": profile.overall_magnitude,
+        "concern_level": profile.concern_level,
+        "concern_summary": profile.concern_summary,
+        "worry_score": profile.worry_score,
+        "combined_score": profile.combined_score,
+        "bullish_factors": profile.bullish_factors,
+        "bearish_factors": profile.bearish_factors,
+        "sentiment_score": profile.sentiment_score,
+        "sentiment_label": profile.sentiment_label,
+        "dominant_themes": profile.dominant_themes,
+        "contrarian_flag": profile.contrarian_flag,
+        "sentiment_vs_stock": profile.sentiment_vs_stock,
+        "short_term_outlook": profile.short_term_outlook,
+        "long_term_outlook": profile.long_term_outlook,
+        "draft_recommendation": profile.draft_recommendation,
+        "last_full_analysis": profile.last_full_analysis.isoformat(),
+    }
+
+
+async def get_stock_profiles_for(player_ids: list[str], db: AsyncSession) -> dict[str, dict]:
+    """Batch-fetch current stock profiles for a set of players → {player_id: serialized}.
+
+    Only completed profiles are returned; missing/unanalyzed players are absent from
+    the map. Profiles are global, so this reuses whatever any user has already analyzed.
+    """
+    if not player_ids:
+        return {}
+    rows = (
+        await db.execute(
+            select(PlayerStockProfile).where(
+                PlayerStockProfile.player_id.in_(player_ids),
+                PlayerStockProfile.last_full_analysis.isnot(None),
+            )
+        )
+    ).scalars().all()
+    return {r.player_id: serialize_stock_profile(r) for r in rows}
 
 
 # ── Card builder ──────────────────────────────────────────────────────────────
