@@ -51,9 +51,16 @@ def compute_weighted_projection(
     if not available:
         return {"weighted_proj": None, "sources_used": None, "confidence_flag": None}
 
-    # Redistribute weight proportionally among available sources
+    # Redistribute weight proportionally among available sources.
     total_weight = sum(w for _, w in available.values())
-    normalized = {k: round(v / total_weight, 4) for k, (_, v) in available.items()}
+    if total_weight <= 0:
+        # The user's weights give 0 to every source we actually have (e.g. 100% ESPN
+        # for a player with no ESPN projection). Fall back to an equal split rather
+        # than dividing by zero.
+        n = len(available)
+        normalized = {k: round(1 / n, 4) for k in available}
+    else:
+        normalized = {k: round(v / total_weight, 4) for k, (_, v) in available.items()}
 
     weighted_proj = sum(val * normalized[k] for k, (val, _) in available.items())
     weighted_proj = round(weighted_proj, 2)
