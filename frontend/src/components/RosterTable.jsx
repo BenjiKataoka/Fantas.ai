@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import InjuryBadge from './InjuryBadge'
 import ProjectionBar from './ProjectionBar'
 import ConfidenceBadge from './ConfidenceBadge'
@@ -48,6 +48,39 @@ function StartSitCell({ rec }) {
     <span className="px-1.5 py-0.5 rounded bg-raised border border-line text-subtle text-xs font-medium">
       SIT
     </span>
+  )
+}
+
+// Expansion row that animates open (down) AND closed (up). Stays mounted through the
+// close transition, then unmounts once the collapse finishes.
+function CollapseRow({ open, colSpan, children }) {
+  const [render, setRender] = useState(open)
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setRender(true)
+      // Two rAFs so the browser paints the 0fr state before we flip to 1fr — otherwise
+      // it mounts already-open and the transition never runs.
+      const id = requestAnimationFrame(() => requestAnimationFrame(() => setExpanded(true)))
+      return () => cancelAnimationFrame(id)
+    }
+    setExpanded(false)  // triggers the collapse; unmount happens on transitionend
+  }, [open])
+
+  if (!render) return null
+  return (
+    <tr>
+      <td colSpan={colSpan} className="p-0 bg-ink/30 border-l-2 border-brand">
+        <div
+          className="collapse-row"
+          style={{ gridTemplateRows: expanded ? '1fr' : '0fr', opacity: expanded ? 1 : 0 }}
+          onTransitionEnd={(e) => { if (!open && e.propertyName === 'grid-template-rows') setRender(false) }}
+        >
+          <div>{children}</div>
+        </div>
+      </td>
+    </tr>
   )
 }
 
@@ -111,15 +144,12 @@ function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
       </td>
 
       {/* Start/Sit */}
-      <td className={COL_CELL}><StartSitCell rec={startSitRec} /></td>
+      <td className={`${COL_CELL} whitespace-nowrap`}><StartSitCell rec={startSitRec} /></td>
     </tr>
-    {isOpen && (
-      <tr>
-        <td colSpan={9} className="p-0 bg-ink/30 border-l-2 border-brand">
-          <StockSection stock={stock} />
-        </td>
-      </tr>
-    )}
+    {/* Drops open and collapses back up; column widths stay locked by table-fixed. */}
+    <CollapseRow open={isOpen} colSpan={9}>
+      <StockSection stock={stock} />
+    </CollapseRow>
     </>
   )
 }
@@ -135,8 +165,23 @@ export default function RosterTable({ players, newsMap = {}, startSitMap = {} })
   const bench    = players.filter(p => !p.is_starter)
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-      <table className="w-full text-left">
+    <div className="rounded-xl border border-line bg-surface">
+      {/* table-fixed + colgroup lock column widths (so the expandable row never reflows
+          the table) AND size the table to exactly fit its container — no horizontal
+          scroll, so opening a card never lets you swipe past the left/right edges.
+          (A dedicated mobile pass comes after deploy.) */}
+      <table className="w-full table-fixed text-left">
+        <colgroup>
+          <col className="w-[21%]" /> {/* Player */}
+          <col className="w-[6%]" />  {/* Pos */}
+          <col className="w-[9%]" />  {/* Slp */}
+          <col className="w-[9%]" />  {/* ESPN */}
+          <col className="w-[9%]" />  {/* FP */}
+          <col className="w-[10%]" /> {/* Proj */}
+          <col className="w-[8%]" />  {/* Conf */}
+          <col className="w-[14%]" /> {/* News */}
+          <col className="w-[14%]" /> {/* Start/Sit */}
+        </colgroup>
         <thead className="bg-raised border-b border-line">
           <tr>
             <th className={COL_HEADER}>Player</th>

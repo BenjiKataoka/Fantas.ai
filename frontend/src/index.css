@@ -92,3 +92,19 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Collapsible roster-row body: transitions grid-template-rows between 0fr and 1fr so
+   the card both drops open (pushing rows below down) AND animates back up on close.
+   The child clips via overflow:hidden as the track shrinks/grows. */
+.collapse-row {
+  display: grid;
+  transition: grid-template-rows 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
+}
+.collapse-row > * {
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collapse-row { transition: none; }
+}

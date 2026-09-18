@@ -10,6 +10,9 @@ import TrendChart, { METRICS } from '../components/TrendChart'
 import PlayerSearchModal from '../components/PlayerSearchModal'
 
 const POS_COLORS = { QB: 'text-violet-300', RB: 'text-teal-300', WR: 'text-sky-300', TE: 'text-amber-300', K: 'text-subtle' }
+// Each detail section fades + slides in from the top; a per-section animationDelay
+// makes them land 1-by-1 top→down when a player is (re)selected.
+const REVEAL = 'animate-in fade-in-0 slide-in-from-top-2 duration-300 ease-out fill-mode-both'
 const RANGES = [{ k: '1w', label: '1W' }, { k: '1m', label: '1M' }, { k: 'season', label: 'Season' }]
 const METRIC_KEYS = ['rank', 'rostered', 'sentiment', 'concern', 'adp']
 
@@ -199,9 +202,14 @@ export default function PlayerTracker() {
               </>}
         </div>
       ) : selected && (
-        <div className="bg-surface border border-line rounded-xl overflow-hidden">
+        // key on the player id so selecting a new player remounts the card and replays
+        // the staggered reveal below; metric/range toggles keep the same id (no retrigger).
+        <div
+          key={selected.id}
+          className="bg-surface border border-line rounded-xl overflow-hidden"
+        >
           {/* Player header */}
-          <div className="flex items-center gap-3 p-4 border-b border-line">
+          <div className={`flex items-center gap-3 p-4 border-b border-line ${REVEAL}`} style={{ animationDelay: '0ms' }}>
             <PlayerAvatar playerId={selected.id} name={selected.name} size="lg" />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -226,7 +234,7 @@ export default function PlayerTracker() {
 
           {/* Plain-English trend readout */}
           {stats && stats.changed && (
-            <div className="px-4 pt-3 -mb-1">
+            <div className={`px-4 pt-3 -mb-1 ${REVEAL}`} style={{ animationDelay: '70ms' }}>
               <span className={`inline-flex items-center gap-1.5 text-sm font-medium ${stats.improved ? 'text-bull' : 'text-bear'}`}>
                 {stats.improved ? '▲ Trending up' : '▼ Trending down'}
                 <span className="text-subtle font-normal font-mono text-xs">
@@ -237,7 +245,7 @@ export default function PlayerTracker() {
           )}
 
           {/* Chart controls */}
-          <div className="flex items-center justify-between flex-wrap gap-2 px-4 pt-3">
+          <div className={`flex items-center justify-between flex-wrap gap-2 px-4 pt-3 ${REVEAL}`} style={{ animationDelay: '140ms' }}>
             <div className="inline-flex rounded-lg border border-line bg-raised p-0.5">
               {METRIC_KEYS.map(k => (
                 <button
@@ -264,20 +272,20 @@ export default function PlayerTracker() {
           </div>
 
           {/* Chart */}
-          <div className="px-2 pb-2 pt-1">
+          <div className={`px-2 pb-2 pt-1 ${REVEAL}`} style={{ animationDelay: '210ms' }}>
             {histLoading && !history
               ? <div className="h-[210px] flex items-center justify-center text-sm text-subtle">Loading…</div>
               : <TrendChart points={history?.points || []} metric={metric} position={selected.position} />}
           </div>
 
           {/* Current profile (comprehensive) */}
-          <div className="border-t border-line">
+          <div className={`border-t border-line ${REVEAL}`} style={{ animationDelay: '280ms' }}>
             <StockSection stock={selected.stock} />
           </div>
 
           {/* Watchlist-only remove */}
           {tab === 'watchlist' && (
-            <div className="px-4 pb-4">
+            <div className={`px-4 pb-4 ${REVEAL}`} style={{ animationDelay: '350ms' }}>
               <button onClick={handleUnstar} className="text-xs text-subtle/70 hover:text-bear transition-colors">
                 Remove from watchlist
               </button>

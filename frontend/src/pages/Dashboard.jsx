@@ -210,7 +210,7 @@ export default function Dashboard() {
           {rosterData && <RosterTable players={rosterData.roster} newsMap={newsMap} startSitMap={startSitMap} />}
         </div>
 
-        <div className="w-64 shrink-0 flex flex-col gap-4">
+        <div className="w-56 shrink-0 flex flex-col gap-4">
           <WeightSidebar />
           <div className="bg-surface border border-line rounded-xl p-5">
             <h3 className="text-sm font-display font-semibold text-content mb-3">Alerts</h3>
