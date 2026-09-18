@@ -105,7 +105,7 @@ def run_classify_type_tests():
     cases = {
         "Josh Jacobs questionable with an ankle": "INJURY",
         "Player signs three-year extension": "CONTRACT",
-        "Team signs veteran WR to one-year deal": "TRANSACTION",
+        "Team signed a veteran WR off waivers": "TRANSACTION",
         "Rookie named starter, veteran demoted on depth chart": "DEPTH_CHART",
         "Quarterback throws for 300 yards in win": "GENERAL",
     }
@@ -116,6 +116,11 @@ def run_classify_type_tests():
 
     print("\n[3] no false-positive from ambiguous words ('came back', 'quarterback')...")
     assert classify_news_type("He came back to lead the quarterback room") == "GENERAL"
+    print("    PASS")
+
+    print("\n[4] 'bad sign' / 'signs of' don't false-trigger TRANSACTION...")
+    assert classify_news_type("Bad game or bad sign for the offense") == "GENERAL"
+    assert classify_news_type("Showing signs of concern early in the year") == "GENERAL"
     print("    PASS")
 
     print("\n✅ All classifier tests passed.")

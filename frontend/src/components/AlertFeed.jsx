@@ -1,4 +1,3 @@
-import StockBadge from './StockBadge'
 import PlayerAvatar from './PlayerAvatar'
 
 function relativeTime(isoStr) {
@@ -12,24 +11,61 @@ function relativeTime(isoStr) {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
+// What counts as "alert-worthy": actionable categories or a real directional signal.
+// General/performance chatter is excluded here (it still shows in the News Hub).
+const TYPE_SCORE = { INJURY: 3, TRANSACTION: 3, DEPTH_CHART: 2, CONTRACT: 2 }
+const MAG_SCORE  = { HIGH: 3, MEDIUM: 2, LOW: 1 }
+const SIGNAL     = new Set(['BULLISH', 'BEARISH'])
+
+const TYPE_LABEL = {
+  INJURY:      { text: 'Injury',      cls: 'text-bear' },
+  TRANSACTION: { text: 'Transaction', cls: 'text-teal-300' },
+  DEPTH_CHART: { text: 'Depth',       cls: 'text-amber-300' },
+  CONTRACT:    { text: 'Contract',    cls: 'text-brand' },
+}
+
+const isMeaningful = (i) => (TYPE_SCORE[i.news_type] || 0) >= 2 || SIGNAL.has(i.stock_direction)
+
+// Higher = more important. Significant type dominates, then magnitude, then a bull/bear
+// signal, then whether a full Gemini analysis exists.
+function importance(i) {
+  const t = (TYPE_SCORE[i.news_type] || 0) * 4
+  const m = (MAG_SCORE[i.stock_magnitude] || 0) * 2
+  const d = SIGNAL.has(i.stock_direction) ? 2 : 0
+  const full = i.analysis_tier === 'full' ? 1 : 0
+  return t + m + d + full
+}
+
+const recency = (i) => (i.published_at ? new Date(i.published_at).getTime() : 0)
+
 /**
- * AlertFeed — compact news sidebar for Dashboard.
- * Shows the most recent news items (up to maxItems) for rostered players.
+ * AlertFeed — a curated (not chronological) sidebar of the roster's meaningful news.
+ * Filters to actionable items, keeps the single most-important alert per player, and
+ * ranks by importance then recency so one player can't flood the feed.
  *
  * Props:
- *   items     — array of news cards from AppContext newsData.news
- *   playerMap — { player_id: { name, position } } built from rosterData
- *   maxItems  — max items to display (default 8)
+ *   items     — news cards from AppContext newsData.news
+ *   playerMap — { player_id: { name, position } } from rosterData
+ *   maxItems  — max alerts to display (default 6)
  */
-export default function AlertFeed({ items = [], playerMap = {}, maxItems = 8 }) {
-  const visible = items
-    .filter(item => item.stock_direction || item.analysis_tier === 'full')
+export default function AlertFeed({ items = [], playerMap = {}, maxItems = 6 }) {
+  // 1) keep only meaningful items, 2) best one per player, 3) rank, 4) cap.
+  const bestPerPlayer = new Map()
+  for (const item of items) {
+    if (!isMeaningful(item)) continue
+    const prev = bestPerPlayer.get(item.player_id)
+    if (!prev || importance(item) > importance(prev) ||
+        (importance(item) === importance(prev) && recency(item) > recency(prev))) {
+      bestPerPlayer.set(item.player_id, item)
+    }
+  }
+
+  const visible = [...bestPerPlayer.values()]
+    .sort((a, b) => importance(b) - importance(a) || recency(b) - recency(a))
     .slice(0, maxItems)
 
   if (!visible.length) {
-    return (
-      <p className="text-xs text-subtle/70">No recent news for your roster.</p>
-    )
+    return <p className="text-xs text-subtle/70">No injury or roster alerts right now.</p>
   }
 
   return (
@@ -37,6 +73,7 @@ export default function AlertFeed({ items = [], playerMap = {}, maxItems = 8 }) 
       {visible.map(item => {
         const player = playerMap[item.player_id]
         const label  = player ? `${player.name} · ${player.position}` : `Player ${item.player_id}`
+        const type   = TYPE_LABEL[item.news_type]
         return (
           <div key={item.news_id} className="flex gap-2 py-2 border-b border-line/60 last:border-0">
             <PlayerAvatar playerId={item.player_id} name={player?.name} size="sm" />
@@ -46,8 +83,8 @@ export default function AlertFeed({ items = [], playerMap = {}, maxItems = 8 }) 
                 <span className="text-xs text-subtle/70 shrink-0 font-mono">{relativeTime(item.published_at)}</span>
               </div>
               <p className="text-xs text-subtle leading-snug line-clamp-2">{item.headline}</p>
-              {item.stock_direction && (
-                <StockBadge direction={item.stock_direction} magnitude={item.stock_magnitude} size="sm" />
+              {type && (
+                <span className={`text-[10px] font-semibold uppercase tracking-wide ${type.cls}`}>{type.text}</span>
               )}
             </div>
           </div>

@@ -163,7 +163,11 @@ NEWS_TYPE_KEYWORDS: list[tuple[str, list[str]]] = [
         r"\bholdout\b", r"\bguaranteed?\b", r"\bcap hit\b",
     ]),
     ("TRANSACTION", [
-        r"\bsign(?:s|ed|ing)?\b", r"\bwaiv(?:e|ed|er)", r"\breleased?\b", r"\bcut by\b",
+        # "sign" needs transaction context — bare "sign"/"signs of" over-matches noise
+        # like "bad sign". Past-tense "signed" and "re-sign" are safe on their own.
+        r"\bre-?signs?\b", r"\bsigned\b", r"\bsigns (?:with|to|for|a\b|an\b)",
+        r"\bsigning (?:with|a\b|of\b|bonus)",
+        r"\bwaiv(?:e|ed|er)", r"\breleased?\b", r"\bcut by\b",
         r"\bclaim(?:s|ed)?\b", r"\belevat", r"\btrade[d]?\b", r"\bacquir",
         r"\bpractice squad\b",
     ]),
