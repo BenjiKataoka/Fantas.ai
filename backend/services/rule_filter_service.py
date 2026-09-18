@@ -144,6 +144,53 @@ OFFSEASON_KEYWORDS = [
 ]
 
 
+# Category classifier — assigns a news_type even when NO direction rule fired, so
+# labeling no longer piggybacks on scoring. Order matters: first category wins.
+# Kept deliberately injury-forward (the most common + most actionable fantasy news);
+# ambiguous body-part words ("back", "quad") are omitted to avoid false positives.
+NEWS_TYPE_KEYWORDS: list[tuple[str, list[str]]] = [
+    ("INJURY", [
+        r"\binjur", r"\bhurt\b", r"\bquestionable\b", r"\bdoubtful\b", r"\bruled out\b",
+        r"\bmiss(?:es|ed|ing)?\b", r"\bsidelined\b", r"\bplaced on IR\b", r"\bon IR\b",
+        r"\bsurgery\b", r"\bconcussion\b", r"\bhamstring\b", r"\bankle\b", r"\bknee\b",
+        r"\bgroin\b", r"\bshoulder\b", r"\bcalf\b", r"\bsprain", r"\bstrain", r"\btorn\b",
+        r"\bfractur", r"\bACL\b", r"\bMCL\b", r"\bDNP\b", r"\bdid not practice\b",
+        r"\blimited practice\b", r"\bfull practice\b", r"\binjury designation\b",
+        r"\bweek[- ]to[- ]week\b", r"\bday[- ]to[- ]day\b", r"\bactivated\b",
+    ]),
+    ("CONTRACT", [
+        r"\bcontract\b", r"\bextension\b", r"\brestructur", r"\bfranchise tag\b",
+        r"\bholdout\b", r"\bguaranteed?\b", r"\bcap hit\b",
+    ]),
+    ("TRANSACTION", [
+        r"\bsign(?:s|ed|ing)?\b", r"\bwaiv(?:e|ed|er)", r"\breleased?\b", r"\bcut by\b",
+        r"\bclaim(?:s|ed)?\b", r"\belevat", r"\btrade[d]?\b", r"\bacquir",
+        r"\bpractice squad\b",
+    ]),
+    ("DEPTH_CHART", [
+        r"\bstarter\b", r"\bstarting (?:job|role|running back|quarterback|rb|qb)\b",
+        r"\bdepth chart\b", r"\bdemot", r"\bpromot", r"\bbench", r"\bfirst[- ]team\b",
+        r"\bsecond[- ]string\b", r"\bsnap (?:share|count)\b", r"\bworkload\b",
+        r"\bcommittee\b", r"\blead back\b",
+    ]),
+]
+
+
+def classify_news_type(headline: str, news_body: Optional[str] = None) -> str:
+    """Infer a news_type from category keywords, independent of direction scoring.
+
+    Used as a fallback when a direction rule didn't already assign a type, so obvious
+    injury/transaction items get labeled even if they don't trip a scoring keyword.
+    Returns one of INJURY/CONTRACT/TRANSACTION/DEPTH_CHART, else GENERAL.
+    """
+    text = f"{headline} {news_body or ''}"
+    for news_type, patterns in NEWS_TYPE_KEYWORDS:
+        for pattern in patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return news_type
+    return "GENERAL"
+
+
 @dataclass
 class FilterResult:
     matched: bool                        # True = rule fired; False = pass to Gemini

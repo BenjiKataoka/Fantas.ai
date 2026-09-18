@@ -179,6 +179,9 @@ def run_orchestration_tests():
                 # my_roster query → empty (not rostered separately)
                 mock_result.fetchall.return_value = []
             elif n == 3:
+                # tracked names (for RSS matcher) → empty (RSS is mocked out anyway)
+                mock_result.fetchall.return_value = []
+            elif n == 4:
                 # existing source_urls → empty
                 mock_result.fetchall.return_value = []
             else:
@@ -204,6 +207,8 @@ def run_orchestration_tests():
                    new=AsyncMock(return_value=fake_espn_news)), \
              patch("services.news_scraper_service.get_teams_playing_today",
                    new=AsyncMock(return_value=fake_teams_today)), \
+             patch("services.news_scraper_service.rss_service.fetch_rss_news",
+                   new=AsyncMock(return_value=[])), \
              patch("services.news_scraper_service._resolve_player_id",
                    new=AsyncMock(side_effect=["mahomes_id", None])):  # Mahomes resolves, Nobody doesn't
 
@@ -226,10 +231,12 @@ def run_orchestration_tests():
             mock_result = MagicMock()
             n = call_tracker["execute_calls"]
             if n == 1:
-                mock_result.fetchall.return_value = [("mahomes_id",)]
+                mock_result.fetchall.return_value = [("mahomes_id",)]   # starred tier
             elif n == 2:
-                mock_result.fetchall.return_value = []
+                mock_result.fetchall.return_value = []                   # rostered tier
             elif n == 3:
+                mock_result.fetchall.return_value = [("Patrick Mahomes",)]  # tracked names (for RSS matcher)
+            elif n == 4:
                 # Return the existing URL so Mahomes's news gets deduped
                 mock_result.fetchall.return_value = [("https://rotowire.com/news/1",)]
             else:
@@ -244,7 +251,9 @@ def run_orchestration_tests():
              patch("services.news_scraper_service.nfl_service.get_espn_news",
                    new=AsyncMock(return_value=[])), \
              patch("services.news_scraper_service.get_teams_playing_today",
-                   new=AsyncMock(return_value=fake_teams_today)):
+                   new=AsyncMock(return_value=fake_teams_today)), \
+             patch("services.news_scraper_service.rss_service.fetch_rss_news",
+                   new=AsyncMock(return_value=[])):
 
             summary = await news_scraper_service.scrape_and_analyze(
                 db=mock_db,
@@ -293,7 +302,9 @@ def run_scraper_failure_tests():
              patch("services.news_scraper_service.nfl_service.get_espn_news",
                    new=AsyncMock(return_value=[])), \
              patch("services.news_scraper_service.get_teams_playing_today",
-                   new=AsyncMock(return_value=set())):
+                   new=AsyncMock(return_value=set())), \
+             patch("services.news_scraper_service.rss_service.fetch_rss_news",
+                   new=AsyncMock(return_value=[])):
 
             summary = await news_scraper_service.scrape_and_analyze(
                 db=mock_db,
@@ -313,7 +324,9 @@ def run_scraper_failure_tests():
              patch("services.news_scraper_service.nfl_service.get_espn_news",
                    new=AsyncMock(return_value=[])), \
              patch("services.news_scraper_service.get_teams_playing_today",
-                   new=AsyncMock(return_value=set())):  # empty = schedule API failed
+                   new=AsyncMock(return_value=set())), \
+             patch("services.news_scraper_service.rss_service.fetch_rss_news",
+                   new=AsyncMock(return_value=[])):  # empty = schedule API failed
 
             summary = await news_scraper_service.scrape_and_analyze(
                 db=mock_db,

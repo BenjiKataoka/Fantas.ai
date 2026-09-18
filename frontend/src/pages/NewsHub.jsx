@@ -16,9 +16,17 @@ function relativeTime(isoStr) {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
+// Preferred display casing per source. Acronyms stay uppercase; unknown sources
+// fall back to Title case so a new feed still renders sensibly.
+const SOURCE_LABELS = {
+  PFT: 'PFT', CBS: 'CBS', ESPN: 'ESPN', YAHOO: 'Yahoo',
+  ROTOWIRE: 'RotoWire', SLEEPER: 'Sleeper', NFL_TRANS: 'NFL',
+}
+
 function formatSource(source) {
   if (!source) return ''
-  return source.charAt(0).toUpperCase() + source.slice(1).toLowerCase()
+  const key = source.toUpperCase()
+  return SOURCE_LABELS[key] || (source.charAt(0).toUpperCase() + source.slice(1).toLowerCase())
 }
 
 // news_type → chip styling. Presentational only, no LLM — the type is scraped.
@@ -54,7 +62,11 @@ const FILTERS = [
 function NewsCard({ item, playerLabel, playerName }) {
   const [expanded, setExpanded] = useState(false)
   const isFull = item.analysis_tier === 'full'
-  const hasBadge = !!item.stock_direction
+  // On rostered-only (signal_only) cards the badge is just a rule-keyword echo that
+  // mostly restates the headline + type chip. Only surface it when the event is HIGH
+  // magnitude (ruled out / IR / torn) — genuinely actionable at a glance. Full (starred)
+  // analysis cards always show their badge.
+  const showBadge = !!item.stock_direction && (isFull || item.stock_magnitude === 'HIGH')
   const url = item.source_url
   const body = item.news_body?.trim()
   const longBody = body && body.length > 220
@@ -123,10 +135,10 @@ function NewsCard({ item, playerLabel, playerName }) {
         <p className="text-sm text-content/90 leading-relaxed border-l-2 border-brand/40 pl-3">{item.summary}</p>
       )}
 
-      {/* Signal / stock badge row — free rule-filter or full Gemini direction */}
-      {(hasBadge || item.confidence_score != null) && (
+      {/* Signal / stock badge row — full Gemini direction, or a HIGH-magnitude rule signal */}
+      {showBadge && (
         <div className="flex items-center gap-3">
-          {hasBadge && <StockBadge direction={item.stock_direction} magnitude={item.stock_magnitude} size={isFull ? undefined : 'sm'} />}
+          <StockBadge direction={item.stock_direction} magnitude={item.stock_magnitude} size={isFull ? undefined : 'sm'} />
           {item.confidence_score != null && (
             <span className="text-xs text-subtle font-mono tabular-nums">{Math.round(item.confidence_score * 100)}% confidence</span>
           )}

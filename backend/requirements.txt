@@ -14,3 +14,4 @@ google-genai
 sleeper-api-wrapper
 pyjwt[crypto]
 apscheduler
+feedparser

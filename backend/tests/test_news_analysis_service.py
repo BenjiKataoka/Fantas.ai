@@ -89,6 +89,38 @@ def run_rule_filter_tests():
     print("\n✅ All rule filter tests passed.")
 
 
+def run_classify_type_tests():
+    from services.rule_filter_service import classify_news_type
+
+    print("\n" + "=" * 50)
+    print("RULE FILTER — NEWS TYPE CLASSIFIER")
+    print("=" * 50)
+
+    # The motivating case: obvious injury news that trips no DIRECTION rule.
+    print("\n[1] 'might miss Week 2 due to injury' → INJURY (was GENERAL before)...")
+    assert classify_news_type("Ladd McConkey might miss Week 2 due to injury") == "INJURY"
+    print("    PASS")
+
+    print("\n[2] category coverage...")
+    cases = {
+        "Josh Jacobs questionable with an ankle": "INJURY",
+        "Player signs three-year extension": "CONTRACT",
+        "Team signs veteran WR to one-year deal": "TRANSACTION",
+        "Rookie named starter, veteran demoted on depth chart": "DEPTH_CHART",
+        "Quarterback throws for 300 yards in win": "GENERAL",
+    }
+    for text, expected in cases.items():
+        got = classify_news_type(text)
+        assert got == expected, f"{text!r} → {got}, expected {expected}"
+        print(f"    PASS — {expected:11} ← {text!r}")
+
+    print("\n[3] no false-positive from ambiguous words ('came back', 'quarterback')...")
+    assert classify_news_type("He came back to lead the quarterback room") == "GENERAL"
+    print("    PASS")
+
+    print("\n✅ All classifier tests passed.")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION 2 — Queue Service
 # ══════════════════════════════════════════════════════════════════════════════
@@ -329,6 +361,7 @@ def run_router_tests():
 
 if __name__ == "__main__":
     run_rule_filter_tests()
+    run_classify_type_tests()
     run_queue_tests()
     run_analysis_service_tests()
     run_router_tests()

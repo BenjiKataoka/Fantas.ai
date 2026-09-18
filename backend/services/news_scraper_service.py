@@ -34,9 +34,9 @@ from models.player import Player
 from models.news import PlayerNews, NewsAnalysis
 from models.roster import MyRoster
 from models.tracker import TrackedPlayer
-from services import rotowire_service, nfl_service
+from services import rotowire_service, nfl_service, rss_service
 from services.nfl_service import get_teams_playing_today
-from services.rule_filter_service import apply_rule_filter, should_run_gemini, FilterResult
+from services.rule_filter_service import apply_rule_filter, should_run_gemini, classify_news_type, FilterResult
 from services.news_analysis_service import analyze_news_item
 from services.news_queue_service import get_queue, QueuedItem
 from services.utils import normalize_name
@@ -196,16 +196,26 @@ async def scrape_and_analyze(
     starred_ids, rostered_ids = await _get_player_tiers(db)
     all_tracked_ids = starred_ids | rostered_ids
 
+    # Names for the RSS matcher: general feeds aren't player-keyed, so RSS matches
+    # entries against this tracked-name set and drops everything else.
+    tracked_names: list[str] = []
+    if all_tracked_ids:
+        name_rows = await db.execute(
+            select(Player.name).where(Player.player_id.in_(all_tracked_ids))
+        )
+        tracked_names = [row[0] for row in name_rows.fetchall()]
+
     # Fetch today's schedule + raw news concurrently
-    rw_news, espn_news, teams_playing_today = await asyncio.gather(
+    rw_news, espn_news, rss_news, teams_playing_today = await asyncio.gather(
         asyncio.to_thread(
             rotowire_service.scrape_rotowire_news,
             force_refresh=force_refresh,
         ),
         nfl_service.get_espn_news(force_refresh=force_refresh),
+        rss_service.fetch_rss_news(tracked_names, force_refresh=force_refresh),
         get_teams_playing_today(force_refresh=force_refresh),
     )
-    all_raw = rw_news + espn_news
+    all_raw = rw_news + espn_news + rss_news
 
     # Existing source_urls to deduplicate
     existing_urls_result = await db.execute(
@@ -268,7 +278,9 @@ async def scrape_and_analyze(
             news_body=news_body,
             published_at=raw.get("published_at"),
             source_url=source_url,
-            news_type=filter_result.news_type_hint,
+            # Prefer the scoring rule's type hint; else classify from category keywords
+            # so items like "might miss Week 2 due to injury" still label as INJURY.
+            news_type=filter_result.news_type_hint or classify_news_type(headline, news_body),
             is_rostered=True,
             analysis_status="PENDING",
         )
