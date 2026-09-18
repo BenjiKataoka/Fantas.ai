@@ -21,6 +21,25 @@ function formatSource(source) {
   return source.charAt(0).toUpperCase() + source.slice(1).toLowerCase()
 }
 
+// news_type → chip styling. Presentational only, no LLM — the type is scraped.
+const TYPE_STYLES = {
+  INJURY:      { label: 'Injury',      cls: 'text-bear border-bear/30 bg-bear/10' },
+  TRANSACTION: { label: 'Transaction', cls: 'text-teal-300 border-teal-400/30 bg-teal-400/10' },
+  CONTRACT:    { label: 'Contract',    cls: 'text-brand border-brand/30 bg-brand/10' },
+  DEPTH_CHART: { label: 'Depth Chart', cls: 'text-amber-300 border-amber-400/30 bg-amber-400/10' },
+  PERFORMANCE: { label: 'Performance', cls: 'text-bull border-bull/30 bg-bull/10' },
+  GENERAL:     { label: 'News',        cls: 'text-subtle border-line bg-raised' },
+}
+
+function TypeChip({ type }) {
+  const s = TYPE_STYLES[type] || TYPE_STYLES.GENERAL
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide border ${s.cls}`}>
+      {s.label}
+    </span>
+  )
+}
+
 const FILTERS = [
   { key: 'all',            label: 'All' },
   { key: 'BULLISH',        label: 'Bullish' },
@@ -29,37 +48,96 @@ const FILTERS = [
   { key: 'contradictions', label: 'Contradictions' },
 ]
 
-// ── Full analysis card (starred player, Gemini ran) ───────────────────────────
-function FullCard({ item, playerLabel, playerName }) {
+// Unified article card. Every scraped item renders as a readable, clickable article;
+// the AI analysis (summary / short-long term / contradiction) is layered on top only
+// when a full Gemini card exists. Rule-filter and rostered items still show a signal badge.
+function NewsCard({ item, playerLabel, playerName }) {
+  const [expanded, setExpanded] = useState(false)
+  const isFull = item.analysis_tier === 'full'
+  const hasBadge = !!item.stock_direction
+  const url = item.source_url
+  const body = item.news_body?.trim()
+  const longBody = body && body.length > 220
+
+  // The whole card is the link when a source URL exists. Interactive children
+  // (Read more) call stopPropagation so they don't also trigger navigation.
+  const openSource = () => { if (url) window.open(url, '_blank', 'noopener,noreferrer') }
+  const onKeyDown = (e) => { if (url && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openSource() } }
+
+  const Headline = url ? (
+    <span className="group inline-flex items-start gap-1 text-sm font-semibold text-content group-hover/card:text-brand leading-snug transition-colors">
+      <span>{item.headline}</span>
+      <span className="text-subtle/50 shrink-0 mt-0.5" aria-hidden>↗</span>
+    </span>
+  ) : (
+    <p className="text-sm font-semibold text-content leading-snug">{item.headline}</p>
+  )
+
   return (
-    <div className="bg-surface border border-line rounded-xl p-5 flex flex-col gap-3">
+    <article
+      onClick={url ? openSource : undefined}
+      onKeyDown={url ? onKeyDown : undefined}
+      role={url ? 'link' : undefined}
+      tabIndex={url ? 0 : undefined}
+      aria-label={url ? `Open article: ${item.headline}` : undefined}
+      className={`group/card bg-surface border border-line rounded-xl p-4 flex flex-col gap-2.5 transition-colors ${
+        url ? 'cursor-pointer hover:border-brand/40 hover:bg-surface/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50' : ''
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
-          <PlayerAvatar playerId={item.player_id} name={playerName} size="lg" />
+          <PlayerAvatar playerId={item.player_id} name={playerName} size={isFull ? 'lg' : 'md'} />
           <div className="min-w-0">
-            <span className="text-xs font-semibold text-brand">{playerLabel}</span>
-            <p className="text-sm font-semibold text-content mt-0.5 leading-snug">{item.headline}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-xs font-semibold ${isFull ? 'text-brand' : 'text-subtle'}`}>{playerLabel}</span>
+              <TypeChip type={item.news_type} />
+            </div>
+            <div className="mt-1">{Headline}</div>
           </div>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-xs text-subtle">{formatSource(item.source)}</p>
-          <p className="text-xs text-subtle/70 font-mono">{relativeTime(item.published_at)}</p>
+          <p className="text-xs text-subtle/70">{formatSource(item.source)}</p>
+          <p className="text-xs text-subtle/50 font-mono">{relativeTime(item.published_at)}</p>
         </div>
       </div>
 
-      {item.summary && <p className="text-sm text-content/90 leading-relaxed">{item.summary}</p>}
+      {/* Raw scraped body — the article itself, always shown when present */}
+      {body && (
+        <div>
+          <p className={`text-xs text-content/80 leading-relaxed ${!expanded && longBody ? 'line-clamp-3' : ''}`}>
+            {body}
+          </p>
+          {longBody && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setExpanded(v => !v) }}
+              className="mt-1 text-xs text-subtle hover:text-brand font-medium transition-colors"
+            >
+              {expanded ? 'Show less' : 'Read more'}
+            </button>
+          )}
+        </div>
+      )}
 
-      <div className="flex items-center gap-3">
-        <StockBadge direction={item.stock_direction} magnitude={item.stock_magnitude} />
-        {item.confidence_score != null && (
-          <span className="text-xs text-subtle font-mono tabular-nums">{Math.round(item.confidence_score * 100)}% confidence</span>
-        )}
-        {item.analysis_model && <span className="text-xs text-subtle/50 font-mono ml-auto">{item.analysis_model}</span>}
-      </div>
+      {/* AI summary (full cards only) */}
+      {isFull && item.summary && (
+        <p className="text-sm text-content/90 leading-relaxed border-l-2 border-brand/40 pl-3">{item.summary}</p>
+      )}
 
-      {item.contradictions_flagged && <ContradictionAlert detail={item.contradiction_detail} />}
+      {/* Signal / stock badge row — free rule-filter or full Gemini direction */}
+      {(hasBadge || item.confidence_score != null) && (
+        <div className="flex items-center gap-3">
+          {hasBadge && <StockBadge direction={item.stock_direction} magnitude={item.stock_magnitude} size={isFull ? undefined : 'sm'} />}
+          {item.confidence_score != null && (
+            <span className="text-xs text-subtle font-mono tabular-nums">{Math.round(item.confidence_score * 100)}% confidence</span>
+          )}
+          {isFull && item.analysis_model && <span className="text-xs text-subtle/50 font-mono ml-auto">{item.analysis_model}</span>}
+        </div>
+      )}
 
-      {(item.short_term_impact || item.long_term_impact) && (
+      {/* Full-analysis enrichment */}
+      {isFull && item.contradictions_flagged && <ContradictionAlert detail={item.contradiction_detail} />}
+
+      {isFull && (item.short_term_impact || item.long_term_impact) && (
         <div className="grid grid-cols-2 gap-3 pt-1">
           {item.short_term_impact && (
             <div className="bg-raised rounded-lg p-3">
@@ -76,56 +154,10 @@ function FullCard({ item, playerLabel, playerName }) {
         </div>
       )}
 
-      {item.context_notes && (
+      {isFull && item.context_notes && (
         <p className="text-xs text-subtle italic border-t border-line pt-2">{item.context_notes}</p>
       )}
-    </div>
-  )
-}
-
-// ── Signal-only card (rostered player or rule-filter result) ──────────────────
-function SignalCard({ item, playerLabel, playerName }) {
-  return (
-    <div className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          <PlayerAvatar playerId={item.player_id} name={playerName} size="md" />
-          <div className="min-w-0">
-            <span className="text-xs font-semibold text-subtle">{playerLabel}</span>
-            <p className="text-sm text-content/90 mt-0.5 leading-snug">{item.headline}</p>
-          </div>
-        </div>
-        <div className="text-right shrink-0">
-          <p className="text-xs text-subtle/70">{formatSource(item.source)}</p>
-          <p className="text-xs text-subtle/50 font-mono">{relativeTime(item.published_at)}</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        <StockBadge direction={item.stock_direction} magnitude={item.stock_magnitude} size="sm" />
-        {item.confidence_score != null && (
-          <span className="text-xs text-subtle font-mono tabular-nums">{Math.round(item.confidence_score * 100)}%</span>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Pending card ──────────────────────────────────────────────────────────────
-function PendingCard({ item, playerLabel, playerName }) {
-  return (
-    <div className="bg-surface border border-line/60 rounded-xl p-4 opacity-60">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 min-w-0">
-          <PlayerAvatar playerId={item.player_id} name={playerName} size="md" />
-          <div className="min-w-0">
-            <span className="text-xs font-semibold text-subtle/60">{playerLabel}</span>
-            <p className="text-sm text-subtle mt-0.5">{item.headline}</p>
-          </div>
-        </div>
-        <span className="text-xs text-subtle/60 shrink-0 font-mono">{relativeTime(item.published_at)}</span>
-      </div>
-      <p className="text-xs text-subtle/60 mt-2 italic">Analysis pending…</p>
-    </div>
+    </article>
   )
 }
 
@@ -224,13 +256,14 @@ export default function NewsHub() {
 
       {filtered.length > 0 && (
         <div className="flex flex-col gap-3">
-          {filtered.map(item => {
-            const label = getPlayerLabel(item)
-            const pname = playerMap[item.player_id]?.name || ''
-            if (item.analysis_tier === 'full') return <FullCard key={item.news_id} item={item} playerLabel={label} playerName={pname} />
-            if (item.analysis_tier === 'signal_only') return <SignalCard key={item.news_id} item={item} playerLabel={label} playerName={pname} />
-            return <PendingCard key={item.news_id} item={item} playerLabel={label} playerName={pname} />
-          })}
+          {filtered.map(item => (
+            <NewsCard
+              key={item.news_id}
+              item={item}
+              playerLabel={getPlayerLabel(item)}
+              playerName={playerMap[item.player_id]?.name || ''}
+            />
+          ))}
         </div>
       )}
     </div>

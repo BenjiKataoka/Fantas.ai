@@ -129,6 +129,7 @@ def _build_card(item: PlayerNews, is_starred: bool) -> dict:
         "news_body": item.news_body,
         "published_at": item.published_at.isoformat() if item.published_at else None,
         "news_type": item.news_type,
+        "source_url": item.source_url,
         "analysis_status": item.analysis_status,
     }
 
