@@ -89,6 +89,67 @@ def run_market_job_tests():
     print("✅ market job ok")
 
 
+def run_sentiment_job_tests():
+    print("\n" + "=" * 50)
+    print("SCHEDULER — SENTIMENT REFRESH JOB (stale-only + budget gate)")
+    print("=" * 50)
+
+    async def _test():
+        from services import scheduler_service
+
+        # [1] Analyzes only the stale players, paced; fresh ones are skipped
+        print("\n[1] Runs stale players only, skips fresh...")
+        stale = [("p1", "Alice"), ("p2", "Bob")]
+        analyzed = []
+
+        async def fake_analyze(uid, pid):
+            analyzed.append(pid)
+            return True
+
+        big_budget = {"remaining": 1000, "by_model": {"gemini-3.1-flash-lite": {"remaining": 1000}}}
+        with patch("services.tracker_service.get_stale_trackable_players",
+                   new=AsyncMock(return_value=(stale, 3))), \
+             patch("services.tracker_service.analyze_one_player", new=AsyncMock(side_effect=fake_analyze)), \
+             patch("services.scheduler_service._representative_user_id", new=AsyncMock(return_value=7)), \
+             patch("services.llm_budget.usage", return_value=big_budget), \
+             patch("services.tracker_service.ROSTER_PACE_SECONDS", 0), \
+             patch("config.GEMINI_PRIMARY", "gemini-3.1-flash-lite"):
+            scheduler_service._sentiment_running = False
+            res = await scheduler_service.refresh_sentiment_job()
+        assert res == {"stale": 2, "analyzed": 2, "skipped_fresh": 3, "failed": 0, "budget_stopped": False}, res
+        assert analyzed == ["p1", "p2"], analyzed
+        print(f"    PASS — {res}")
+
+        # [2] Budget below a full player's passes → stops before spending, none analyzed
+        print("\n[2] Budget headroom below 4 passes → halts cleanly...")
+        low_budget = {"remaining": 2, "by_model": {"gemini-3.1-flash-lite": {"remaining": 2}}}
+        with patch("services.tracker_service.get_stale_trackable_players",
+                   new=AsyncMock(return_value=(stale, 0))), \
+             patch("services.tracker_service.analyze_one_player", new=AsyncMock(return_value=True)) as spy, \
+             patch("services.scheduler_service._representative_user_id", new=AsyncMock(return_value=7)), \
+             patch("services.llm_budget.usage", return_value=low_budget), \
+             patch("services.tracker_service.ROSTER_PACE_SECONDS", 0), \
+             patch("config.GEMINI_PRIMARY", "gemini-3.1-flash-lite"):
+            scheduler_service._sentiment_running = False
+            res = await scheduler_service.refresh_sentiment_job()
+        assert res["budget_stopped"] is True and res["analyzed"] == 0, res
+        assert spy.await_count == 0, spy.await_count
+        print(f"    PASS — {res}")
+
+        # [3] Overlap guard rejects a concurrent run
+        print("\n[3] Already-running guard...")
+        scheduler_service._sentiment_running = True
+        try:
+            res = await scheduler_service.refresh_sentiment_job()
+            assert res == {"status": "already_running"}, res
+        finally:
+            scheduler_service._sentiment_running = False
+        print(f"    PASS — {res}")
+
+    asyncio.run(_test())
+    print("✅ sentiment job ok")
+
+
 def run_lifecycle_tests():
     print("\n" + "=" * 50)
     print("SCHEDULER — START/SHUTDOWN GATING")
@@ -122,6 +183,7 @@ def run_lifecycle_tests():
 if __name__ == "__main__":
     run_trackable_tests()
     run_market_job_tests()
+    run_sentiment_job_tests()
     run_lifecycle_tests()
     print("\n" + "=" * 50)
     print("ALL SCHEDULER TESTS PASSED ✅")

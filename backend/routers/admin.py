@@ -105,3 +105,18 @@ async def run_market_refresh(admin: User = Depends(require_admin)):
     % rostered for every tracked player. Same job the scheduler runs daily."""
     from services.scheduler_service import refresh_market_job
     return await refresh_market_job()
+
+
+@router.post("/admin/scheduler/run-sentiment")
+async def run_sentiment_refresh(
+    force: bool = False, admin: User = Depends(require_admin)
+):
+    """Manually trigger the sentiment refresh (LLM). Re-analyzes stale tracked players,
+    appending sentiment-history points. Spawned as a background task — a full pass can
+    take minutes — so this returns immediately. Poll /admin/llm-usage to watch spend."""
+    import asyncio
+
+    from services.scheduler_service import refresh_sentiment_job
+
+    asyncio.create_task(refresh_sentiment_job(force=force))
+    return {"status": "started", "note": "running in background; watch /admin/llm-usage"}

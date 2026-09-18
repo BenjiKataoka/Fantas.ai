@@ -2,9 +2,9 @@
 Autonomous background scheduler (APScheduler, in-process).
 
 Two daily UTC jobs:
-  - ADP refresh   (LLM-free): append today's ADP/rank for every tracked player.
-  - Sentiment refresh (LLM):  re-analyze stale tracked players, appending sentiment
-                              history — budget/RPD-gated + paced. (built in the next pass)
+  - Market refresh (LLM-free): append today's ESPN rank/ADP/%rostered per tracked player.
+  - Sentiment refresh (LLM):   re-analyze STALE tracked players, appending sentiment
+                               history — budget/RPD-gated, paced, overlap-guarded.
 
 Gated behind SCHEDULER_ENABLED so it never fires in tests/dev. The job functions are
 independently callable (and exposed via admin endpoints) for on-demand runs + testing;
@@ -74,10 +74,101 @@ async def refresh_market_job() -> dict:
     return result
 
 
-async def refresh_sentiment_job() -> dict:
-    """Re-analyze stale tracked players, appending sentiment history. Built next pass."""
-    logger.info("[Scheduler] sentiment refresh not yet implemented — skipping")
-    return {"status": "not_implemented"}
+# Each player's profile is a 4-pass Flash-Lite run. Require this much RPD headroom
+# before starting a player so we don't half-run one (which would bank no graph point
+# and leave the profile stale for the next run anyway).
+PASSES_PER_PLAYER = 4
+
+# Overlap guard: the cron and a manual admin trigger must never run this concurrently
+# (they'd double-spend the budget and race on the same global profiles).
+_sentiment_running = False
+
+
+async def _representative_user_id() -> int:
+    """A valid user_id to attribute global-profile writes to.
+
+    Profiles are global (keyed by player_id); the user_id column only records who
+    triggered the run. The scheduler has no request user, so use the lowest existing
+    user id (defaulting to 1, the dev placeholder).
+    """
+    from sqlalchemy import text as _text
+
+    from database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        row = (await db.execute(_text("SELECT id FROM users ORDER BY id LIMIT 1"))).first()
+    return row[0] if row else 1
+
+
+async def refresh_sentiment_job(force: bool = False) -> dict:
+    """Re-analyze STALE tracked players, appending a sentiment-history point each time.
+
+    Reuses the tracker's 4-pass pipeline. Cost controls:
+      - stale-only (fresh profiles are reused, never re-run)
+      - stops the moment the Flash-Lite budget can't cover a full player, leaving the
+        rest for the next run (degraded profiles self-heal on retry)
+      - paced ~16s/player to stay under Flash-Lite's ~15 RPM
+
+    Awaited inline by the cron (max_instances=1); the admin trigger spawns it as a task
+    since a full pass can take minutes.
+    """
+    import asyncio
+
+    from database import AsyncSessionLocal
+    from config import GEMINI_PRIMARY
+    from services import llm_budget, tracker_service
+    from services.tracker_service import ROSTER_PACE_SECONDS
+
+    global _sentiment_running
+    if _sentiment_running:
+        logger.info("[Scheduler] sentiment refresh already running — skipping")
+        return {"status": "already_running"}
+
+    _sentiment_running = True
+    analyzed = failed = 0
+    budget_stopped = False
+    try:
+        async with AsyncSessionLocal() as db:
+            stale, skipped_fresh = await tracker_service.get_stale_trackable_players(db, force=force)
+
+        logger.info(f"[Scheduler] sentiment refresh starting — {len(stale)} stale, "
+                    f"{skipped_fresh} fresh")
+        rep_user_id = await _representative_user_id()
+        loop = asyncio.get_event_loop()
+
+        for pid, _name in stale:
+            # Need headroom for a whole player (global cap AND Flash-Lite RPD).
+            snap = llm_budget.usage()
+            lite = snap["by_model"].get(GEMINI_PRIMARY, {})
+            if snap["remaining"] < PASSES_PER_PLAYER or lite.get("remaining", 0) < PASSES_PER_PLAYER:
+                budget_stopped = True
+                logger.warning("[Scheduler] sentiment refresh halted — budget headroom "
+                               f"below {PASSES_PER_PLAYER} passes; {analyzed} done, "
+                               f"{len(stale) - analyzed} deferred to next run")
+                break
+
+            start = loop.time()
+            try:
+                ran = await tracker_service.analyze_one_player(rep_user_id, pid)
+                if ran:
+                    analyzed += 1
+            except Exception as e:
+                failed += 1
+                logger.error(f"[Scheduler] sentiment refresh failed player={pid}: {e}")
+            # Pace so 4 calls/player stays under ~15 RPM.
+            await asyncio.sleep(max(0.0, ROSTER_PACE_SECONDS - (loop.time() - start)))
+    finally:
+        _sentiment_running = False
+
+    result = {
+        "stale": len(stale),
+        "analyzed": analyzed,
+        "skipped_fresh": skipped_fresh,
+        "failed": failed,
+        "budget_stopped": budget_stopped,
+    }
+    logger.info(f"[Scheduler] sentiment refresh done — {result}")
+    return result
 
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────

@@ -280,6 +280,39 @@ async def get_trackable_players(db: AsyncSession) -> list[tuple[str, str]]:
     return [(r["player_id"], r["name"]) for r in rows]
 
 
+async def get_stale_trackable_players(
+    db: AsyncSession, force: bool = False
+) -> tuple[list[tuple[str, str]], int]:
+    """Split the global trackable set into (stale, count_of_fresh_skipped).
+
+    "Stale" = no complete profile, or one older than the season-aware TTL. This is the
+    scheduler's work list — fresh profiles are reused, never re-analyzed.
+    """
+    players = await get_trackable_players(db)
+    ttl = await _season_ttl_hours(db)
+    stale: list[tuple[str, str]] = []
+    for pid, name in players:
+        if force or not await _profile_is_fresh(pid, db, ttl):
+            stale.append((pid, name))
+    return stale, len(players) - len(stale)
+
+
+async def analyze_one_player(user_id: int, player_id: str) -> bool:
+    """Load a player and run the full 4-pass profile. Returns True if it ran.
+
+    Public entry point for callers outside a request (the scheduler) that have only a
+    player_id. Opens its own sessions — same as the fire-and-forget analysis path.
+    """
+    from database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as s:
+        player = await s.get(Player, player_id)
+    if player is None:
+        return False
+    await _run_analysis_for_player(user_id, player_id, player, None)
+    return True
+
+
 async def roster_analysis_status(user_id: int, db: AsyncSession) -> dict:
     """How many of the user's rostered players have a completed stock profile.
 
