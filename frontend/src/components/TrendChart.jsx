@@ -16,6 +16,12 @@ export const METRICS = {
     value: v => `${v > 0 ? '+' : ''}${v.toFixed(2)}`,
     unit: 'pts',
   },
+  rostered: {
+    label: '% Rostered', color: '#34D399', betterHigh: true, domain: 'auto',
+    accessor: p => p.rostered,
+    value: v => `${v.toFixed(1)}%`,
+    unit: '%',
+  },
   adp: {
     label: 'ADP', color: '#2DD4BF', betterHigh: false, domain: 'auto',
     accessor: p => p.adp,

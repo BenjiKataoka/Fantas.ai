@@ -97,3 +97,11 @@ async def revoke_user(
 async def llm_usage(admin: User = Depends(require_admin)):
     """Today's Gemini call budget snapshot."""
     return llm_budget.usage()
+
+
+@router.post("/admin/scheduler/run-market")
+async def run_market_refresh(admin: User = Depends(require_admin)):
+    """Manually trigger the market refresh now (LLM-free): ESPN position rank + ADP +
+    % rostered for every tracked player. Same job the scheduler runs daily."""
+    from services.scheduler_service import refresh_market_job
+    return await refresh_market_job()

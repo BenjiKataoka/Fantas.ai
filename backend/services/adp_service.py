@@ -38,6 +38,10 @@ FP_SOURCE = "FANTASYPROS"
 _adp_cache: dict = {}
 CACHE_TTL_HOURS = 24
 
+# ADP snapshots feed both the 14-day trend AND the season-long value graph, so retain
+# a full year rather than 30 days (rows are tiny). Keep > the graph's "season" window.
+ADP_HISTORY_RETENTION_DAYS = 400
+
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
@@ -273,9 +277,9 @@ def _find_in_fp(data: list[dict], norm_name: str) -> Optional[dict]:
 # ── Pruning ───────────────────────────────────────────────────────────────────
 
 async def _prune_old_adp(player_id: str, db: AsyncSession) -> None:
-    """Delete ADP snapshots older than 30 days for this player."""
+    """Delete ADP snapshots older than the retention window for this player."""
     try:
-        cutoff = datetime.utcnow() - timedelta(days=30)
+        cutoff = datetime.utcnow() - timedelta(days=ADP_HISTORY_RETENTION_DAYS)
         stmt = select(PlayerADPHistory).where(
             PlayerADPHistory.player_id == player_id,
             PlayerADPHistory.recorded_at < cutoff,

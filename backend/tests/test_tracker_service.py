@@ -545,26 +545,26 @@ def run_sentiment_history_query_tests():
             {"t": datetime(2026, 8, 18, 12), "s": 0.3, "c": 5},
         ]
         a_rows = [
-            {"t": datetime(2026, 8, 4, 12), "a": 10.0, "r": 5},
-            {"t": datetime(2026, 8, 11, 12), "a": 20.0, "r": 9},
-            {"t": datetime(2026, 8, 18, 12), "a": 6.0, "r": 3},
+            {"t": datetime(2026, 8, 4, 12), "a": 10.0, "r": 5, "pr": 95.0},
+            {"t": datetime(2026, 8, 11, 12), "a": 20.0, "r": 9, "pr": 90.0},
+            {"t": datetime(2026, 8, 18, 12), "a": 6.0, "r": 3, "pr": 98.0},
         ]
 
-        # [1] Merges sentiment + adp/rank into real per-metric points
-        print("\n[1] Sentiment + ADP/rank → per-metric points...")
+        # [1] Merges sentiment + market (adp/rank/%rostered) into real per-metric points
+        print("\n[1] Sentiment + ADP/rank/%rostered → per-metric points...")
         res = await tracker_service.get_sentiment_history("p1", "season", db_returning(s_rows, a_rows))
         assert res["count"] == 3
         p0 = res["points"][0]
-        assert p0 == {"t": "2026-08-04", "sentiment": 0.5, "concern": 4.0, "adp": 10.0, "rank": 5.0}, p0
+        assert p0 == {"t": "2026-08-04", "sentiment": 0.5, "concern": 4.0, "adp": 10.0, "rank": 5.0, "rostered": 95.0}, p0
         assert "outlook" not in p0  # dropped the synthetic composite
         print(f"    PASS — {res['count']} pts, first={p0}")
 
-        # [2] Missing ADP → adp and rank null, sentiment/concern still present
-        print("\n[2] No ADP data → adp/rank null...")
+        # [2] No market data → adp/rank/rostered null, sentiment/concern still present
+        print("\n[2] No market data → adp/rank/rostered null...")
         res = await tracker_service.get_sentiment_history("p1", "season", db_returning(s_rows, []))
-        assert all(p["adp"] is None and p["rank"] is None for p in res["points"])
+        assert all(p["adp"] is None and p["rank"] is None and p["rostered"] is None for p in res["points"])
         assert res["points"][0]["sentiment"] == 0.5
-        print("    PASS — adp/rank null, sentiment intact")
+        print("    PASS — market null, sentiment intact")
 
         # [3] Unknown range falls back to season
         print("\n[3] Invalid range → season...")

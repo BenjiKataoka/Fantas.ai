@@ -1,7 +1,20 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Fantas.ai", version="0.1.0")
+from services.scheduler_service import start_scheduler, shutdown_scheduler
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Start the background scheduler on boot (no-op unless SCHEDULER_ENABLED).
+    start_scheduler()
+    yield
+    shutdown_scheduler()
+
+
+app = FastAPI(title="Fantas.ai", version="0.1.0", lifespan=lifespan)
 
 # Allow requests from the React frontend (Vercel + local dev)
 app.add_middleware(

@@ -51,6 +51,13 @@ GEMINI_RPD_LIMITS: dict[str, int] = {
     GEMINI_FALLBACK: int(os.environ.get("GEMINI_FALLBACK_RPD", "18")),  # Flash (limit ~20)
 }
 
+# ── Background scheduler (APScheduler, in-process) ──────────────────────────────
+# OFF by default so it never fires during tests/local dev — flip on in deployment.
+# Two daily UTC jobs: ADP refresh (LLM-free) and sentiment refresh (LLM, budget-gated).
+SCHEDULER_ENABLED: bool = os.environ.get("SCHEDULER_ENABLED", "false").strip().lower() in ("true", "1", "yes")
+SCHEDULER_ADP_HOUR: int = int(os.environ.get("SCHEDULER_ADP_HOUR", "8"))          # daily ADP/rank refresh
+SCHEDULER_SENTIMENT_HOUR: int = int(os.environ.get("SCHEDULER_SENTIMENT_HOUR", "9"))  # daily sentiment refresh
+
 # ── Clerk auth ─────────────────────────────────────────────────────────────────
 # When CLERK_SECRET_KEY is unset, the backend runs in DEV-FALLBACK mode: all requests
 # resolve to a single local dev user (no real auth). Setting the keys switches on real

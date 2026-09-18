@@ -262,6 +262,24 @@ async def analyze_roster(user_id: int, db: AsyncSession, force: bool = False) ->
     }
 
 
+async def get_trackable_players(db: AsyncSession) -> list[tuple[str, str]]:
+    """Distinct (player_id, name) for every player anyone rosters or has starred.
+
+    The scheduler refreshes exactly this set — never all of NFL — and it's deduped
+    because ADP/profiles are global (keyed by player_id).
+    """
+    stmt = text(
+        "SELECT p.player_id, p.name FROM players p "
+        "WHERE p.player_id IN ("
+        "  SELECT player_id FROM my_roster "
+        "  UNION "
+        "  SELECT player_id FROM tracked_players WHERE is_active = TRUE"
+        ")"
+    )
+    rows = (await db.execute(stmt)).mappings().all()
+    return [(r["player_id"], r["name"]) for r in rows]
+
+
 async def roster_analysis_status(user_id: int, db: AsyncSession) -> dict:
     """How many of the user's rostered players have a completed stock profile.
 
@@ -613,8 +631,11 @@ async def get_sentiment_history(player_id: str, rng: str, db: AsyncSession) -> d
             "ORDER BY recorded_at"
         )
         a_stmt = text(
-            "SELECT recorded_at AS t, adp AS a, position_rank AS r FROM player_adp_history "
-            "WHERE player_id=:pid AND recorded_at>=:since AND adp IS NOT NULL ORDER BY recorded_at"
+            "SELECT recorded_at AS t, adp AS a, position_rank AS r, percent_rostered AS pr "
+            "FROM player_adp_history "
+            "WHERE player_id=:pid AND recorded_at>=:since "
+            "AND (adp IS NOT NULL OR position_rank IS NOT NULL OR percent_rostered IS NOT NULL) "
+            "ORDER BY recorded_at"
         )
     else:
         sp["b"] = ap["b"] = bucket
@@ -625,31 +646,45 @@ async def get_sentiment_history(player_id: str, rng: str, db: AsyncSession) -> d
             "GROUP BY 1 ORDER BY 1"
         )
         a_stmt = text(
-            "SELECT date_trunc(:b, recorded_at) AS t, AVG(adp) AS a, AVG(position_rank) AS r "
-            "FROM player_adp_history "
-            "WHERE player_id=:pid AND recorded_at>=:since AND adp IS NOT NULL GROUP BY 1 ORDER BY 1"
+            "SELECT date_trunc(:b, recorded_at) AS t, AVG(adp) AS a, AVG(position_rank) AS r, "
+            "AVG(percent_rostered) AS pr FROM player_adp_history "
+            "WHERE player_id=:pid AND recorded_at>=:since "
+            "AND (adp IS NOT NULL OR position_rank IS NOT NULL OR percent_rostered IS NOT NULL) "
+            "GROUP BY 1 ORDER BY 1"
         )
 
     s_rows = (await db.execute(s_stmt, sp)).mappings().all()
     a_rows = (await db.execute(a_stmt, ap)).mappings().all()
-    adp_by_t = {
+
+    # Merge on the UNION of dates from both tables — market metrics (rank/%rostered)
+    # accrue on their own schedule and must show even on dates with no sentiment point.
+    sent_by_t = {
         r["t"].date().isoformat(): (
-            float(r["a"]),
-            float(r["r"]) if r["r"] is not None else None,
+            round(float(r["s"]), 3),
+            round(float(r["c"]), 1) if r["c"] is not None else None,
+        )
+        for r in s_rows
+    }
+    market_by_t = {
+        r["t"].date().isoformat(): (
+            round(float(r["a"]), 1) if r["a"] is not None else None,
+            round(float(r["r"]), 1) if r["r"] is not None else None,
+            round(float(r["pr"]), 1) if r["pr"] is not None else None,
         )
         for r in a_rows
     }
 
     points = []
-    for r in s_rows:
-        t = r["t"].date().isoformat()
-        adp, rank = adp_by_t.get(t, (None, None))
+    for t in sorted(set(sent_by_t) | set(market_by_t)):
+        sentiment, concern = sent_by_t.get(t, (None, None))
+        adp, rank, rostered = market_by_t.get(t, (None, None, None))
         points.append({
             "t": t,
-            "sentiment": round(float(r["s"]), 3),
-            "concern": round(float(r["c"]), 1) if r["c"] is not None else None,
-            "adp": round(adp, 1) if adp is not None else None,
-            "rank": round(rank, 1) if rank is not None else None,
+            "sentiment": sentiment,
+            "concern": concern,
+            "adp": adp,
+            "rank": rank,
+            "rostered": rostered,
         })
 
     return {

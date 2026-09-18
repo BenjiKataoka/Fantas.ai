@@ -11,7 +11,7 @@ import PlayerSearchModal from '../components/PlayerSearchModal'
 
 const POS_COLORS = { QB: 'text-violet-300', RB: 'text-teal-300', WR: 'text-sky-300', TE: 'text-amber-300', K: 'text-subtle' }
 const RANGES = [{ k: '1w', label: '1W' }, { k: '1m', label: '1M' }, { k: 'season', label: 'Season' }]
-const METRIC_KEYS = ['rank', 'sentiment', 'adp', 'concern']
+const METRIC_KEYS = ['rank', 'rostered', 'sentiment', 'concern', 'adp']
 
 // ── Rostered / Watchlist segmented switch ─────────────────────────────────────
 function TabSwitch({ tab, onChange, counts }) {

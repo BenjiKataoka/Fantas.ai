@@ -134,6 +134,81 @@ async def get_espn_projections_full(
     return result
 
 
+async def get_espn_market_pool(season: int, week: int) -> dict[str, dict]:
+    """
+    One ESPN pull → an in-season market snapshot per player, keyed by normalized name:
+      { norm_name: {espn_id, position, position_rank, overall_rank, adp, percent_rostered} }
+
+    In-season, ADP is frozen, so the meaningful "rank" is derived from ESPN's WEEKLY
+    projected points (higher points = better rank), grouped by position — this moves as
+    projections update. ADP and % rostered come from each player's ownership block.
+    Players with no projection this week (bye/inactive) keep null ranks but still carry
+    ADP / % rostered. Cached 6h.
+    """
+    cache_key = f"espn_market_{season}_{week}"
+    cached = _get_cache(cache_key)
+    if cached is not None:
+        return cached
+
+    filter_header = json.dumps({
+        "players": {
+            "limit": 500,
+            "filterSlotIds": {"value": [0, 2, 4, 6, 17]},  # QB/RB/WR/TE/K
+            "sortDraftRanks": {"sortPriority": 100, "sortAsc": True, "value": "PPR"},
+        }
+    })
+    url = f"{ESPN_BASE}/seasons/{season}/segments/0/leaguedefaults/3"
+    headers = {"X-Fantasy-Filter": filter_header, "Accept": "application/json"}
+
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.get(url, headers=headers, params={"view": "kona_player_info"})
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:
+        logger.error(f"[ESPN] get_espn_market_pool failed season={season} week={week}: {e}")
+        return {}
+
+    rows = []
+    for entry in data.get("players", []):
+        pl = entry.get("player", {})
+        pos = _espn_position(pl.get("defaultPositionId"))
+        if pos not in ("QB", "RB", "WR", "TE", "K") or not pl.get("fullName"):
+            continue
+        own = pl.get("ownership") or {}
+        rows.append({
+            "name": pl.get("fullName"),
+            "espn_id": str(pl.get("id", "")),
+            "position": pos,
+            "proj": _extract_espn_proj(pl, season, week),
+            "adp": own.get("averageDraftPosition"),
+            "percent_rostered": own.get("percentOwned"),
+        })
+
+    # Rank the projectable players (proj desc) → overall + within-position rank.
+    ranked = sorted((r for r in rows if r["proj"] is not None), key=lambda r: r["proj"], reverse=True)
+    pos_counter: dict[str, int] = {}
+    for i, r in enumerate(ranked, 1):
+        r["overall_rank"] = i
+        pos_counter[r["position"]] = pos_counter.get(r["position"], 0) + 1
+        r["position_rank"] = pos_counter[r["position"]]
+
+    pool: dict[str, dict] = {}
+    for r in rows:
+        pool[normalize_name(r["name"])] = {
+            "espn_id": r["espn_id"],
+            "position": r["position"],
+            "position_rank": r.get("position_rank"),
+            "overall_rank": r.get("overall_rank"),
+            "adp": round(r["adp"], 1) if r.get("adp") is not None else None,
+            "percent_rostered": round(r["percent_rostered"], 1) if r.get("percent_rostered") is not None else None,
+        }
+
+    _set_cache(cache_key, pool, ttl_hours=6)
+    logger.info(f"[ESPN] market pool: {len(pool)} players, {len(ranked)} ranked by projection (week {week})")
+    return pool
+
+
 async def get_espn_projections(season: int, week: int) -> dict[str, float]:
     """Backward-compatible id-keyed view: {espn_player_id_str: projected_points}."""
     by_id, _ = await get_espn_projections_full(season, week)

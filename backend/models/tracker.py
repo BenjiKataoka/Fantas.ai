@@ -65,11 +65,12 @@ class PlayerADPHistory(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     player_id = Column(String, ForeignKey("players.player_id"), nullable=False)
-    source = Column(String, nullable=False)           # FFC/FANTASYPROS
+    source = Column(String, nullable=False)           # FFC/FANTASYPROS/ESPN/SEED
     adp = Column(Float, nullable=True)
     adp_stdev = Column(Float, nullable=True)
-    position_rank = Column(Integer, nullable=True)
+    position_rank = Column(Integer, nullable=True)    # in-season: derived from ESPN weekly projections
     overall_rank = Column(Integer, nullable=True)
+    percent_rostered = Column(Float, nullable=True)   # ESPN % rostered — live in-season momentum
     recorded_at = Column(TIMESTAMP, server_default=func.now())
 
     # Relationships
