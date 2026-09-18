@@ -8,16 +8,16 @@ Player Tracker core logic.
 """
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.news import PlayerNews, NewsAnalysis
 from models.player import Player
 from models.roster import MyRoster
-from models.tracker import TrackedPlayer, PlayerStockProfile
+from models.tracker import TrackedPlayer, PlayerStockProfile, PlayerSentimentHistory
 from services import adp_service, historical_stats_service, nflreadpy_service, sentiment_service
 from services.projection_service import get_nfl_state
 
@@ -382,8 +382,10 @@ async def _run_analysis_for_player(
                 logger.error(f"[Tracker] Sentiment analysis returned None for player={player_id}")
                 return
 
-            # 8. Upsert player_stock_profile
+            # 8. Upsert player_stock_profile (current values)
             await _upsert_stock_profile(player_id, user_id, result, adp_trend, adp_delta, task_db)
+            # 9. Append a dated snapshot for the sentiment-over-time graph
+            _append_sentiment_snapshot(player_id, result, task_db)
             await task_db.commit()
             logger.info(f"[Tracker] Profile written for player={player_id}")
 
@@ -435,6 +437,26 @@ async def _get_current_projection(player_id: str, db: AsyncSession) -> Optional[
         return result.scalar_one_or_none()
     except Exception:
         return None
+
+
+def _append_sentiment_snapshot(player_id: str, result: dict, db: AsyncSession) -> None:
+    """Append one dated sentiment point for the over-time graph.
+
+    Skips degraded runs (null sentiment_score) — a null point is useless on a chart,
+    and the freshness-retry will re-run and bank a real point once scoring succeeds.
+    Added to the session; committed by the caller alongside the profile upsert.
+    """
+    if result.get("sentiment_score") is None:
+        return
+    db.add(PlayerSentimentHistory(
+        player_id=player_id,
+        sentiment_score=result.get("sentiment_score"),
+        sentiment_label=result.get("sentiment_label"),
+        concern_level=result.get("concern_level"),
+        worry_score=result.get("worry_score"),
+        combined_score=result.get("combined_score"),
+        overall_direction=result.get("overall_direction"),
+    ))
 
 
 async def _get_stock_profile(player_id: str, db: AsyncSession) -> Optional[PlayerStockProfile]:
@@ -557,6 +579,85 @@ async def get_stock_profiles_for(player_ids: list[str], db: AsyncSession) -> dic
         )
     ).scalars().all()
     return {r.player_id: serialize_stock_profile(r) for r in rows}
+
+
+# ── Metric-over-time (graph) ──────────────────────────────────────────────────
+
+# range → (window length, SQL date_trunc bucket or None for raw points)
+_RANGE_CONFIG = {
+    "1w":     (timedelta(days=7),   None),    # raw points — recent detail
+    "1m":     (timedelta(days=31),  "day"),   # daily average
+    "season": (timedelta(days=240), "week"),  # weekly average — whole trail
+}
+
+
+async def get_sentiment_history(player_id: str, rng: str, db: AsyncSession) -> dict:
+    """Chart-ready metric series for one player, downsampled by range.
+
+    Returns the real per-date metrics — sentiment, concern, overall ADP, and position
+    rank — each on its own scale; the frontend focuses one metric at a time on a real,
+    player-scaled axis. Aggregated server-side (date_trunc + AVG): 1w = raw, 1m = daily
+    average, season = weekly average. ADP/rank are joined from player_adp_history.
+    """
+    rng = rng if rng in _RANGE_CONFIG else "season"
+    window, bucket = _RANGE_CONFIG[rng]
+    since = datetime.utcnow() - window
+    sp = {"pid": player_id, "since": since}
+    ap = {"pid": player_id, "since": since}
+
+    if bucket is None:
+        s_stmt = text(
+            "SELECT recorded_at AS t, sentiment_score AS s, concern_level AS c "
+            "FROM player_sentiment_history "
+            "WHERE player_id=:pid AND recorded_at>=:since AND sentiment_score IS NOT NULL "
+            "ORDER BY recorded_at"
+        )
+        a_stmt = text(
+            "SELECT recorded_at AS t, adp AS a, position_rank AS r FROM player_adp_history "
+            "WHERE player_id=:pid AND recorded_at>=:since AND adp IS NOT NULL ORDER BY recorded_at"
+        )
+    else:
+        sp["b"] = ap["b"] = bucket
+        s_stmt = text(
+            "SELECT date_trunc(:b, recorded_at) AS t, AVG(sentiment_score) AS s, AVG(concern_level) AS c "
+            "FROM player_sentiment_history "
+            "WHERE player_id=:pid AND recorded_at>=:since AND sentiment_score IS NOT NULL "
+            "GROUP BY 1 ORDER BY 1"
+        )
+        a_stmt = text(
+            "SELECT date_trunc(:b, recorded_at) AS t, AVG(adp) AS a, AVG(position_rank) AS r "
+            "FROM player_adp_history "
+            "WHERE player_id=:pid AND recorded_at>=:since AND adp IS NOT NULL GROUP BY 1 ORDER BY 1"
+        )
+
+    s_rows = (await db.execute(s_stmt, sp)).mappings().all()
+    a_rows = (await db.execute(a_stmt, ap)).mappings().all()
+    adp_by_t = {
+        r["t"].date().isoformat(): (
+            float(r["a"]),
+            float(r["r"]) if r["r"] is not None else None,
+        )
+        for r in a_rows
+    }
+
+    points = []
+    for r in s_rows:
+        t = r["t"].date().isoformat()
+        adp, rank = adp_by_t.get(t, (None, None))
+        points.append({
+            "t": t,
+            "sentiment": round(float(r["s"]), 3),
+            "concern": round(float(r["c"]), 1) if r["c"] is not None else None,
+            "adp": round(adp, 1) if adp is not None else None,
+            "rank": round(rank, 1) if rank is not None else None,
+        })
+
+    return {
+        "player_id": player_id,
+        "range": rng,
+        "points": points,
+        "count": len(points),
+    }
 
 
 # ── Card builder ──────────────────────────────────────────────────────────────

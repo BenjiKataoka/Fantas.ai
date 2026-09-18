@@ -212,6 +212,18 @@ async def get_tracker_player(
     return detail
 
 
+@router.get("/tracker/{player_id}/sentiment-history")
+async def sentiment_history(
+    player_id: str,
+    range: str = Query("season", pattern="^(1w|1m|season)$"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Chart-ready sentiment series for a player, downsampled by range
+    (1w = raw, 1m = daily avg, season = weekly avg). Empty points if never analyzed."""
+    return await tracker_service.get_sentiment_history(player_id, range, db)
+
+
 @router.post("/tracker/refresh/{player_id}")
 async def refresh_tracker_player(
     player_id: str,

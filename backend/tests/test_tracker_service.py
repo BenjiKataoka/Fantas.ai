@@ -314,6 +314,20 @@ def run_router_tests():
         assert resp.json()["ready"] == 9
         print(f"    PASS — roster-analysis returned {resp.json()}")
 
+        # [8] GET /api/tracker/{id}/sentiment-history — chart series, range validated
+        print("\n[8] GET /api/tracker/{id}/sentiment-history returns series...")
+        with patch("routers.tracker.tracker_service.get_sentiment_history",
+                   new=AsyncMock(return_value={"player_id": "4034", "range": "1m",
+                                               "points": [{"t": "2026-09-01", "sentiment": 0.3, "concern": 4.0}],
+                                               "latest": 0.3, "delta": 0.1, "count": 1})):
+            resp = client.get("/api/tracker/4034/sentiment-history?range=1m")
+        assert resp.status_code == 200, f"got {resp.status_code}"
+        assert resp.json()["range"] == "1m" and resp.json()["count"] == 1
+        # bad range rejected by the route's pattern validation
+        resp_bad = client.get("/api/tracker/4034/sentiment-history?range=decade")
+        assert resp_bad.status_code == 422, f"bad range should 422, got {resp_bad.status_code}"
+        print("    PASS — series returned; invalid range rejected (422)")
+
     app.dependency_overrides.clear()
     print("\n✅ All router tests passed.")
 
@@ -472,6 +486,103 @@ def run_stock_serializer_tests():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# SECTION 4.7 — Sentiment history snapshot (append-only, for the graph)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def run_sentiment_snapshot_tests():
+    print("\n" + "=" * 50)
+    print("TRACKER — SENTIMENT HISTORY SNAPSHOT")
+    print("=" * 50)
+    from services.tracker_service import _append_sentiment_snapshot
+    from models.tracker import PlayerSentimentHistory
+
+    # [1] Completed run → one history row added with the run's values
+    print("\n[1] Completed analysis → snapshot row added...")
+    db = MagicMock()
+    result = {"sentiment_score": 0.42, "sentiment_label": "BULLISH", "concern_level": 3,
+              "worry_score": 2, "combined_score": 2.4, "overall_direction": "BULLISH"}
+    _append_sentiment_snapshot("p1", result, db)
+    assert db.add.call_count == 1, "expected exactly one row added"
+    row = db.add.call_args[0][0]
+    assert isinstance(row, PlayerSentimentHistory)
+    assert row.player_id == "p1" and row.sentiment_score == 0.42 and row.concern_level == 3
+    print(f"    PASS — added sentiment={row.sentiment_score}, concern={row.concern_level}")
+
+    # [2] Degraded run (null sentiment) → no row (would be a useless point)
+    print("\n[2] Null sentiment_score → no snapshot written...")
+    db2 = MagicMock()
+    _append_sentiment_snapshot("p2", {"sentiment_score": None, "concern_level": 5}, db2)
+    assert db2.add.call_count == 0, "must not write a null-sentiment point"
+    print("    PASS — skipped degraded run")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 4.8 — Sentiment history query (graph endpoint)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def run_sentiment_history_query_tests():
+    print("\n" + "=" * 50)
+    print("TRACKER — SENTIMENT HISTORY QUERY")
+    print("=" * 50)
+
+    class FakeResult:
+        def __init__(self, rows): self._rows = rows
+        def mappings(self): return self
+        def all(self): return self._rows
+
+    def db_returning(s_rows, a_rows):
+        # get_sentiment_history runs the sentiment query first, then the ADP query.
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=[FakeResult(s_rows), FakeResult(a_rows)])
+        return db
+
+    async def _test():
+        from services import tracker_service
+
+        s_rows = [
+            {"t": datetime(2026, 8, 4, 12), "s": 0.5, "c": 4},
+            {"t": datetime(2026, 8, 11, 12), "s": 0.1, "c": 6},
+            {"t": datetime(2026, 8, 18, 12), "s": 0.3, "c": 5},
+        ]
+        a_rows = [
+            {"t": datetime(2026, 8, 4, 12), "a": 10.0, "r": 5},
+            {"t": datetime(2026, 8, 11, 12), "a": 20.0, "r": 9},
+            {"t": datetime(2026, 8, 18, 12), "a": 6.0, "r": 3},
+        ]
+
+        # [1] Merges sentiment + adp/rank into real per-metric points
+        print("\n[1] Sentiment + ADP/rank → per-metric points...")
+        res = await tracker_service.get_sentiment_history("p1", "season", db_returning(s_rows, a_rows))
+        assert res["count"] == 3
+        p0 = res["points"][0]
+        assert p0 == {"t": "2026-08-04", "sentiment": 0.5, "concern": 4.0, "adp": 10.0, "rank": 5.0}, p0
+        assert "outlook" not in p0  # dropped the synthetic composite
+        print(f"    PASS — {res['count']} pts, first={p0}")
+
+        # [2] Missing ADP → adp and rank null, sentiment/concern still present
+        print("\n[2] No ADP data → adp/rank null...")
+        res = await tracker_service.get_sentiment_history("p1", "season", db_returning(s_rows, []))
+        assert all(p["adp"] is None and p["rank"] is None for p in res["points"])
+        assert res["points"][0]["sentiment"] == 0.5
+        print("    PASS — adp/rank null, sentiment intact")
+
+        # [3] Unknown range falls back to season
+        print("\n[3] Invalid range → season...")
+        res = await tracker_service.get_sentiment_history("p1", "bogus", db_returning(s_rows, a_rows))
+        assert res["range"] == "season", res["range"]
+        print(f"    PASS — range={res['range']}")
+
+        # [4] No history → empty points
+        print("\n[4] Empty history → no points...")
+        res = await tracker_service.get_sentiment_history("p1", "1w", db_returning([], []))
+        assert res["count"] == 0 and res["points"] == []
+        print(f"    PASS — {res}")
+
+    asyncio.run(_test())
+    print("\n✅ All sentiment history query tests passed.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # SECTION 5 — Failure modes
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -530,6 +641,8 @@ if __name__ == "__main__":
     run_combined_score_tests()
     run_batch_analysis_tests()
     run_stock_serializer_tests()
+    run_sentiment_snapshot_tests()
+    run_sentiment_history_query_tests()
     run_router_tests()
     run_failure_tests()
     print("\n" + "=" * 50)

@@ -121,3 +121,23 @@ class PlayerStockProfile(Base):
 
     # Relationships
     # Access tracked_player via TrackedPlayer.stock_profile (viewonly relationship above)
+
+
+class PlayerSentimentHistory(Base):
+    """Append-only sentiment snapshots per player — one row per completed analysis.
+
+    Unlike player_stock_profile (which is overwritten each run to hold the CURRENT
+    values), this table keeps every dated point so we can chart sentiment over time.
+    Global (no user_id), matching the global stock profile. Mirrors player_adp_history.
+    """
+    __tablename__ = "player_sentiment_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    player_id = Column(String, ForeignKey("players.player_id"), nullable=False, index=True)
+    sentiment_score = Column(Float, nullable=True)      # -1.0..1.0 — the primary line
+    sentiment_label = Column(String, nullable=True)
+    concern_level = Column(Integer, nullable=True)      # 1-10 — optional overlay line
+    worry_score = Column(Integer, nullable=True)        # 1-10
+    combined_score = Column(Float, nullable=True)
+    overall_direction = Column(String, nullable=True)   # BULLISH/BEARISH/NEUTRAL — point color
+    recorded_at = Column(TIMESTAMP, server_default=func.now(), index=True)

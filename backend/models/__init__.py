@@ -3,7 +3,7 @@ from models.user import User, UserLeague
 from models.projection import Projection
 from models.roster import MyRoster
 from models.news import PlayerNews, NewsAnalysis, NewsHistoryContext, BeatWriterSentiment
-from models.tracker import TrackedPlayer, PlayerHistoricalStats, PlayerADPHistory, PlayerStockProfile
+from models.tracker import TrackedPlayer, PlayerHistoricalStats, PlayerADPHistory, PlayerStockProfile, PlayerSentimentHistory
 
 __all__ = [
     "Player",
@@ -19,4 +19,5 @@ __all__ = [
     "PlayerHistoricalStats",
     "PlayerADPHistory",
     "PlayerStockProfile",
+    "PlayerSentimentHistory",
 ]
