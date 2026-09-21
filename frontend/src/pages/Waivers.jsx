@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { getWaivers, getLeagues, analyzeFreeAgent, starPlayer } from '../services/api'
+import { getWaivers, analyzeFreeAgent, starPlayer } from '../services/api'
 import PlayerAvatar from '../components/PlayerAvatar'
 import InjuryBadge from '../components/InjuryBadge'
-import { TableSkeleton } from '../components/Skeletons'
-import { REVEAL } from '@/lib/utils'
+import { WaiverSkeleton } from '../components/Skeletons'
+import { REVEAL, slotLabel } from '@/lib/utils'
 import { TrendingDown, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import CollapseRow from '../components/CollapseRow'
@@ -131,25 +131,7 @@ function Row({ p, i, analysis, open, onAnalyze, lineAbove }) {
 }
 
 const SLOT_ORDER = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'WRRB_FLEX', 'REC_FLEX', 'SUPER_FLEX', 'K', 'DEF']
-const SLOT_LABEL = { WRRB_FLEX: 'W/R', REC_FLEX: 'W/T', SUPER_FLEX: 'SF' }
 const CARD = 'bg-surface border border-line rounded-xl p-4'
-
-function LeaguePicker({ leagues, value, onChange }) {
-  if (leagues.length < 2) return null
-  return (
-    <div className={CARD}>
-      <label htmlFor="waiver-league" className="text-xs text-subtle">League</label>
-      <select
-        id="waiver-league"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="mt-1.5 w-full rounded-md bg-raised border border-line px-2.5 py-1.5 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-      >
-        {leagues.map(l => <option key={l.league_id} value={l.league_id}>{l.name}</option>)}
-      </select>
-    </div>
-  )
-}
 
 function LineToBeat({ lineup, weeks }) {
   const rows = [...lineup].sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot))
@@ -160,7 +142,7 @@ function LineToBeat({ lineup, weeks }) {
       <ul className="space-y-1.5 text-sm">
         {rows.map(r => (
           <li key={`${r.slot}-${r.name}`} className="flex items-baseline gap-2">
-            <span className="w-9 shrink-0 font-mono text-xs text-subtle">{SLOT_LABEL[r.slot] || r.slot}</span>
+            <span className="w-11 shrink-0 font-mono text-xs text-subtle">{slotLabel(r.slot)}</span>
             <span className="flex-1 truncate text-content/90">{r.name}</span>
             <Num className="text-subtle">{r.proj.toFixed(1)}</Num>
           </li>
@@ -193,14 +175,7 @@ export default function Waivers() {
   const [filter, setFilter] = useState('All')
   const [analyses, setAnalyses] = useState({})   // player_id → { loading, data }
   const [openId, setOpenId] = useState(null)
-  const [leagues, setLeagues] = useState([])
-  const [leagueId, setLeagueId] = useState(credentials?.leagueId)
-
-  useEffect(() => {
-    if (!credentials) return
-    setLeagueId(credentials.leagueId)
-    getLeagues(credentials.username).then(res => setLeagues(res.data.leagues || [])).catch(() => {})
-  }, [credentials])
+  const leagueId = credentials?.leagueId
 
   const analyze = async (p) => {
     if (analyses[p.player_id]?.data) return setOpenId(id => (id === p.player_id ? null : p.player_id))
@@ -217,7 +192,7 @@ export default function Waivers() {
   }
 
   useEffect(() => {
-    if (!credentials || !leagueId) return
+    if (!credentials || !leagueId || credentials.platform === 'ESPN') return
     let cancelled = false
     setError(null); setData(null); setAnalyses({}); setOpenId(null)
     getWaivers(credentials.username, leagueId)
@@ -227,6 +202,7 @@ export default function Waivers() {
   }, [credentials, leagueId])
 
   if (!credentials) return <p className="text-subtle text-sm py-16 text-center">Pick your league on the Dashboard first.</p>
+  if (credentials.platform === 'ESPN') return <p className="text-subtle text-sm py-16 text-center">The waiver wire for ESPN leagues is coming next. Switch to a Sleeper league in the top bar to use it now.</p>
   if (rosterData?.season_type === 'off') return <p className="text-subtle text-sm py-16 text-center">The waiver wire opens once the season does.</p>
 
   const all = data?.candidates || []
@@ -257,7 +233,7 @@ export default function Waivers() {
       </div>
 
       {error && <p className="text-bear text-sm">{error}</p>}
-      {!data && !error && <TableSkeleton rows={10} />}
+      {!data && !error && <WaiverSkeleton />}
 
       {data && (
         <div className="flex flex-col gap-6">
@@ -299,7 +275,6 @@ export default function Waivers() {
               </table>
             </div>
             <aside className={`w-full xl:w-72 shrink-0 flex flex-col gap-4 ${REVEAL}`} style={{ animationDelay: '180ms' }}>
-              <LeaguePicker leagues={leagues} value={leagueId} onChange={setLeagueId} />
               <LineToBeat lineup={data.lineup} weeks={data.horizon_weeks.length} />
               <Legend weeks={data.horizon_weeks} />
             </aside>

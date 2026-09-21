@@ -1,6 +1,6 @@
-import { TriangleAlert } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { getLeagues } from '../services/api'
+import { getLeagues, getEspnStatus, saveEspn, removeEspn, lookupEspnLeague, addPublicEspnLeague, removeEspnLeague } from '../services/api'
+import { toast } from 'sonner'
 import { useApp } from '../context/AppContext'
 import WeightSlider from '../components/WeightSlider'
 import Spinner from '../components/Spinner'
@@ -60,7 +60,8 @@ function LeagueSection() {
   const { credentials, saveCredentials } = useApp()
   const [username, setUsername]   = useState(credentials?.username || '')
   const [leagues, setLeagues]     = useState([])
-  const [leagueId, setLeagueId]   = useState(credentials?.leagueId || '')
+  // "PLATFORM:league_id", since the list mixes Sleeper and ESPN leagues
+  const [leagueKey, setLeagueKey] = useState(credentials ? `${credentials.platform}:${credentials.leagueId}` : '')
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState(null)
   const [saved, setSaved]         = useState(false)
@@ -77,7 +78,7 @@ function LeagueSection() {
       const res = await getLeagues(u.trim())
       const list = res.data.leagues || []
       setLeagues(list)
-      if (!list.find(l => l.league_id === leagueId) && list.length) setLeagueId(list[0].league_id)
+      if (!list.find(l => `${l.platform}:${l.league_id}` === leagueKey) && list.length) setLeagueKey(`${list[0].platform}:${list[0].league_id}`)
     } catch (err) {
       setError(err.response?.data?.detail || 'Sleeper user not found.')
       setLeagues([])
@@ -87,8 +88,9 @@ function LeagueSection() {
   }
 
   const handleSave = () => {
-    if (!username || !leagueId) return
-    saveCredentials(username.trim(), leagueId)
+    if (!username || !leagueKey) return
+    const [platform, leagueId] = leagueKey.split(':')
+    saveCredentials(username.trim(), leagueId, platform)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -122,13 +124,13 @@ function LeagueSection() {
         {leagues.length > 0 && (
           <div>
             <label className="block text-xs text-subtle uppercase tracking-wide mb-1">Active League</label>
-            <select value={leagueId} onChange={e => { setLeagueId(e.target.value); setSaved(false) }} className={`w-full ${field}`}>
-              {leagues.map(l => <option key={l.league_id} value={l.league_id}>{l.name}</option>)}
+            <select value={leagueKey} onChange={e => { setLeagueKey(e.target.value); setSaved(false) }} className={`w-full ${field}`}>
+              {leagues.map(l => <option key={`${l.platform}:${l.league_id}`} value={`${l.platform}:${l.league_id}`}>{l.name}{l.platform === 'ESPN' ? ' (ESPN)' : ''}</option>)}
             </select>
           </div>
         )}
 
-        <button onClick={handleSave} disabled={!username || !leagueId} className={`w-fit px-4 py-2 ${btnPrimary}`}>
+        <button onClick={handleSave} disabled={!username || !leagueKey} className={`w-fit px-4 py-2 ${btnPrimary}`}>
           {saved ? 'Saved!' : 'Save League'}
         </button>
       </div>
@@ -136,20 +138,162 @@ function LeagueSection() {
   )
 }
 
-// ── ESPN Credentials ──────────────────────────────────────────────────────────
+// Public ESPN leagues need no cookies: paste the link, pick your team.
+function PublicLeagueForm() {
+  const { leagues, reloadLeagues } = useApp()
+  const [link, setLink]     = useState('')
+  const [found, setFound]   = useState(null)   // { league_id, name, teams }
+  const [teamId, setTeamId] = useState('')
+  const [busy, setBusy]     = useState(false)
+  const [error, setError]   = useState(null)
+  const added = leagues.filter(l => l.platform === 'ESPN' && l.public)
+
+  const find = async () => {
+    setBusy(true); setError(null); setFound(null)
+    try {
+      const res = await lookupEspnLeague(link.trim())
+      setFound(res.data); setTeamId(String(res.data.teams[0]?.team_id ?? ''))
+    } catch (err) {
+      setError(err.response?.data?.detail || "Couldn't reach ESPN. Try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const add = async () => {
+    setBusy(true); setError(null)
+    try {
+      await addPublicEspnLeague(found.league_id, Number(teamId))
+      toast.success(`Added ${found.name}. Pick it in the league switcher.`)
+      setFound(null); setLink('')
+      reloadLeagues()
+    } catch (err) {
+      setError(err.response?.data?.detail || "Couldn't add that league.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (l) => {
+    await removeEspnLeague(l.league_id).catch(() => {})
+    toast(`Removed ${l.name}.`)
+    reloadLeagues()
+  }
+
+  return (
+    <div className="flex flex-col gap-3 max-w-sm">
+      <h3 className="text-sm font-medium text-content">Add a public league</h3>
+      <p className="text-sm text-subtle">If your league manager made the league public, paste its link. No ESPN login needed.</p>
+      <div className="flex gap-2">
+        <input
+          value={link}
+          onChange={e => { setLink(e.target.value); setFound(null) }}
+          onKeyDown={e => e.key === 'Enter' && link.trim() && find()}
+          placeholder="fantasy.espn.com/football/league?leagueId=..."
+          className={`flex-1 min-w-0 ${field}`}
+        />
+        <button onClick={find} disabled={busy || !link.trim()} className="px-3 py-2 bg-raised hover:bg-line disabled:opacity-40 text-content text-sm rounded-lg border border-line">
+          Find
+        </button>
+      </div>
+      {found && (
+        <>
+          <label htmlFor="espn-team" className="text-sm text-content">Which team is yours in {found.name}?</label>
+          <select id="espn-team" value={teamId} onChange={e => setTeamId(e.target.value)} className={field}>
+            {found.teams.map(t => <option key={t.team_id} value={t.team_id}>{t.name}{t.owner ? ` (${t.owner})` : ''}</option>)}
+          </select>
+          <button onClick={add} disabled={busy || !teamId} className={`w-fit px-4 py-2 ${btnPrimary}`}>Add league</button>
+        </>
+      )}
+      {error && <p className="text-bear text-sm">{error}</p>}
+      {added.length > 0 && (
+        <ul className="text-sm divide-y divide-line border border-line rounded-lg">
+          {added.map(l => (
+            <li key={l.league_id} className="flex items-center justify-between px-3 py-2">
+              <span className="text-content truncate">{l.name}</span>
+              <button onClick={() => remove(l)} className="text-xs text-subtle hover:text-bear">Remove</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// ── ESPN account ──────────────────────────────────────────────────────────────
+// Cookies are write-only: the API checks them against ESPN, saves them, and never sends
+// them back, so this form only ever shows connected / not connected.
 function ESPNSection() {
+  const { reloadLeagues, refreshEspnStatus } = useApp()
+  const [connected, setConnected] = useState(null)
+  const [expired, setExpired]     = useState(false)
+  const [s2, setS2]               = useState('')
+  const [swid, setSwid]           = useState('')
+  const [busy, setBusy]           = useState(false)
+  const [error, setError]         = useState(null)
+  const [found, setFound]         = useState(null)
+
+  // Expired cookies show the connect form again, with a note, instead of "Connected".
+  useEffect(() => {
+    getEspnStatus()
+      .then(res => { setExpired(res.data.needs_reconnect); setConnected(res.data.connected && !res.data.needs_reconnect) })
+      .catch(() => setConnected(false))
+  }, [])
+
+  const connect = async () => {
+    setBusy(true); setError(null)
+    try {
+      const res = await saveEspn(s2.trim(), swid.trim())
+      setConnected(true); setExpired(false); setFound(res.data.leagues); setS2(''); setSwid('')
+      reloadLeagues(); refreshEspnStatus()
+    } catch (err) {
+      setError(err.response?.data?.detail || "Couldn't reach ESPN. Try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const disconnect = async () => {
+    await removeEspn().catch(() => {})
+    setConnected(false); setFound(null)
+    reloadLeagues(); refreshEspnStatus()
+  }
+
   return (
     <Section
-      title="ESPN Credentials"
-      description="ESPN S2 cookie and SWID are required to sync your ESPN roster and projections."
+      title="ESPN leagues"
+      description="Add ESPN leagues next to your Sleeper ones in the league switcher."
     >
-      <div className="flex items-start gap-3 p-3 bg-warn/10 border border-warn/30 rounded-lg max-w-sm">
-        <TriangleAlert className="size-4 text-warn mt-0.5 shrink-0" />
-        <p className="text-sm text-content/80">
-          ESPN credentials are set in the server config for now, and they're working.
-          Per-user ESPN login is planned.
-        </p>
-      </div>
+      <PublicLeagueForm />
+      <div className="border-t border-line my-6" />
+      <h3 className="text-sm font-medium text-content mb-1">Private leagues: connect your ESPN account</h3>
+      <p className="text-sm text-subtle mb-3">Finds every ESPN league you're in, public or private.</p>
+      {connected === null ? <Spinner label="Checking..." /> : connected ? (
+        <div className="flex flex-col gap-3 max-w-sm">
+          <p className="text-sm text-content">
+            Connected.{' '}
+            {found && (found.length
+              ? `Found ${found.length === 1 ? '1 league' : `${found.length} leagues`}: ${found.map(l => l.name).join(', ')}.`
+              : 'No ESPN football leagues found for this season.')}
+          </p>
+          <button onClick={disconnect} className="w-fit px-3 py-1.5 text-sm text-subtle border border-line rounded-lg hover:text-content hover:bg-raised">
+            Disconnect ESPN
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 max-w-sm">
+          {expired && <p className="text-sm text-warn">ESPN stopped accepting your saved cookies. Paste fresh ones to reconnect.</p>}
+          <p className="text-sm text-subtle">
+            On espn.com, open your browser's developer tools, go to Application, then Cookies, and copy the <span className="font-mono text-content">espn_s2</span> and <span className="font-mono text-content">SWID</span> values.
+          </p>
+          <input type="password" autoComplete="off" value={s2} onChange={e => setS2(e.target.value)} placeholder="espn_s2" className={field} />
+          <input type="password" autoComplete="off" value={swid} onChange={e => setSwid(e.target.value)} placeholder="SWID" className={field} />
+          {error && <p className="text-bear text-sm">{error}</p>}
+          <button onClick={connect} disabled={busy || !s2.trim() || !swid.trim()} className={`w-fit px-4 py-2 ${btnPrimary}`}>
+            {busy ? 'Checking with ESPN' : 'Connect ESPN'}
+          </button>
+        </div>
+      )}
     </Section>
   )
 }

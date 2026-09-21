@@ -37,11 +37,11 @@ api.interceptors.response.use(
 export const getLeagues = (sleeperUsername) =>
   api.get('/leagues', { params: { sleeper_username: sleeperUsername } })
 
-export const getRoster = (sleeperUsername, leagueId) =>
-  api.get('/roster', { params: { sleeper_username: sleeperUsername, league_id: leagueId } })
+export const getRoster = (sleeperUsername, leagueId, platform = 'SLEEPER', force = false) =>
+  api.get('/roster', { params: { sleeper_username: sleeperUsername, league_id: leagueId, platform, force } })
 
 // --- Projections ---
-export const getProjections = (week) => api.get(`/projections/${week}`)
+export const getProjections = (week, leagueId) => api.get(`/projections/${week}`, { params: { league_id: leagueId } })
 
 // --- Settings ---
 export const getSettings = () => api.get('/settings')
@@ -66,7 +66,7 @@ export const getSentimentHistory = (playerId, range = 'season') =>
   api.get(`/tracker/${playerId}/sentiment-history`, { params: { range } })
 
 // --- Start/Sit ---
-export const getStartSit = (week) => api.get(`/startsit/${week}`)
+export const getStartSit = (week, leagueId) => api.get(`/startsit/${week}`, { params: { league_id: leagueId } })
 
 // --- Recap ---
 export const getRecap = (week, sleeperUsername, leagueId) =>
@@ -77,6 +77,14 @@ export const getWaivers = (sleeperUsername, leagueId) =>
 
 export const analyzeFreeAgent = (playerId, sleeperUsername, leagueId) =>
   api.post(`/waivers/analyze/${playerId}`, null, { params: { sleeper_username: sleeperUsername, league_id: leagueId } })
+
+// --- ESPN account (cookies are write-only: the API never returns them) ---
+export const getEspnStatus = () => api.get('/settings/espn')
+export const saveEspn = (espn_s2, swid) => api.put('/settings/espn', { espn_s2, swid })
+export const removeEspn = () => api.delete('/settings/espn')
+export const lookupEspnLeague = (league) => api.post('/leagues/espn/lookup', { league })
+export const addPublicEspnLeague = (leagueId, teamId) => api.post('/leagues/espn/public', { league_id: leagueId, team_id: teamId })
+export const removeEspnLeague = (leagueId) => api.delete(`/leagues/espn/${leagueId}`)
 
 // --- Auth / Admin ---
 export const getMe = () => api.get('/me')

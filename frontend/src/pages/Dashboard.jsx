@@ -46,7 +46,7 @@ function SetupForm({ onComplete }) {
         setError('No redraft PPR leagues found for this username.')
       } else {
         setLeagues(list)
-        setLeagueId(list[0].league_id)
+        setLeagueId(`${list[0].platform}:${list[0].league_id}`)
       }
     } catch (err) {
       setError(err.response?.data?.detail || 'Could not find Sleeper user.')
@@ -79,9 +79,9 @@ function SetupForm({ onComplete }) {
       {leagues.length > 0 && (
         <>
           <select value={leagueId} onChange={e => setLeagueId(e.target.value)} className={`w-full mb-4 ${field}`}>
-            {leagues.map(l => <option key={l.league_id} value={l.league_id}>{l.name}</option>)}
+            {leagues.map(l => <option key={`${l.platform}:${l.league_id}`} value={`${l.platform}:${l.league_id}`}>{l.name}{l.platform === 'ESPN' ? ' (ESPN)' : ''}</option>)}
           </select>
-          <button onClick={() => onComplete(username.trim(), leagueId)} className={`w-full py-2 text-sm ${btnPrimary}`}>
+          <button onClick={() => { const [platform, id] = leagueId.split(':'); onComplete(username.trim(), id, platform) }} className={`w-full py-2 text-sm ${btnPrimary}`}>
             Load Roster
           </button>
         </>
@@ -91,14 +91,13 @@ function SetupForm({ onComplete }) {
 }
 
 // ── Top bar ───────────────────────────────────────────────────────────────────
-function TopBar({ rosterData, lastRefresh, onRefresh, loading }) {
+function TopBar({ rosterData }) {
   const seasonType   = rosterData?.season_type
   const season       = rosterData?.season
   const week         = rosterData?.week
   const starters     = (rosterData?.roster || []).filter(p => p.is_starter)
   const totalPts     = starters.reduce((s, p) => s + (p.weighted_proj || 0), 0)
   const weekLabel    = !rosterData ? '-' : seasonType === 'off' ? `${season} Offseason` : `Week ${week} · ${season}`
-  const refreshLabel = lastRefresh ? lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null
 
   return (
     <div className="flex items-end justify-between mb-6 pb-4 border-b border-line">
@@ -115,15 +114,7 @@ function TopBar({ rosterData, lastRefresh, onRefresh, loading }) {
         )}
       </div>
       <div className="flex items-center gap-3">
-        {refreshLabel && <span className="text-xs text-subtle/70 font-mono">Updated {refreshLabel}</span>}
         {rosterData && <AnalyzeRosterButton />}
-        <button
-          onClick={onRefresh}
-          disabled={loading}
-          className="px-3 py-1.5 bg-raised hover:bg-line disabled:opacity-40 text-subtle hover:text-content text-xs font-medium rounded-lg border border-line transition-colors"
-        >
-          {loading ? 'Loading...' : 'Refresh'}
-        </button>
       </div>
     </div>
   )
@@ -159,7 +150,7 @@ function WeightSidebar() {
 export default function Dashboard() {
   const {
     credentials, saveCredentials, clearCredentials,
-    rosterData, rosterLoading, rosterError, lastRefresh, fetchRoster,
+    rosterData, rosterLoading, rosterError,
     newsData, newsLoading,
     startSitData,
   } = useApp()
@@ -190,14 +181,14 @@ export default function Dashboard() {
   }, [rosterData])
 
   if (!credentials) {
-    return <SetupForm onComplete={(username, leagueId) => saveCredentials(username, leagueId)} />
+    return <SetupForm onComplete={(username, leagueId, platform) => saveCredentials(username, leagueId, platform)} />
   }
 
   return (
     <div>
       {/* Wrap so the click event isn't passed as `creds` (would break the fetch). */}
       <div className={REVEAL}>
-        <TopBar rosterData={rosterData} lastRefresh={lastRefresh} onRefresh={() => fetchRoster()} loading={rosterLoading} />
+        <TopBar rosterData={rosterData} />
       </div>
 
       {rosterError && (
@@ -222,9 +213,6 @@ export default function Dashboard() {
               : <AlertFeed items={newsData?.news ?? []} playerMap={playerMap} />
             }
           </div>
-          <button onClick={clearCredentials} className="text-xs text-subtle/70 hover:text-content transition-colors text-left">
-            Switch league
-          </button>
         </div>
       </div>
     </div>

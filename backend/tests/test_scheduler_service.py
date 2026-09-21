@@ -1,7 +1,7 @@
 """
 Tests for the background scheduler (Phase 5).
 Covers: trackable-player collection, the ADP refresh job (success + per-player failure
-isolation), and start/shutdown gating. Job logic is tested directly, not cron timing.
+isolation), the roster sync job (offseason skip + per-league isolation), and start/shutdown gating. Job logic is tested directly, not cron timing.
 Usage: python3 tests/test_scheduler_service.py
 """
 import asyncio
@@ -150,6 +150,49 @@ def run_sentiment_job_tests():
     print("✅ sentiment job ok")
 
 
+def run_roster_sync_tests():
+    print("\n" + "=" * 50); print("SCHEDULER, ROSTER SYNC JOB"); print("=" * 50)
+    from services import scheduler_service
+
+    async def _run(state, pairs, sync_side_effect):
+        mock_db = MagicMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=pairs)))
+        mock_db.get = AsyncMock(side_effect=lambda model, key: MagicMock(id=key, sleeper_user_id="s1"))
+        mock_db.commit, mock_db.rollback = AsyncMock(), AsyncMock()
+        with patch("database.AsyncSessionLocal", side_effect=lambda: FakeSession(mock_db)), \
+             patch("services.projection_service.get_nfl_state", new=AsyncMock(return_value=state)), \
+             patch("services.league_service.sync_league", new=AsyncMock(side_effect=sync_side_effect)) as spy:
+            return await scheduler_service.sync_rosters_job(), spy, mock_db
+
+    print("\n[1] Offseason → no syncing...")
+    res, spy, _ = asyncio.run(_run({"season_type": "off"}, [(1, 1)], None))
+    assert res["skipped"] == "offseason" and not spy.called, res
+    print("    PASS, skipped")
+
+    print("\n[2] One league fails, the others still commit...")
+    calls = {"n": 0}
+    async def flaky(*a, **k):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("sleeper down")
+        return None if calls["n"] == 3 else {"player_ids": []}
+    res, spy, db = asyncio.run(_run({"season_type": "regular", "season": 2026, "week": 3},
+                                    [(1, 1), (2, 1), (3, 5), (4, 5)], flaky))
+    assert res == {"leagues": 4, "synced": 2, "failed": 2}, res
+    assert db.commit.await_count == 2 and db.rollback.await_count == 1
+    print("    PASS, 2 synced, 1 error rolled back, 1 league with no team counted as failed")
+
+    print("\n[3] Rejected ESPN cookies → user flagged for the reconnect banner...")
+    from services.espn_service import EspnAuthError
+    async def expired(*a, **k):
+        raise EspnAuthError("expired")
+    res, spy, db = asyncio.run(_run({"season_type": "regular", "season": 2026, "week": 3}, [(7, 5)], expired))
+    assert res == {"leagues": 1, "synced": 0, "failed": 1}, res
+    flagged = [c for c in db.execute.await_args_list if "espn_needs_reconnect" in str(c.args[0])]
+    assert flagged and db.commit.await_count == 1, db.execute.await_args_list
+    print("    PASS, rolled back, flag UPDATE committed")
+
+
 def run_lifecycle_tests():
     print("\n" + "=" * 50)
     print("SCHEDULER, START/SHUTDOWN GATING")
@@ -165,25 +208,26 @@ def run_lifecycle_tests():
     print("    PASS, nothing started when disabled")
 
     # [2] Enabled → creates scheduler, registers both jobs, starts; shutdown clears it
-    print("\n[2] SCHEDULER_ENABLED=true → wires both jobs...")
+    print("\n[2] SCHEDULER_ENABLED=true → wires all three jobs...")
     with patch("services.scheduler_service.SCHEDULER_ENABLED", True), \
          patch("services.scheduler_service.AsyncIOScheduler") as MockSched:
         inst = MockSched.return_value
         scheduler_service._scheduler = None
         scheduler_service.start_scheduler()
         assert MockSched.called
-        assert inst.add_job.call_count == 2, inst.add_job.call_count
+        assert inst.add_job.call_count == 3, inst.add_job.call_count
         assert inst.start.called
         scheduler_service.shutdown_scheduler()
         assert inst.shutdown.called
         assert scheduler_service._scheduler is None
-    print("    PASS, 2 jobs registered, start+shutdown called")
+    print("    PASS, 3 jobs registered, start+shutdown called")
 
 
 if __name__ == "__main__":
     run_trackable_tests()
     run_market_job_tests()
     run_sentiment_job_tests()
+    run_roster_sync_tests()
     run_lifecycle_tests()
     print("\n" + "=" * 50)
     print("ALL SCHEDULER TESTS PASSED ✅")

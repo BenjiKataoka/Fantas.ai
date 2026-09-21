@@ -84,10 +84,11 @@ async def get_eligible_leagues(user_id: str, season: int = CURRENT_SEASON) -> li
     return eligible
 
 
-async def get_league_rosters(league_id: str) -> list:
-    """Every roster in a league. Cached 15 min since waiver claims change ownership."""
+async def get_league_rosters(league_id: str, force: bool = False) -> list:
+    """Every roster in a league. Cached 15 min since waiver claims change ownership;
+    force skips the cache (manual refresh right after a roster move)."""
     cache_key = f"sleeper_rosters_{league_id}"
-    cached = _get_cache(cache_key)
+    cached = None if force else _get_cache(cache_key)
     if cached:
         return cached
     try:
@@ -102,9 +103,9 @@ async def get_league_rosters(league_id: str) -> list:
         return []
 
 
-async def get_roster(league_id: str, user_id: str) -> Optional[dict]:
+async def get_roster(league_id: str, user_id: str, force: bool = False) -> Optional[dict]:
     """Returns the roster belonging to user_id in the given league."""
-    rosters = await get_league_rosters(league_id)
+    rosters = await get_league_rosters(league_id, force=force)
     return next((r for r in rosters if r.get("owner_id") == user_id), None)
 
 

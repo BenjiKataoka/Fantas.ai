@@ -78,6 +78,80 @@ export function RecapSkeleton({ starters = 9, bench = 5 }) {
   )
 }
 
+// Waivers: summary sentence, then the fixed-width free-agent table beside the sidebar.
+// Uses the page's own colgroup so every placeholder sits in its real column.
+export function WaiverSkeleton({ rows = 10 }) {
+  const td = 'px-3 py-2.5'
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="space-y-2.5 max-w-2xl">
+        <Skeleton className="h-4.5 w-full" />
+        <Skeleton className="h-4.5 w-1/2" />
+      </div>
+      <div className="flex flex-col xl:flex-row gap-6 items-start">
+        <div className="w-fit max-w-full overflow-x-auto bg-surface border border-line rounded-xl">
+          <table className="w-[51.5rem] table-fixed">
+            <colgroup>
+              <col className="w-72" /><col className="w-14" /><col className="w-20" /><col className="w-20" />
+              <col className="w-20" /><col className="w-32" /><col className="w-28" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th className={td}><Skeleton className="h-2.5 w-10" /></th>
+                <th className={td}><Skeleton className="h-2.5 w-6" /></th>
+                {[10, 10, 12, 16].map((w, i) => (
+                  <th key={i} className={td}><Skeleton className="h-2.5 ml-auto" style={{ width: `${w * 0.25}rem` }} /></th>
+                ))}
+                <th className={td} />
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: rows }).map((_, i) => (
+                <tr key={i} className="border-t border-line/50">
+                  <td className={td}>
+                    <div className="flex items-center gap-2.5">
+                      <Skeleton className="size-8 rounded-full shrink-0" />
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2"><Skeleton className="h-3.5 w-28" /><Skeleton className="h-3 w-7" /></div>
+                        {i % 3 === 1 && <Skeleton className="h-2.5 w-44" />}
+                      </div>
+                    </div>
+                  </td>
+                  <td className={td}><Skeleton className="h-3 w-6" /></td>
+                  <td className={td}><Skeleton className="h-3.5 w-8 ml-auto" /></td>
+                  <td className={td}><Skeleton className="h-3.5 w-8 ml-auto" /></td>
+                  <td className={td}><Skeleton className="h-3.5 w-11 ml-auto" /></td>
+                  <td className={td}>
+                    <Skeleton className="h-3 w-20 ml-auto" />
+                    {i % 4 === 1 && <Skeleton className="h-3 w-24 ml-auto mt-1.5" />}
+                  </td>
+                  <td className={`${td} pl-5`}><Skeleton className="h-6 w-16 rounded-md" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="w-full xl:w-72 shrink-0 flex flex-col gap-4">
+          <div className="bg-surface border border-line rounded-xl p-4">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-2.5 w-52 mt-2 mb-4" />
+            <div className="space-y-2.5">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Skeleton className="h-2.5 w-8" /><Skeleton className="h-3 flex-1" /><Skeleton className="h-3 w-8" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="px-1 space-y-2.5">
+            {[90, 100, 60, 70].map(w => <Skeleton key={w} className="h-2.5" style={{ width: `${w}%` }} />)}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Card feed placeholder, for news, tracker, and admin lists.
 export function CardListSkeleton({ count = 5 }) {
   return (

@@ -7,6 +7,7 @@ import ConfidenceBadge from './ConfidenceBadge'
 import PlayerAvatar from './PlayerAvatar'
 import StockSection from './StockSection'
 import CollapseRow from './CollapseRow'
+import { slotLabel } from '@/lib/utils'
 
 // Concern is 1-10 from the AI analysis. 8+ is rare (2 of 15 on a typical roster), so the
 // icon stays meaningful instead of decorating everyone.
@@ -62,7 +63,7 @@ function StartSitCell({ rec }) {
   if (rec.slot) {
     return (
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-bull/10 border border-bull/30 text-bull text-xs font-semibold">
-        START<span className="text-bull/70 font-mono font-normal">{rec.slot}</span>
+        START<span className="text-bull/70 font-mono font-normal">{slotLabel(rec.slot)}</span>
       </span>
     )
   }

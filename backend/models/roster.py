@@ -4,11 +4,15 @@ from database import Base
 
 
 class MyRoster(Base):
-    """Per-user roster, which players each user owns in their fantasy league."""
+    """Per-user, per-league roster. A player on two of your teams has two rows, one per
+    league, so cross-league readers must dedupe on player_id."""
     __tablename__ = "my_roster"
 
-    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    # Points at user_leagues (not a raw league id) so the platform travels with it: a
+    # Sleeper and an ESPN league id could collide.
+    user_league_id = Column(Integer, ForeignKey("user_leagues.id", ondelete="CASCADE"), primary_key=True)
     player_id = Column(String, ForeignKey("players.player_id"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     acquisition_date = Column(Date, nullable=True)
     is_starter = Column(Boolean, default=False, nullable=False)
 

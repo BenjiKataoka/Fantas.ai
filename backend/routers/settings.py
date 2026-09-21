@@ -1,8 +1,9 @@
 """
 Settings router, per-user projection weight management.
 
-GET  /api/settings  → returns current weights for the placeholder user
-PUT  /api/settings  → validates and saves new weights to the users table
+GET  /api/settings              → current projection weights
+PUT  /api/settings              → validates and saves new weights to the users table
+GET/PUT/DELETE /api/settings/espn → ESPN cookie status / save (validated) / remove
 """
 import logging
 from fastapi import APIRouter, Depends, HTTPException
@@ -72,3 +73,57 @@ async def update_settings(
         "weight_espn": user.weight_espn,
         "weight_fp": user.weight_fp,
     }
+
+
+# ── ESPN account (cookies) ────────────────────────────────────────────────────
+# Separate from the weights endpoints on purpose: GET /settings must return weights only.
+# ponytail: cookies are stored as plain text like the rest of the users table; encrypt at
+# rest (e.g. Fernet with a server key) before opening the app beyond a few friends.
+
+class EspnCredentials(BaseModel):
+    espn_s2: str
+    swid: str
+
+    @field_validator("espn_s2", "swid")
+    @classmethod
+    def not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Required")
+        return v
+
+    @field_validator("swid")
+    @classmethod
+    def braced(cls, v: str) -> str:
+        # ESPN's SWID cookie is a GUID in braces; people often copy it without them.
+        return v if v.startswith("{") else "{" + v.strip("{}") + "}"
+
+
+@router.get("/settings/espn")
+async def get_espn_status(user: User = Depends(get_current_user)):
+    """Whether this user has ESPN cookies saved, and whether ESPN has started rejecting them.
+    The cookies themselves are never returned."""
+    return {"connected": bool(user.espn_s2 and user.swid), "needs_reconnect": user.espn_needs_reconnect}
+
+
+@router.put("/settings/espn")
+async def save_espn_credentials(body: EspnCredentials, user: User = Depends(get_current_user)):
+    """Checks the cookies against ESPN before saving, and returns the leagues they unlock."""
+    from services.espn_service import EspnAuthError, get_espn_fan_leagues
+    from services.projection_service import get_nfl_state
+
+    season = (await get_nfl_state())["season"]
+    try:
+        leagues = await get_espn_fan_leagues(body.espn_s2, body.swid, season)
+    except EspnAuthError:
+        raise HTTPException(status_code=400, detail="ESPN didn't accept those cookies. Copy fresh ones from espn.com and try again.")
+    user.espn_s2, user.swid, user.espn_needs_reconnect = body.espn_s2, body.swid, False
+    logger.info(f"[Settings] ESPN connected for user {user.id}, {len(leagues)} league(s) found")
+    return {"connected": True, "leagues": leagues}
+
+
+@router.delete("/settings/espn")
+async def remove_espn_credentials(user: User = Depends(get_current_user)):
+    user.espn_s2 = user.swid = None
+    user.espn_needs_reconnect = False
+    return {"connected": False, "needs_reconnect": False}

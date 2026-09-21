@@ -303,3 +303,139 @@ async def get_espn_roster(
 def _espn_position(pos_id: int | None) -> str:
     """Maps ESPN defaultPositionId to position string."""
     return {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DST"}.get(pos_id or 0, "")
+
+
+# ── Multi-league: ESPN leagues as a second platform ───────────────────────────
+# ESPN lineup slot id → the Sleeper slot names the rest of the app uses (lineup solver,
+# SLOT_ELIGIBLE, frontend labels). Bench (20) and IR (21) aren't lineup slots.
+ESPN_TO_SLOT = {
+    0: "QB", 2: "RB", 3: "WRRB_FLEX", 4: "WR", 5: "REC_FLEX", 6: "TE",
+    7: "SUPER_FLEX", 16: "DEF", 17: "K", 23: "FLEX",
+}
+FAN_API = "https://fan.api.espn.com/apis/v2/fans/{swid}"
+
+
+def _cookie_headers(espn_s2: str | None, swid: str | None) -> dict:
+    """Public leagues need no cookies; private ones need both."""
+    headers = {"Accept": "application/json"}
+    if espn_s2 and swid:
+        headers["Cookie"] = f"espn_s2={espn_s2}; SWID={swid}"
+    return headers
+
+
+class EspnAuthError(Exception):
+    """ESPN rejected the cookies (expired or wrong account)."""
+
+
+async def get_espn_fan_leagues(espn_s2: str, swid: str, season: int) -> list[dict]:
+    """Every ESPN football league this account is in for a season, from ESPN's (unofficial)
+    fan profile endpoint: [{league_id, name}]. Raises EspnAuthError on bad cookies."""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(FAN_API.format(swid=swid), headers=_cookie_headers(espn_s2, swid),
+                                    params={"displayHiddenPrefs": "true"})
+    except Exception as e:
+        logger.error(f"[ESPN] fan leagues request failed: {e}")
+        return []
+    # An unknown SWID comes back 404, not 401, so treat it as bad cookies too.
+    if resp.status_code in (401, 403, 404):
+        raise EspnAuthError("ESPN cookies were rejected")
+    if resp.status_code != 200:
+        logger.error(f"[ESPN] fan leagues status {resp.status_code}")
+        return []
+    leagues = []
+    for pref in resp.json().get("preferences", []):
+        entry = (pref.get("metaData") or {}).get("entry") or {}
+        group = (entry.get("groups") or [{}])[0]
+        if entry.get("abbrev") == "FFL" and entry.get("seasonId") == season and group.get("groupId"):
+            leagues.append({"league_id": str(group["groupId"]), "name": group.get("groupName")})
+    return leagues
+
+
+async def get_espn_league(league_id: str, season: int, espn_s2: str | None = None,
+                          swid: str | None = None, force: bool = False) -> dict | None:
+    """League settings plus every team's roster in one call. Cached 15 minutes, like the
+    Sleeper rosters, since waiver claims change ownership. Cookies are optional for public
+    leagues. Raises EspnAuthError on 401 (bad cookies, or a private league without them)."""
+    cache_key = f"espn_league_{league_id}_{season}"
+    cached = None if force else _get_cache(cache_key)
+    if cached is not None:
+        return cached
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.get(
+                f"{ESPN_BASE}/seasons/{season}/segments/0/leagues/{league_id}",
+                headers=_cookie_headers(espn_s2, swid),
+                params=[("view", "mSettings"), ("view", "mTeam"), ("view", "mRoster")],
+            )
+    except Exception as e:
+        logger.error(f"[ESPN] get_espn_league failed for {league_id}: {e}")
+        return None
+    if resp.status_code == 401:
+        raise EspnAuthError("ESPN cookies were rejected")
+    if resp.status_code != 200:
+        logger.error(f"[ESPN] get_espn_league {league_id} status {resp.status_code}")
+        return None
+    data = resp.json()
+    _set_cache(cache_key, data, ttl_hours=0.25)
+    return data
+
+
+def espn_roster_positions(league: dict) -> list[str]:
+    """The league's lineup as Sleeper-style slot names, e.g. ["QB", "RB", "RB", ..., "FLEX"]."""
+    counts = ((league.get("settings") or {}).get("rosterSettings") or {}).get("lineupSlotCounts") or {}
+    return [ESPN_TO_SLOT[int(k)] for k, n in counts.items() if int(k) in ESPN_TO_SLOT for _ in range(n)]
+
+
+def espn_is_redraft_ppr(league: dict) -> bool:
+    """Same rule as Sleeper's filter: 1 point per reception and no keepers."""
+    st = league.get("settings") or {}
+    rec = next((i.get("points") for i in (st.get("scoringSettings") or {}).get("scoringItems") or []
+                if i.get("statId") == 53), None)
+    return rec == 1.0 and not (st.get("draftSettings") or {}).get("keeperCount")
+
+
+def espn_my_team(league: dict, swid: str | None = None, team_id: int | None = None) -> dict | None:
+    """The user's team: by the team they picked (public leagues), else by SWID ownership."""
+    teams = league.get("teams") or []
+    if team_id is not None:
+        return next((t for t in teams if t.get("id") == team_id), None)
+    if not swid:
+        return None
+    swid_clean = swid.strip("{} ").lower()
+    return next((t for t in teams
+                 if any(o.strip("{} ").lower() == swid_clean for o in t.get("owners") or [])), None)
+
+
+def espn_teams(league: dict) -> list[dict]:
+    """Team picker for public leagues: [{team_id, name, owner}]."""
+    members = {m.get("id"): m.get("displayName") for m in league.get("members") or []}
+    return [{"team_id": t.get("id"), "name": t.get("name") or t.get("abbrev") or f"Team {t.get('id')}",
+             "owner": members.get(t.get("primaryOwner"))}
+            for t in league.get("teams") or []]
+
+
+def parse_espn_league_id(text: str) -> str | None:
+    """A pasted league link (…/league?leagueId=123) or a bare id → "123"."""
+    import re
+    m = re.search(r"leagueId=(\d+)", text) or re.fullmatch(r"\s*(\d{4,})\s*", text)
+    return m.group(1) if m else None
+
+
+def espn_to_sleeper_ids(entries: list[dict], all_players: dict) -> list[tuple[str, dict]]:
+    """Map ESPN roster entries onto Sleeper player ids (the app's canonical key): by the
+    espn_id Sleeper stores, then by normalized name + position for the few it leaves blank.
+    Returns [(sleeper_id, entry)], dropping players that can't be matched (team defenses)."""
+    by_espn = {str(p["espn_id"]): pid for pid, p in all_players.items() if p.get("espn_id") is not None}
+    by_name = {(normalize_name(p.get("full_name") or ""), p.get("position")): pid
+               for pid, p in all_players.items() if p.get("full_name")}
+    out = []
+    for e in entries:
+        pl = (e.get("playerPoolEntry") or {}).get("player") or {}
+        pid = by_espn.get(str(pl.get("id"))) or by_name.get(
+            (normalize_name(pl.get("fullName") or ""), _espn_position(pl.get("defaultPositionId"))))
+        if pid:
+            out.append((pid, e))
+        else:
+            logger.info(f"[ESPN] no Sleeper match for {pl.get('fullName')} ({pl.get('id')})")
+    return out

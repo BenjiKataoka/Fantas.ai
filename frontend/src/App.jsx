@@ -1,4 +1,4 @@
-import { TriangleAlert, Hourglass, Sun, Moon } from 'lucide-react'
+import { TriangleAlert, Hourglass, Sun, Moon, RotateCw } from 'lucide-react'
 import { useTheme, setTheme } from '@/lib/theme'
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
@@ -17,6 +17,7 @@ import Admin from './pages/Admin'
 import Spinner from './components/Spinner'
 import Ticker from './components/Ticker'
 import { getMe } from './services/api'
+import { useApp } from './context/AppContext'
 
 const NAV_LINKS = [
   { to: '/',         label: 'Dashboard' },
@@ -33,6 +34,75 @@ function BrandMark({ className = '' }) {
     <span className={`font-display font-bold uppercase tracking-wide text-content select-none ${className}`}>
       Fantas.ai
     </span>
+  )
+}
+
+const PLATFORM_LABEL = { SLEEPER: 'Sleeper', ESPN: 'ESPN' }
+
+// Value is "PLATFORM:league_id" so a Sleeper and an ESPN league can never collide.
+function LeagueSwitcher() {
+  const { leagues, credentials, switchLeague } = useApp()
+  if (leagues.length < 2 || !credentials) return null
+  const platforms = [...new Set(leagues.map(l => l.platform))]
+  const option = l => <option key={`${l.platform}:${l.league_id}`} value={`${l.platform}:${l.league_id}`}>{l.name}</option>
+  return (
+    <select
+      aria-label="League"
+      value={`${credentials.platform}:${credentials.leagueId}`}
+      onChange={e => { const [platform, id] = e.target.value.split(':'); switchLeague(id, platform) }}
+      className="max-w-56 truncate rounded-md bg-raised border border-line px-2.5 py-1 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-content/30"
+    >
+      {platforms.length > 1
+        ? platforms.map(p => <optgroup key={p} label={PLATFORM_LABEL[p]}>{leagues.filter(l => l.platform === p).map(option)}</optgroup>)
+        : leagues.map(option)}
+    </select>
+  )
+}
+
+function ago(date, now) {
+  const mins = Math.floor((now - date) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  return `${Math.floor(mins / 60)}h ago`
+}
+
+// Last roster sync plus a manual refresh. Refreshing normally happens on its own (tab
+// return after 15 min, league switch, and the server's 6-hour sync).
+function RefreshStatus() {
+  const { lastRefresh, rosterLoading, refreshAll, credentials } = useApp()
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000)
+    return () => clearInterval(id)
+  }, [])
+  if (!credentials) return null
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-subtle">
+      {lastRefresh && <span className="font-mono">{rosterLoading ? 'Updating' : `Updated ${ago(lastRefresh, now)}`}</span>}
+      <button
+        onClick={() => refreshAll({ force: true })}
+        disabled={rosterLoading}
+        aria-label="Refresh roster"
+        title="Refresh roster"
+        className="rounded-md p-1.5 hover:text-content hover:bg-raised disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-content/30"
+      >
+        <RotateCw className={`size-3.5 ${rosterLoading ? 'motion-safe:animate-spin' : ''}`} />
+      </button>
+    </div>
+  )
+}
+
+// Shown on every page once ESPN starts rejecting the saved cookies, so the user finds out
+// before an ESPN league quietly stops updating.
+function EspnReconnectBanner() {
+  const { espnNeedsReconnect } = useApp()
+  if (!espnNeedsReconnect) return null
+  return (
+    <div role="status" className="bg-warn/10 border-b border-warn/30 px-6 py-2 text-sm text-content flex items-center gap-2">
+      <TriangleAlert className="size-4 text-warn shrink-0" />
+      <span>Your ESPN connection expired, so your ESPN leagues stopped updating.</span>
+      <NavLink to="/settings" className="font-medium underline underline-offset-2 hover:text-warn">Reconnect in Settings</NavLink>
+    </div>
   )
 }
 
@@ -74,6 +144,8 @@ function NavBar({ isAdmin }) {
         </NavLink>
       ))}
       <div className="ml-auto flex items-center gap-3">
+        <RefreshStatus />
+        <LeagueSwitcher />
         <ThemeToggle />
         <UserButton afterSignOutUrl="/" />
       </div>
@@ -203,6 +275,7 @@ function AuthedApp() {
     <BrowserRouter>
       <div className="min-h-screen bg-ink text-content">
         <NavBar isAdmin={me?.is_admin} />
+        <EspnReconnectBanner />
         <Ticker />
         <RoutedMain isAdmin={me?.is_admin} />
       </div>

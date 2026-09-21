@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, TIMESTAMP, Integer, Float, ForeignKey
+from sqlalchemy import Column, String, Boolean, TIMESTAMP, Integer, Float, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -23,6 +23,9 @@ class User(Base):
     # ESPN credentials (only needed if user's league is on ESPN)
     espn_s2 = Column(String, nullable=True)           # Cookie, treat as sensitive
     swid = Column(String, nullable=True)              # Cookie, treat as sensitive
+    # Set when ESPN rejects the saved cookies (sync or page load); drives the reconnect
+    # banner. Cleared when the user saves fresh cookies or disconnects.
+    espn_needs_reconnect = Column(Boolean, default=False, nullable=False, server_default="false")
 
     # Per-user projection source weights
     weight_sleeper = Column(Float, default=0.35, nullable=False)
@@ -37,8 +40,10 @@ class User(Base):
 
 class UserLeague(Base):
     """All fantasy leagues a user has connected, across all platforms.
-    is_primary=True indicates the league that drives the roster dashboard."""
+    is_primary=True marks the league loaded most recently (the server-side default when
+    a request doesn't name one)."""
     __tablename__ = "user_leagues"
+    __table_args__ = (UniqueConstraint("user_id", "platform", "league_id", name="uq_user_league"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -48,6 +53,9 @@ class UserLeague(Base):
     total_rosters = Column(Integer, nullable=True)    # League size
     season = Column(Integer, nullable=True)
     is_primary = Column(Boolean, default=False, nullable=False)
+    # ESPN public leagues only: which team is yours, since without cookies there's no SWID
+    # to match. Null means "find my team by SWID".
+    team_id = Column(Integer, nullable=True)
     connected_at = Column(TIMESTAMP, server_default=func.now())
 
     # Relationships

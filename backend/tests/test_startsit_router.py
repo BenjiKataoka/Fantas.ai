@@ -88,7 +88,8 @@ def run_lineup_logic_tests():
     print("=" * 50)
 
     async def _test():
-        from routers.startsit import _adjusted_proj, LINEUP_SLOTS, FLEX_POSITIONS, CLOSE_DECISION_MARGIN
+        from routers.startsit import _adjusted_proj, DEFAULT_SLOTS, CLOSE_DECISION_MARGIN
+        from services.recap_service import best_lineup
 
         # Build a mock roster: 1 QB, 3 RB, 3 WR, 1 TE, 1 K
         def make_player(pid, name, pos, proj, injury="Active"):
@@ -117,42 +118,27 @@ def run_lineup_logic_tests():
             make_player("k1",  "K One",    "K",   8.0),
         ]
 
-        # [1] Correct starters selected
-        print("\n[1] Correct positional starters selected...")
-        by_position = {}
-        for p in players:
-            by_position.setdefault(p["position"], []).append(p)
-        for pos in by_position:
-            by_position[pos].sort(key=lambda x: x["adjusted_proj"], reverse=True)
+        score = lambda p: p["adjusted_proj"]
 
-        starters = []
-        bench_ids = set()
-        for pos, count in LINEUP_SLOTS.items():
-            pool = by_position.get(pos, [])
-            for i in range(min(count, len(pool))):
-                starters.append({**pool[i], "slot": pos})
-                bench_ids.add(pool[i]["player_id"])
+        # [1] Standard slots: positional starters plus the best leftover as FLEX
+        print("\n[1] Standard lineup + FLEX...")
+        lineup = best_lineup(players, DEFAULT_SLOTS, score)
+        by_slot = {}
+        for p in lineup:
+            by_slot.setdefault(p["slot"], []).append(p["player_id"])
+        assert by_slot["QB"] == ["qb1"] and sorted(by_slot["RB"]) == ["rb1", "rb2"], by_slot
+        assert sorted(by_slot["WR"]) == ["wr1", "wr2"] and by_slot["TE"] == ["te1"] and by_slot["K"] == ["k1"], by_slot
+        assert by_slot["FLEX"] == ["rb3"], f"RB3 (11.0) should be FLEX, got {by_slot['FLEX']}"
+        print(f"    PASS, FLEX: rb3 (11.0), wr3 (9.0) benched")
 
-        starter_ids = {s["player_id"] for s in starters}
-        assert "qb1" in starter_ids, "QB1 should be started"
-        assert "rb1" in starter_ids, "RB1 should be started"
-        assert "rb2" in starter_ids, "RB2 should be started"
-        assert "rb3" not in starter_ids, "RB3 should not be started (positional)"
-        assert "wr1" in starter_ids, "WR1 should be started"
-        assert "wr2" in starter_ids, "WR2 should be started"
-        assert "te1" in starter_ids, "TE1 should be started"
-        assert "k1" in starter_ids, "K1 should be started"
-        print(f"    PASS, positional starters: {sorted(starter_ids)}")
-
-        # [2] FLEX picks best remaining RB/WR/TE
-        print("\n[2] FLEX selects best remaining RB/WR/TE...")
-        flex_pool = sorted(
-            [p for pos in FLEX_POSITIONS for p in by_position.get(pos, []) if p["player_id"] not in bench_ids],
-            key=lambda x: x["adjusted_proj"],
-            reverse=True,
-        )
-        assert flex_pool[0]["player_id"] == "rb3", f"RB3 (11.0) should be FLEX pick, got {flex_pool[0]['player_id']}"
-        print(f"    PASS, FLEX: {flex_pool[0]['name']} ({flex_pool[0]['adjusted_proj']})")
+        # [2] League format is respected: superflex takes a second QB, no kicker slot
+        print("\n[2] Superflex league, no K slot...")
+        sf_players = players + [make_player("qb2", "QB Two", "QB", 17.0)]
+        lineup = best_lineup(sf_players, ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "SUPER_FLEX", "BN"], score)
+        by_slot = {p["slot"]: p["player_id"] for p in lineup}
+        assert by_slot["SUPER_FLEX"] == "qb2", f"QB2 (17.0) should take SUPER_FLEX, got {by_slot}"
+        assert "k1" not in {p["player_id"] for p in lineup}, "No K slot means no kicker starts"
+        print(f"    PASS, SUPER_FLEX: qb2, kicker benched")
 
         # [3] Out player is never started
         print("\n[3] Out player never started...")
@@ -274,6 +260,9 @@ def run_router_tests():
             call_count["n"] += 1
             result = MagicMock()
             if call_count["n"] == 1:
+                # League lookup (resolve_user_league)
+                result.scalar_one_or_none.return_value = MagicMock(id=1)
+            elif call_count["n"] == 2:
                 # Roster query
                 result.all.return_value = roster_rows
             else:

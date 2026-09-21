@@ -240,7 +240,7 @@ async def analyze_roster(user_id: int, db: AsyncSession, force: bool = False) ->
     Flash-Lite rate limit, returns immediately with the queued/skipped counts.
     """
     player_ids = (
-        await db.execute(select(MyRoster.player_id).where(MyRoster.user_id == user_id))
+        await db.execute(select(MyRoster.player_id).where(MyRoster.user_id == user_id).distinct())
     ).scalars().all()
 
     if not player_ids:
@@ -328,7 +328,7 @@ async def roster_analysis_status(user_id: int, db: AsyncSession) -> dict:
     Lets the frontend poll a batch run to completion and fill gauges in as they land.
     """
     player_ids = (
-        await db.execute(select(MyRoster.player_id).where(MyRoster.user_id == user_id))
+        await db.execute(select(MyRoster.player_id).where(MyRoster.user_id == user_id).distinct())
     ).scalars().all()
     if not player_ids:
         return {"total": 0, "ready": 0, "pending": 0}

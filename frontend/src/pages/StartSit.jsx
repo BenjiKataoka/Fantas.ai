@@ -1,10 +1,10 @@
-import { REVEAL } from '@/lib/utils'
+import { REVEAL, slotLabel } from '@/lib/utils'
 import { useApp } from '../context/AppContext'
 import InjuryBadge from '../components/InjuryBadge'
 import PlayerAvatar from '../components/PlayerAvatar'
 import { TableSkeleton } from '../components/Skeletons'
 
-const SLOT_ORDER = { QB: 0, RB: 1, WR: 2, TE: 3, FLEX: 4, K: 5 }
+const SLOT_ORDER = { QB: 0, RB: 1, WR: 2, TE: 3, FLEX: 4, WRRB_FLEX: 4, REC_FLEX: 4, SUPER_FLEX: 5, K: 6, DEF: 7 }
 
 // Position/slot tints kept clear of the bull-green / bear-red market colors.
 const SLOT_COLORS = {
@@ -12,7 +12,7 @@ const SLOT_COLORS = {
   RB:   'text-pos-rb',
   WR:   'text-pos-wr',
   TE:   'text-pos-te',
-  FLEX: 'text-brand',
+  FLEX: 'text-brand', SUPER_FLEX: 'text-brand', WRRB_FLEX: 'text-brand', REC_FLEX: 'text-brand',
   K:    'text-subtle',
 }
 
@@ -30,7 +30,7 @@ function LineupRow({ p }) {
     <tr className="hover:bg-raised/50 transition-colors">
       <td className="px-3 py-2.5">
         <span className={`font-mono font-semibold text-xs uppercase tracking-wide ${SLOT_COLORS[p.slot] || 'text-subtle'}`}>
-          {p.slot}
+          {slotLabel(p.slot)}
         </span>
       </td>
       <td className="px-3 py-2.5">
@@ -58,7 +58,7 @@ function CloseDecision({ d }) {
   return (
     <div className="bg-warn/8 border border-warn/25 rounded-lg p-3">
       <div className="flex items-center gap-2 mb-2">
-        <span className={`font-mono text-xs font-semibold uppercase ${SLOT_COLORS[d.slot] || 'text-subtle'}`}>{d.slot}</span>
+        <span className={`font-mono text-xs font-semibold uppercase ${SLOT_COLORS[d.slot] || 'text-subtle'}`}>{slotLabel(d.slot)}</span>
         <span className="text-xs text-warn/80 font-mono">margin {d.margin.toFixed(1)}</span>
       </div>
       <div className="flex items-center gap-2 text-sm">

@@ -1,30 +1,20 @@
 import logging
-from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import delete, select, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models.player import Player
-from models.roster import MyRoster
 from models.user import User, UserLeague
-from services.sleeper_service import (
-    get_user_id,
-    get_eligible_leagues,
-    get_roster,
-    get_all_players,
-)
+from services.sleeper_service import get_user_id, get_eligible_leagues
 from auth import get_current_user
 from services import tracker_service
-from services.projection_engine import weights_from_user
-from services.projection_service import get_nfl_state, normalize_name, sync_projections
+from services import espn_service
+from services.league_service import RELEVANT_POSITIONS, full_name, sync_espn_league, sync_sleeper_league
+from services.projection_service import get_nfl_state
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-RELEVANT_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
-
 
 def _resolve_league_season(nfl_state: dict) -> int:
     """
@@ -43,10 +33,11 @@ def _resolve_league_season(nfl_state: dict) -> int:
 async def list_eligible_leagues(
     sleeper_username: str = Query(..., description="Sleeper username"),
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Returns the user's redraft PPR leagues from Sleeper.
-    Used in Settings to let the user pick which league to track.
+    The user's redraft PPR leagues across platforms: Sleeper by username, plus ESPN when
+    the user has saved ESPN cookies. Each entry carries its `platform`.
     """
     user_id = await get_user_id(sleeper_username)
     if not user_id:
@@ -54,7 +45,8 @@ async def list_eligible_leagues(
 
     nfl_state = await get_nfl_state()
     league_season = _resolve_league_season(nfl_state)
-    leagues = await get_eligible_leagues(user_id, season=league_season)
+    leagues = [{**l, "platform": "SLEEPER"} for l in await get_eligible_leagues(user_id, season=league_season)]
+    leagues += await _espn_leagues(user, league_season, db)
     if not leagues:
         return {
             "leagues": [],
@@ -64,15 +56,106 @@ async def list_eligible_leagues(
     return {"leagues": leagues, "sleeper_user_id": user_id}
 
 
+async def _espn_leagues(user: User, season: int, db: AsyncSession) -> list[dict]:
+    """ESPN leagues for this user: every league their cookies unlock (filtered to redraft
+    PPR like Sleeper's), plus public leagues they added by link without cookies."""
+    out: dict[str, dict] = {}
+    if user.espn_s2 and user.swid:
+        try:
+            for l in await espn_service.get_espn_fan_leagues(user.espn_s2, user.swid, season):
+                league = await espn_service.get_espn_league(l["league_id"], season, user.espn_s2, user.swid)
+                if league and espn_service.espn_is_redraft_ppr(league):
+                    out[l["league_id"]] = {"league_id": l["league_id"], "name": l["name"], "platform": "ESPN",
+                                           "total_rosters": (league.get("settings") or {}).get("size"), "season": season}
+        except espn_service.EspnAuthError:
+            logger.warning(f"[Leagues] ESPN cookies expired for user {user.id}")
+            user.espn_needs_reconnect = True
+    public = (await db.execute(select(UserLeague).where(
+        UserLeague.user_id == user.id, UserLeague.platform == "ESPN",
+        UserLeague.team_id.isnot(None), UserLeague.season == season,
+    ))).scalars().all()
+    for ul in public:
+        out.setdefault(ul.league_id, {"league_id": ul.league_id, "name": ul.league_name, "platform": "ESPN",
+                                      "total_rosters": ul.total_rosters, "season": season, "public": True})
+    return list(out.values())
+
+
+class EspnLookup(BaseModel):
+    league: str   # a pasted league link or a bare league id
+
+
+class EspnPublicConnect(BaseModel):
+    league_id: str
+    team_id: int
+
+
+async def _public_espn_league(league_id: str, season: int) -> dict:
+    """Fetch a league without cookies and check it's usable, or raise a clear 400."""
+    try:
+        league = await espn_service.get_espn_league(league_id, season)
+    except espn_service.EspnAuthError:
+        raise HTTPException(status_code=400, detail="That league is private. Connect your ESPN account below to add it.")
+    if not league:
+        raise HTTPException(status_code=404, detail=f"No ESPN league {league_id} found for the {season} season.")
+    if not espn_service.espn_is_redraft_ppr(league):
+        raise HTTPException(status_code=400, detail="Only redraft PPR leagues are supported.")
+    return league
+
+
+@router.post("/leagues/espn/lookup")
+async def lookup_espn_league(body: EspnLookup, user: User = Depends(get_current_user)):
+    """Step 1 of adding a public ESPN league: resolve the link and list its teams to pick from."""
+    league_id = espn_service.parse_espn_league_id(body.league)
+    if not league_id:
+        raise HTTPException(status_code=400, detail="Paste a league link like fantasy.espn.com/football/league?leagueId=123456.")
+    season = _resolve_league_season(await get_nfl_state())
+    league = await _public_espn_league(league_id, season)
+    return {"league_id": league_id, "name": (league.get("settings") or {}).get("name"),
+            "teams": espn_service.espn_teams(league)}
+
+
+@router.post("/leagues/espn/public")
+async def connect_public_espn_league(
+    body: EspnPublicConnect,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Step 2: save the league with the team the user picked."""
+    season = _resolve_league_season(await get_nfl_state())
+    league = await _public_espn_league(body.league_id, season)
+    if not espn_service.espn_my_team(league, team_id=body.team_id):
+        raise HTTPException(status_code=400, detail="That team isn't in this league.")
+    settings_ = league.get("settings") or {}
+    ul = (await db.execute(select(UserLeague).where(
+        UserLeague.user_id == user.id, UserLeague.platform == "ESPN", UserLeague.league_id == body.league_id,
+    ))).scalar_one_or_none()
+    if not ul:
+        ul = UserLeague(user_id=user.id, platform="ESPN", league_id=body.league_id)
+        db.add(ul)
+    ul.league_name, ul.total_rosters, ul.season, ul.team_id = settings_.get("name"), settings_.get("size"), season, body.team_id
+    return {"league_id": body.league_id, "name": ul.league_name, "platform": "ESPN", "public": True}
+
+
+@router.delete("/leagues/espn/{league_id}")
+async def remove_espn_league(league_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Remove a public ESPN league (its roster rows go with it via the cascade)."""
+    await db.execute(delete(UserLeague).where(
+        UserLeague.user_id == user.id, UserLeague.platform == "ESPN", UserLeague.league_id == league_id,
+    ))
+    return {"removed": league_id}
+
+
 @router.get("/roster")
 async def get_my_roster(
     sleeper_username: str = Query(..., description="Sleeper username"),
-    league_id: str = Query(..., description="Sleeper league ID"),
+    league_id: str = Query(..., description="League ID on its platform"),
+    platform: str = Query("SLEEPER", pattern="^(SLEEPER|ESPN)$"),
+    force: bool = Query(False, description="Skip the 15-minute league cache (manual refresh)"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Fetches the user's roster from Sleeper, syncs players + roster into Neon,
+    Fetches the user's roster from Sleeper or ESPN, syncs players + roster into Neon,
     and returns the full roster with player details.
     """
     # Fetch NFL state first, used for season/week throughout this handler
@@ -87,134 +170,61 @@ async def get_my_roster(
     # Uses the same season resolution as /api/leagues so the dropdown and this
     # validation always agree (see _resolve_league_season).
     league_season = _resolve_league_season(nfl_state)
-    eligible = await get_eligible_leagues(sleeper_user_id, season=league_season)
+    eligible = (await _espn_leagues(user, league_season, db) if platform == "ESPN"
+                else await get_eligible_leagues(sleeper_user_id, season=league_season))
     eligible_ids = {l["league_id"] for l in eligible}
+    if league_id not in eligible_ids and user.espn_needs_reconnect and platform == "ESPN":
+        # The ESPN lookup above hit rejected cookies (and set the flag): say so, and commit
+        # the flag before raising, since the error response would roll it back.
+        await db.commit()
+        raise HTTPException(status_code=401, detail="Your ESPN cookies expired. Paste fresh ones in Settings.")
     if league_id not in eligible_ids:
         raise HTTPException(
             status_code=400,
             detail="League is not a redraft PPR league or does not belong to this user."
         )
 
-    # Fetch roster from Sleeper
-    roster = await get_roster(league_id, sleeper_user_id)
-    if not roster:
-        raise HTTPException(status_code=404, detail="Roster not found in this league.")
-
-    player_ids: list[str] = roster.get("players") or []
-    starters: set[str] = set(roster.get("starters") or [])
-
-    if not player_ids:
-        return {"roster": [], "source": "sleeper", "warning": "Roster appears empty."}
-
-    # Fetch full player map from Sleeper to get names/positions
-    all_players = await get_all_players()
-
-    # --- Upsert players into `players` table ---
-    players_to_upsert = []
-    for pid in player_ids:
-        p = all_players.get(pid, {})
-        position = p.get("position", "")
-        if position not in RELEVANT_POSITIONS:
-            continue
-        # Sleeper returns espn_id as int, cast to str for VARCHAR column
-        espn_id = p.get("espn_id")
-        espn_id_str = str(espn_id) if espn_id is not None else None
-        players_to_upsert.append({
-            "player_id": pid,
-            "name": _full_name(p),
-            "position": position,
-            "nfl_team": p.get("team") or p.get("nfl_team"),
-            "sleeper_id": pid,
-            "espn_id": espn_id_str,
-            "espn_athlete_id": espn_id_str,
-            "injury_status": p.get("injury_status", "Active"),
-        })
-
-    if players_to_upsert:
-        stmt = pg_insert(Player).values(players_to_upsert)
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["player_id"],
-            set_={
-                "name": stmt.excluded.name,
-                "position": stmt.excluded.position,
-                "nfl_team": stmt.excluded.nfl_team,
-                "espn_id": stmt.excluded.espn_id,
-                "injury_status": stmt.excluded.injury_status,
-            },
-        )
-        await db.execute(stmt)
-
     # --- Persist the Sleeper credentials on the authenticated user ---
     user.sleeper_username = sleeper_username
     user.sleeper_user_id = sleeper_user_id
 
-    # --- Upsert this league into user_leagues and mark as primary ---
-    result = await db.execute(
+    # --- Upsert this league into user_leagues and make it the primary (last loaded) ---
+    ul = (await db.execute(
         select(UserLeague).where(
             UserLeague.user_id == user.id,
             UserLeague.league_id == league_id,
-            UserLeague.platform == "SLEEPER",
+            UserLeague.platform == platform,
         )
-    )
-    existing_league = result.scalar_one_or_none()
-    if not existing_league:
-        # Clear primary flag on any existing leagues before setting the new one
-        await db.execute(
-            update(UserLeague)
-            .where(UserLeague.user_id == user.id)
-            .values(is_primary=False)
-        )
-        db.add(UserLeague(
+    )).scalar_one_or_none()
+    if not ul:
+        ul = UserLeague(
             user_id=user.id,
-            platform="SLEEPER",
+            platform=platform,
             league_id=league_id,
             league_name=next((l["name"] for l in eligible if l["league_id"] == league_id), None),
             total_rosters=next((l.get("total_rosters") for l in eligible if l["league_id"] == league_id), None),
             season=league_season,
-            is_primary=True,
-        ))
+        )
+        db.add(ul)
         await db.flush()
-
-    # --- Clear old roster and re-sync ---
     await db.execute(
-        delete(MyRoster).where(MyRoster.user_id == user.id)
+        update(UserLeague).where(UserLeague.user_id == user.id).values(is_primary=(UserLeague.id == ul.id))
     )
 
-    valid_pids = {p["player_id"] for p in players_to_upsert}
-    for pid in player_ids:
-        if pid not in valid_pids:
-            continue
-        db.add(MyRoster(
-            user_id=user.id,
-            player_id=pid,
-            is_starter=pid in starters,
-            slot=_guess_slot(pid, starters, all_players),
-            acquisition_date=date.today(),
-        ))
-
-    # --- Sync projections if in-season ---
-    projections: dict = {}
-    if nfl_state["season_type"] in ("regular", "post"):
-        espn_id_map = {
-            p["player_id"]: p["espn_id"]
-            for p in players_to_upsert
-            if p.get("espn_id")
-        }
-        name_map = {
-            p["player_id"]: normalize_name(p["name"])
-            for p in players_to_upsert
-        }
-        # Use the authenticated user's saved weights
-        user_weights = weights_from_user(user)
-        projections = await sync_projections(
-            player_ids=list(valid_pids),
-            espn_id_map=espn_id_map,
-            name_map=name_map,
-            season=nfl_state["season"],
-            week=nfl_state["week"],
-            db=db,
-            weights=user_weights,
-        )
+    try:
+        synced = (await sync_espn_league(db, user, ul, nfl_state, force=force) if platform == "ESPN"
+                  else await sync_sleeper_league(db, user, sleeper_user_id, ul, nfl_state, force=force))
+    except espn_service.EspnAuthError:
+        # Commit the flag before raising: the error response would otherwise roll it back.
+        user.espn_needs_reconnect = True
+        await db.commit()
+        raise HTTPException(status_code=401, detail="Your ESPN cookies expired. Paste fresh ones in Settings.")
+    if synced is None:
+        raise HTTPException(status_code=404, detail="Roster not found in this league.")
+    player_ids, starters, slots = synced["player_ids"], synced["starters"], synced["slots"]
+    all_players, projections = synced["all_players"], synced["projections"]
+    if not player_ids:
+        return {"roster": [], "source": "sleeper", "warning": "Roster appears empty."}
 
     await db.commit()
 
@@ -232,12 +242,12 @@ async def get_my_roster(
         proj = projections.get(pid, {})
         roster_out.append({
             "player_id": pid,
-            "name": _full_name(p),
+            "name": full_name(p),
             "position": position,
             "nfl_team": p.get("team") or p.get("nfl_team"),
             "injury_status": p.get("injury_status", "Active"),
             "is_starter": pid in starters,
-            "slot": _guess_slot(pid, starters, all_players),
+            "slot": slots.get(pid, "BN"),
             "sleeper_proj": proj.get("sleeper_proj"),
             "espn_proj": proj.get("espn_proj"),
             "fp_proj": proj.get("fp_proj"),
@@ -253,23 +263,10 @@ async def get_my_roster(
         "roster": roster_out,
         "total_players": len(roster_out),
         "starters": len([p for p in roster_out if p["is_starter"]]),
-        "source": "sleeper",
+        "source": platform.lower(),
+        "platform": platform,
         "season": nfl_state["season"],
         "week": nfl_state["week"],
         "season_type": nfl_state["season_type"],
         "league_id": league_id,
     }
-
-
-def _full_name(player: dict) -> str:
-    first = player.get("first_name", "")
-    last = player.get("last_name", "")
-    return f"{first} {last}".strip() or player.get("full_name", "Unknown")
-
-
-def _guess_slot(pid: str, starters: set, all_players: dict) -> str:
-    """Best-effort slot label based on position for Sleeper rosters."""
-    if pid not in starters:
-        return "BN"
-    p = all_players.get(pid, {})
-    return p.get("position", "BN")

@@ -7,13 +7,14 @@ GET /api/projections/{week}
   Does not re-sync the full roster, reads player list from my_roster.
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.player import Player
 from models.roster import MyRoster
+from services.league_service import resolve_user_league
 from models.user import User
 from auth import get_current_user
 from services.projection_engine import compute_weighted_projection, weights_from_user
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 @router.get("/projections/{week}")
 async def get_projections(
     week: int,
+    league_id: str | None = Query(None, description="League to use; defaults to the last one loaded"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -47,10 +49,11 @@ async def get_projections(
     weights = weights_from_user(user)
 
     # Load rostered player IDs + player details
+    ul = await resolve_user_league(db, user.id, league_id)
     result = await db.execute(
         select(MyRoster, Player)
         .join(Player, MyRoster.player_id == Player.player_id)
-        .where(MyRoster.user_id == user.id)
+        .where(MyRoster.user_league_id == (ul.id if ul else -1))
     )
     rows = result.all()
 

@@ -99,6 +99,14 @@ async def llm_usage(admin: User = Depends(require_admin)):
     return llm_budget.usage()
 
 
+@router.post("/admin/scheduler/run-rosters")
+async def run_roster_sync(admin: User = Depends(require_admin)):
+    """Manually trigger the roster sync now (LLM-free): every connected league's roster
+    and this week's projections. Same job the scheduler runs 4x daily."""
+    from services.scheduler_service import sync_rosters_job
+    return await sync_rosters_job()
+
+
 @router.post("/admin/scheduler/run-market")
 async def run_market_refresh(admin: User = Depends(require_admin)):
     """Manually trigger the market refresh now (LLM-free): ESPN position rank + ADP +

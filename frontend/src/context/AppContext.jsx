@@ -1,11 +1,13 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@clerk/react'
 import { toast } from 'sonner'
-import { getRoster, getSettings, updateSettings, getNews, getStartSit, analyzeRoster, getRosterAnalysis, setTokenGetter } from '../services/api'
+import { getRoster, getLeagues, getEspnStatus, getSettings, updateSettings, getNews, getStartSit, analyzeRoster, getRosterAnalysis, setTokenGetter } from '../services/api'
 import { balanceWeights } from '../utils/weights'
 
 const LS_USERNAME = 'fantasai_sleeper_username'
 const LS_LEAGUE   = 'fantasai_league_id'
+const LS_PLATFORM = 'fantasai_league_platform'
+const STALE_MS    = 15 * 60 * 1000
 
 const AppContext = createContext(null)
 
@@ -23,18 +25,21 @@ export function AppProvider({ children }) {
   const [credentials, setCredentials] = useState(() => {
     const username = localStorage.getItem(LS_USERNAME)
     const leagueId = localStorage.getItem(LS_LEAGUE)
-    return username && leagueId ? { username, leagueId } : null
+    const platform = localStorage.getItem(LS_PLATFORM) || 'SLEEPER'
+    return username && leagueId ? { username, leagueId, platform } : null
   })
 
-  const saveCredentials = useCallback((username, leagueId) => {
+  const saveCredentials = useCallback((username, leagueId, platform = 'SLEEPER') => {
     localStorage.setItem(LS_USERNAME, username)
     localStorage.setItem(LS_LEAGUE, leagueId)
-    setCredentials({ username, leagueId })
+    localStorage.setItem(LS_PLATFORM, platform)
+    setCredentials({ username, leagueId, platform })
   }, [])
 
   const clearCredentials = useCallback(() => {
     localStorage.removeItem(LS_USERNAME)
     localStorage.removeItem(LS_LEAGUE)
+    localStorage.removeItem(LS_PLATFORM)
     setCredentials(null)
     setRosterData(null)
     setStartSitData(null)
@@ -47,14 +52,16 @@ export function AppProvider({ children }) {
   const [rosterError, setRosterError]   = useState(null)
   const [lastRefresh, setLastRefresh]   = useState(null)
 
-  const fetchRoster = useCallback(async (creds = credentials) => {
+  // force skips the server's 15-minute league cache (the manual refresh icon uses it).
+  const fetchRoster = useCallback(async (creds = credentials, { force = false } = {}) => {
     if (!creds) return
     setRosterLoading(true)
     setRosterError(null)
     try {
-      const res = await getRoster(creds.username, creds.leagueId)
+      const res = await getRoster(creds.username, creds.leagueId, creds.platform, force)
       setRosterData(res.data)
       setLastRefresh(new Date())
+      return res.data
     } catch (err) {
       setRosterError(err.response?.data?.detail || 'Failed to load roster.')
     } finally {
@@ -66,6 +73,31 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (authed && credentials && !rosterData) fetchRoster(credentials)
   }, [authed, credentials]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Leagues ────────────────────────────────────────────────────────────────
+  // Every eligible league for this Sleeper account, for the navbar switcher.
+  const [leagues, setLeagues] = useState([])
+
+  const reloadLeagues = useCallback(() => {
+    if (!credentials?.username) return
+    getLeagues(credentials.username).then(res => setLeagues(res.data.leagues || [])).catch(() => {})
+  }, [credentials?.username])
+
+  useEffect(() => { if (authed) reloadLeagues() }, [authed, reloadLeagues])
+
+  // Switching reloads the roster (which also syncs it server-side) and drops the old
+  // league's start/sit; pages that read credentials.leagueId refetch on their own.
+  // Switching takes the league's platform along, since Sleeper and ESPN load differently.
+  const switchLeague = useCallback((leagueId, platform = 'SLEEPER') => {
+    if (!credentials || (leagueId === credentials.leagueId && platform === credentials.platform)) return
+    const next = { username: credentials.username, leagueId, platform }
+    localStorage.setItem(LS_LEAGUE, leagueId)
+    localStorage.setItem(LS_PLATFORM, platform)
+    setCredentials(next)
+    setRosterData(null)
+    setStartSitData(null)
+    fetchRoster(next)
+  }, [credentials, fetchRoster])
 
   // ── News ───────────────────────────────────────────────────────────────────
   const [newsData, setNewsData]       = useState(null)
@@ -97,19 +129,55 @@ export function AppProvider({ children }) {
     const wk = Number.isInteger(week) ? week : 1
     setStartSitLoading(true)
     try {
-      const res = await getStartSit(wk)
+      const res = await getStartSit(wk, credentials?.leagueId)
       setStartSitData(res.data)
     } catch {
       // silently fail, start/sit is optional (e.g. no projections synced yet)
     } finally {
       setStartSitLoading(false)
     }
-  }, [])
+  }, [credentials])
 
   // Auto-fetch start/sit once the roster (and its week) is available
   useEffect(() => {
     if (authed && credentials && rosterData && !startSitData) fetchStartSit(rosterData.week)
   }, [authed, credentials, rosterData]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── ESPN connection ────────────────────────────────────────────────────────
+  // needs_reconnect flips on server-side whenever ESPN rejects the saved cookies (page load
+  // or the 6-hour sync); it drives the app-wide reconnect banner.
+  const [espnNeedsReconnect, setEspnNeedsReconnect] = useState(false)
+  const refreshEspnStatus = useCallback(() => {
+    getEspnStatus().then(res => setEspnNeedsReconnect(res.data.needs_reconnect)).catch(() => {})
+  }, [])
+  useEffect(() => { if (authed) refreshEspnStatus() }, [authed, refreshEspnStatus])
+  // A roster load can be what discovers expired cookies, so re-check after any failure.
+  useEffect(() => { if (authed && rosterError) refreshEspnStatus() }, [authed, rosterError, refreshEspnStatus])
+
+  // ── Background refresh ─────────────────────────────────────────────────────
+  // The roster (and the start/sit built on it) re-syncs in place: the current data stays
+  // on screen, so no page needs a manual refresh. The server also syncs every 6h.
+  const refreshAll = useCallback(async ({ force = false } = {}) => {
+    const data = await fetchRoster(credentials, { force })
+    if (data) fetchStartSit(data.week)
+    refreshEspnStatus()
+  }, [credentials, fetchRoster, fetchStartSit, refreshEspnStatus])
+
+  // Coming back to a tab that's been idle 15+ minutes triggers a quiet refresh.
+  useEffect(() => {
+    if (!authed || !credentials) return
+    const onReturn = () => {
+      if (document.visibilityState !== 'visible' || rosterLoading) return
+      if (lastRefresh && Date.now() - lastRefresh.getTime() < STALE_MS) return
+      refreshAll()
+    }
+    document.addEventListener('visibilitychange', onReturn)
+    window.addEventListener('focus', onReturn)
+    return () => {
+      document.removeEventListener('visibilitychange', onReturn)
+      window.removeEventListener('focus', onReturn)
+    }
+  }, [authed, credentials, lastRefresh, rosterLoading, refreshAll])
 
   // ── Roster deep-dive analysis ────────────────────────────────────────────────
   // Lives in context (not the Dashboard) so progress survives page navigation and
@@ -216,10 +284,11 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{
-      // Credentials
-      credentials, saveCredentials, clearCredentials,
+      // Credentials + leagues
+      credentials, saveCredentials, clearCredentials, leagues, switchLeague, reloadLeagues,
+      espnNeedsReconnect, refreshEspnStatus,
       // Roster
-      rosterData, rosterLoading, rosterError, lastRefresh, fetchRoster,
+      rosterData, rosterLoading, rosterError, lastRefresh, fetchRoster, refreshAll,
       // Weights
       weights, weightsLoaded, saving, saveError, updateWeight, saveWeights, setWeights,
       // News

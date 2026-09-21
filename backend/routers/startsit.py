@@ -1,23 +1,24 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.player import Player
 from models.roster import MyRoster
+from services.league_service import resolve_user_league
 from models.projection import Projection
 from models.user import User
 from auth import get_current_user
+from services import espn_service, sleeper_service
 from services.projection_service import get_nfl_state
+from services.recap_service import SLOT_ELIGIBLE, best_lineup
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Standard redraft PPR lineup (1 FLEX slot for RB/WR/TE)
-LINEUP_SLOTS = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1}
-FLEX_POSITIONS = {"RB", "WR", "TE"}
-FLEX_COUNT = 1
+# Used only when the league's own slots can't be fetched.
+DEFAULT_SLOTS = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K"]
 
 # Margin (adjusted points) below which a decision is flagged as close
 CLOSE_DECISION_MARGIN = 2.0
@@ -30,6 +31,19 @@ INJURY_MODIFIER = {
     "Out": 0.0,
     "IR": 0.0,
 }
+
+
+async def _league_slots(ul, user) -> list[str]:
+    """The league's lineup slots on its own platform; empty if they can't be fetched."""
+    if not ul:
+        return []
+    if ul.platform == "ESPN":
+        try:
+            league = await espn_service.get_espn_league(ul.league_id, ul.season, user.espn_s2, user.swid)
+        except espn_service.EspnAuthError:
+            return []
+        return espn_service.espn_roster_positions(league or {})
+    return ((await sleeper_service.get_league(ul.league_id)) or {}).get("roster_positions") or []
 
 
 def _adjusted_proj(weighted_proj: float | None, injury_status: str | None) -> float:
@@ -84,6 +98,7 @@ def _close_decision(slot: str, starter: dict, alt: dict, margin: float) -> dict:
 @router.get("/startsit/{week}")
 async def get_start_sit(
     week: int,
+    league_id: str | None = Query(None, description="League to use; defaults to the last one loaded"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -112,10 +127,11 @@ async def get_start_sit(
         }
 
     # Load roster with player details
+    ul = await resolve_user_league(db, user.id, league_id)
     result = await db.execute(
         select(MyRoster, Player)
         .join(Player, MyRoster.player_id == Player.player_id)
-        .where(MyRoster.user_id == user.id)
+        .where(MyRoster.user_league_id == (ul.id if ul else -1))
     )
     roster_rows = result.all()
 
@@ -143,70 +159,31 @@ async def get_start_sit(
             "Run /api/roster to sync projections first."
         )
 
-    # Build and group players by position
-    by_position: dict[str, list] = {}
-    for row in roster_rows:
-        pos = row.Player.position
-        if pos not in {*LINEUP_SLOTS.keys(), *FLEX_POSITIONS}:
-            continue
-        p = _build_player_dict(row.Player, proj_map.get(row.Player.player_id))
-        by_position.setdefault(pos, []).append(p)
+    players = [
+        _build_player_dict(row.Player, proj_map.get(row.Player.player_id))
+        for row in roster_rows
+        if any(row.Player.position in eligible for eligible in SLOT_ELIGIBLE.values())
+    ]
 
-    for pos in by_position:
-        by_position[pos].sort(key=lambda x: x["adjusted_proj"], reverse=True)
+    # The league's real lineup (superflex, 3 WR, no kicker, ...), not a hardcoded one.
+    slots = await _league_slots(ul, user) or DEFAULT_SLOTS
 
-    starters: list[dict] = []
-    bench_ids: set[str] = set()
+    starters = best_lineup(players, slots, lambda p: p["adjusted_proj"])
+    starter_ids = {p["player_id"] for p in starters}
+    bench = sorted((p for p in players if p["player_id"] not in starter_ids),
+                   key=lambda x: x["adjusted_proj"], reverse=True)
+
+    # A close call: the best bench player who could legally fill that slot is within the
+    # margin. Kickers are skipped, thin K depth makes it noise.
     close_decisions: list[dict] = []
-
-    # Fill positional slots
-    for pos, count in LINEUP_SLOTS.items():
-        pool = by_position.get(pos, [])
-        for i in range(count):
-            if i >= len(pool):
-                break
-            starter = pool[i]
-            starters.append({**starter, "slot": pos})
-            bench_ids.add(starter["player_id"])
-
-            # Flag close decisions (skip K, thin rosters make this noise)
-            alt = pool[i + 1] if i + 1 < len(pool) else None
-            if alt and pos != "K":
-                margin = starter["adjusted_proj"] - alt["adjusted_proj"]
-                if margin < CLOSE_DECISION_MARGIN:
-                    close_decisions.append(_close_decision(pos, starter, alt, margin))
-
-    # Fill FLEX with best remaining RB/WR/TE
-    flex_pool = sorted(
-        [
-            p
-            for pos in FLEX_POSITIONS
-            for p in by_position.get(pos, [])
-            if p["player_id"] not in bench_ids
-        ],
-        key=lambda x: x["adjusted_proj"],
-        reverse=True,
-    )
-    for i in range(FLEX_COUNT):
-        if i >= len(flex_pool):
-            break
-        flex_starter = flex_pool[i]
-        starters.append({**flex_starter, "slot": "FLEX"})
-        bench_ids.add(flex_starter["player_id"])
-
-        alt = flex_pool[i + 1] if i + 1 < len(flex_pool) else None
+    for starter in starters:
+        if starter["slot"] == "K":
+            continue
+        alt = next((b for b in bench if b["position"] in SLOT_ELIGIBLE[starter["slot"]]), None)
         if alt:
-            margin = flex_starter["adjusted_proj"] - alt["adjusted_proj"]
+            margin = starter["adjusted_proj"] - alt["adjusted_proj"]
             if margin < CLOSE_DECISION_MARGIN:
-                close_decisions.append(_close_decision("FLEX", flex_starter, alt, margin))
-
-    # All remaining players go to bench
-    all_players = [p for pos_list in by_position.values() for p in pos_list]
-    bench = sorted(
-        [p for p in all_players if p["player_id"] not in bench_ids],
-        key=lambda x: x["adjusted_proj"],
-        reverse=True,
-    )
+                close_decisions.append(_close_decision(starter["slot"], starter, alt, margin))
 
     logger.info(
         f"[Start/Sit] Week {week}, {len(starters)} starters, "
