@@ -1,17 +1,37 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, TriangleAlert } from 'lucide-react'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useState, useEffect } from 'react'
 import InjuryBadge from './InjuryBadge'
 import ProjectionBar from './ProjectionBar'
 import ConfidenceBadge from './ConfidenceBadge'
-import StockBadge from './StockBadge'
 import PlayerAvatar from './PlayerAvatar'
 import StockSection from './StockSection'
 
-// Small dot summarizing a player's concern level on the collapsed row (green/amber/red).
-function ConcernDot({ level }) {
-  if (level == null) return null
-  const c = level <= 3 ? 'bg-bull' : level <= 6 ? 'bg-warn' : 'bg-bear'
-  return <span className={`h-1.5 w-1.5 rounded-full ${c}`} title={`Concern ${level}/10`} />
+// Concern is 1-10 from the AI analysis. 8+ is rare (2 of 15 on a typical roster), so the
+// icon stays meaningful instead of decorating everyone.
+const HIGH_CONCERN = 8
+
+function ConcernFlag({ stock }) {
+  if (!stock || (stock.concern_level ?? 0) < HIGH_CONCERN) return null
+  const reasons = (stock.bearish_factors || []).slice(0, 2)
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0} aria-label={`High concern, ${stock.concern_level} out of 10`}
+              className="ml-auto shrink-0 rounded p-1 text-bear hover:bg-bear/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-bear/40">
+          <TriangleAlert className="size-4" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="max-w-64">
+        <p className="font-medium">High concern, {stock.concern_level}/10</p>
+        {reasons.length ? (
+          <ul className="mt-1 space-y-0.5 list-disc pl-4">{reasons.map(r => <li key={r}>{r}</li>)}</ul>
+        ) : (
+          stock.concern_summary && <p className="mt-1">{stock.concern_summary}</p>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  )
 }
 
 // Position tints chosen to stay clear of the bull-green / bear-red market colors.
@@ -103,10 +123,10 @@ function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
             <div className="flex items-center gap-2">
               <span className="font-medium text-content">{name}</span>
               <InjuryBadge status={injury_status} />
-              {stock && <ConcernDot level={stock.concern_level} />}
             </div>
             <div className="text-xs text-subtle font-mono mt-0.5">{nfl_team}</div>
           </div>
+          <ConcernFlag stock={stock} />
         </div>
       </td>
 
@@ -133,12 +153,7 @@ function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
       {/* Latest News */}
       <td className={`${COL_CELL} max-w-[180px]`}>
         {latestNews ? (
-          <div className="flex flex-col gap-1">
-            <p className="text-xs text-subtle leading-snug line-clamp-2">{latestNews.headline}</p>
-            {latestNews.stock_direction && (
-              <StockBadge direction={latestNews.stock_direction} magnitude={latestNews.stock_magnitude} size="sm" />
-            )}
-          </div>
+          <p className="text-xs text-subtle leading-snug line-clamp-2">{latestNews.headline}</p>
         ) : (
           <span className="text-subtle/40 text-xs">-</span>
         )}

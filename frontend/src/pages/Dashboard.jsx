@@ -1,3 +1,4 @@
+import { REVEAL } from '@/lib/utils'
 import { useState, useMemo } from 'react'
 import { getLeagues } from '../services/api'
 import { useApp } from '../context/AppContext'
@@ -195,7 +196,9 @@ export default function Dashboard() {
   return (
     <div>
       {/* Wrap so the click event isn't passed as `creds` (would break the fetch). */}
-      <TopBar rosterData={rosterData} lastRefresh={lastRefresh} onRefresh={() => fetchRoster()} loading={rosterLoading} />
+      <div className={REVEAL}>
+        <TopBar rosterData={rosterData} lastRefresh={lastRefresh} onRefresh={() => fetchRoster()} loading={rosterLoading} />
+      </div>
 
       {rosterError && (
         <div className="mb-4 p-3 bg-bear/10 border border-bear/30 rounded-lg text-bear text-sm">
@@ -205,12 +208,12 @@ export default function Dashboard() {
       )}
 
       <div className="flex gap-6 items-start">
-        <div className="flex-1 min-w-0">
+        <div key={rosterData ? 'table' : 'loading'} className={`flex-1 min-w-0 ${REVEAL}`} style={{ animationDelay: '90ms' }}>
           {rosterLoading && !rosterData && <TableSkeleton rows={9} />}
           {rosterData && <RosterTable players={rosterData.roster} newsMap={newsMap} startSitMap={startSitMap} />}
         </div>
 
-        <div className="w-56 shrink-0 flex flex-col gap-4">
+        <div className={`w-56 shrink-0 flex flex-col gap-4 ${REVEAL}`} style={{ animationDelay: '180ms' }}>
           <WeightSidebar />
           <div className="bg-surface border border-line rounded-xl p-5">
             <h3 className="text-sm font-display font-semibold text-content mb-3">Alerts</h3>

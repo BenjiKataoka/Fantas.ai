@@ -68,6 +68,10 @@ export const getSentimentHistory = (playerId, range = 'season') =>
 // --- Start/Sit ---
 export const getStartSit = (week) => api.get(`/startsit/${week}`)
 
+// --- Recap ---
+export const getRecap = (week, sleeperUsername, leagueId) =>
+  api.get(`/recap/${week}`, { params: { sleeper_username: sleeperUsername, league_id: leagueId } })
+
 // --- Auth / Admin ---
 export const getMe = () => api.get('/me')
 export const getAdminUsers = () => api.get('/admin/users')

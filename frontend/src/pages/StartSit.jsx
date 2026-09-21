@@ -1,3 +1,4 @@
+import { REVEAL } from '@/lib/utils'
 import { useApp } from '../context/AppContext'
 import InjuryBadge from '../components/InjuryBadge'
 import PlayerAvatar from '../components/PlayerAvatar'
@@ -97,7 +98,7 @@ export default function StartSit() {
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-4 pb-4 border-b border-line">
+      <div className={`flex items-baseline justify-between mb-4 pb-4 border-b border-line ${REVEAL}`}>
         <h1 className="text-2xl font-display font-bold text-content">Start / Sit</h1>
         <span className="text-sm text-subtle font-mono">
           {season_type === 'off' ? `${season} Offseason` : `Week ${week} · ${season}`}
@@ -114,7 +115,7 @@ export default function StartSit() {
 
       {!offseason_note && (
         <div className="flex gap-6 items-start">
-          <div className="flex-1 min-w-0">
+          <div className={`flex-1 min-w-0 ${REVEAL}`} style={{ animationDelay: '90ms' }}>
             <div className="flex items-center justify-between mb-3">
               <h2 className={H2}>Recommended Lineup</h2>
               {totalProj > 0 && (
@@ -173,7 +174,7 @@ export default function StartSit() {
             )}
           </div>
 
-          <div className="w-72 shrink-0">
+          <div className={`w-72 shrink-0 ${REVEAL}`} style={{ animationDelay: '180ms' }}>
             <h2 className={`${H2} mb-3`}>Close Calls</h2>
             {close_decisions.length > 0 ? (
               <div className="flex flex-col gap-3">

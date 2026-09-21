@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import NewsHub from './pages/NewsHub'
 import PlayerTracker from './pages/PlayerTracker'
 import StartSit from './pages/StartSit'
+import Recap from './pages/Recap'
 import Settings from './pages/Settings'
 import Admin from './pages/Admin'
 import Spinner from './components/Spinner'
@@ -20,6 +21,7 @@ const NAV_LINKS = [
   { to: '/news',     label: 'News' },
   { to: '/tracker',  label: 'Tracker' },
   { to: '/startsit', label: 'Start/Sit' },
+  { to: '/recap',    label: 'Recap' },
   { to: '/settings', label: 'Settings' },
 ]
 
@@ -134,14 +136,17 @@ function ErrorScreen() {
 // per-route remount is cheap. Must live inside <BrowserRouter> to use useLocation.
 function RoutedMain({ isAdmin }) {
   const location = useLocation()
+  // Pages with their own top-down section cascade skip the page-level fade.
+  const plainEnter = ['/settings', '/admin'].includes(location.pathname)
   return (
     <main className="max-w-7xl mx-auto px-6 py-8">
-      <div key={location.pathname} className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out">
+      <div key={location.pathname} className={plainEnter ? 'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out' : undefined}>
         <Routes location={location}>
           <Route path="/"         element={<Dashboard />} />
           <Route path="/news"     element={<NewsHub />} />
           <Route path="/tracker"  element={<PlayerTracker />} />
           <Route path="/startsit" element={<StartSit />} />
+          <Route path="/recap"    element={<Recap />} />
           <Route path="/settings" element={<Settings />} />
           {isAdmin && <Route path="/admin" element={<Admin />} />}
         </Routes>

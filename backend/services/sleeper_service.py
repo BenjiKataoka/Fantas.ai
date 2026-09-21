@@ -109,6 +109,43 @@ async def get_roster(league_id: str, user_id: str) -> Optional[dict]:
         return None
 
 
+async def get_league(league_id: str) -> Optional[dict]:
+    """League object (settings, scoring, roster_positions). Cached 6h."""
+    cache_key = f"sleeper_league_{league_id}"
+    cached = _get_cache(cache_key)
+    if cached:
+        return cached
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{SLEEPER_BASE}/league/{league_id}", timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            _set_cache(cache_key, data)
+            return data
+    except Exception as e:
+        logger.error(f"[Sleeper] get_league failed for {league_id}: {e}")
+        return None
+
+
+async def get_matchups(league_id: str, week: int, live: bool = False) -> list:
+    """Every roster's matchup for a week: starters, players, and players_points in
+    the league's own scoring. Live weeks cache 10 minutes, finished weeks 24h."""
+    cache_key = f"sleeper_matchups_{league_id}_{week}"
+    cached = _get_cache(cache_key)
+    if cached:
+        return cached
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{SLEEPER_BASE}/league/{league_id}/matchups/{week}", timeout=10)
+            resp.raise_for_status()
+            data = resp.json() or []
+            _set_cache(cache_key, data, ttl_hours=(1 / 6) if live else 24)
+            return data
+    except Exception as e:
+        logger.error(f"[Sleeper] get_matchups failed for league {league_id} week {week}: {e}")
+        return []
+
+
 async def get_all_players() -> dict:
     """Returns Sleeper's full NFL player map. Heavy call, cache for 24h."""
     cache_key = "sleeper_all_players"

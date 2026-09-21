@@ -1,3 +1,4 @@
+import { REVEAL } from '@/lib/utils'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { toast } from 'sonner'
 import { getTrackerList, unstarPlayer, getSentimentHistory } from '../services/api'
@@ -10,9 +11,6 @@ import TrendChart, { METRICS } from '../components/TrendChart'
 import PlayerSearchModal from '../components/PlayerSearchModal'
 
 const POS_COLORS = { QB: 'text-violet-300', RB: 'text-teal-300', WR: 'text-sky-300', TE: 'text-amber-300', K: 'text-subtle' }
-// Each detail section fades + slides in from the top; a per-section animationDelay
-// makes them land 1-by-1 top→down when a player is (re)selected.
-const REVEAL = 'animate-in fade-in-0 slide-in-from-top-2 duration-300 ease-out fill-mode-both'
 const RANGES = [{ k: '1w', label: '1W' }, { k: '1m', label: '1M' }, { k: 'season', label: 'Season' }]
 const METRIC_KEYS = ['rank', 'rostered', 'sentiment', 'concern', 'adp']
 

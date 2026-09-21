@@ -1,3 +1,4 @@
+import { REVEAL } from '@/lib/utils'
 import { useState, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
 import StockBadge from '../components/StockBadge'
@@ -203,7 +204,7 @@ export default function NewsHub() {
 
   return (
     <div className="max-w-3xl">
-      <div className="flex items-center justify-between mb-5">
+      <div className={`flex items-center justify-between mb-5 ${REVEAL}`}>
         <div>
           <h1 className="text-2xl font-display font-bold text-content">News Hub</h1>
           {newsData && (
@@ -222,7 +223,7 @@ export default function NewsHub() {
         </button>
       </div>
 
-      <div className="flex gap-2 mb-5 flex-wrap">
+      <div className={`flex gap-2 mb-5 flex-wrap ${REVEAL}`} style={{ animationDelay: '70ms' }}>
         {FILTERS.map(f => {
           const count = f.key === 'all' ? items.length
             : f.key === 'contradictions' ? contradictionCount
@@ -267,14 +268,15 @@ export default function NewsHub() {
       )}
 
       {filtered.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {filtered.map(item => (
+        <div key={activeFilter} className="flex flex-col gap-3">
+          {filtered.map((item, i) => (
+            <div key={item.news_id} className={REVEAL} style={{ animationDelay: `${140 + Math.min(i, 8) * 45}ms` }}>
             <NewsCard
-              key={item.news_id}
               item={item}
               playerLabel={getPlayerLabel(item)}
               playerName={playerMap[item.player_id]?.name || ''}
             />
+            </div>
           ))}
         </div>
       )}
