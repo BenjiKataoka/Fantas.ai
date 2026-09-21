@@ -64,7 +64,7 @@ export default function TrendChart({ points = [], metric = 'rank', position = ''
 
   const line = vals.map((d, k) => `${k === 0 ? 'M' : 'L'}${xFor(d.i).toFixed(1)},${yFor(d.v).toFixed(1)}`).join(' ')
 
-  // Three axis ticks: best (top), middle, worst (bottom) — labeled with real values.
+  // Three axis ticks: best (top), middle, worst (bottom), labeled with real values.
   const bestV = m.betterHigh ? hi : lo
   const worstV = m.betterHigh ? lo : hi
   const ticks = [{ v: bestV, y: padT }, { v: (lo + hi) / 2, y: padT + innerH / 2 }, { v: worstV, y: padT + innerH }]

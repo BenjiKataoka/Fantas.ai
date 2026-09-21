@@ -9,7 +9,7 @@ const STATUS_LABEL = { Questionable: 'Q', Doubtful: 'D', Out: 'Out', IR: 'IR' }
 
 export default function InjuryBadge({ status }) {
   const style = STATUS_STYLES[status]
-  if (!style) return null // Active — show nothing
+  if (!style) return null // Active, show nothing
   return (
     <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${style}`}>
       {STATUS_LABEL[status]}

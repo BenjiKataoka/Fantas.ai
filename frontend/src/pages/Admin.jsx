@@ -82,18 +82,18 @@ export default function Admin() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-xs text-subtle font-mono">
-                  {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
+                  {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}
                 </td>
                 <td className="px-4 py-3 text-right">
                   {u.is_admin ? (
-                    <span className="text-xs text-subtle/60">—</span>
+                    <span className="text-xs text-subtle/60">-</span>
                   ) : u.is_approved ? (
                     <button
                       onClick={() => act(u.id, false)}
                       disabled={busyId === u.id}
                       className="px-3 py-1 text-xs font-medium rounded-md bg-raised hover:bg-line text-subtle hover:text-content border border-line disabled:opacity-40 transition-colors"
                     >
-                      {busyId === u.id ? '…' : 'Revoke'}
+                      {busyId === u.id ? '...' : 'Revoke'}
                     </button>
                   ) : (
                     <button
@@ -101,7 +101,7 @@ export default function Admin() {
                       disabled={busyId === u.id}
                       className="px-3 py-1 text-xs font-semibold rounded-md bg-brand hover:brightness-110 text-brand-fg disabled:opacity-40 transition-all"
                     >
-                      {busyId === u.id ? '…' : 'Approve'}
+                      {busyId === u.id ? '...' : 'Approve'}
                     </button>
                   )}
                 </td>

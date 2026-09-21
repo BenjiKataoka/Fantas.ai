@@ -2,7 +2,7 @@
 4-pass Gemini player stock analysis pipeline (Player Tracker).
 
 All 4 passes run on Flash-Lite (GEMINI_PRIMARY). Full Flash's free-tier limit is ~20
-requests/day — too small to analyze even one roster — while Flash-Lite allows ~500/day,
+requests/day, too small to analyze even one roster, while Flash-Lite allows ~500/day,
 so it is the only viable model for batch roster analysis. Flash is kept as a rare
 escalation fallback (see _run_pass) and hard-capped via GEMINI_RPD_LIMITS.
 
@@ -15,13 +15,15 @@ Combined score formula:
   combined_stock_score = (concern_level × 0.50) + (worry_score × 0.30) + (adp_penalty × 0.20)
   adp_penalty: RISING=-1, STABLE=0, FALLING=+2
 
-Never raises — returns None on full failure.
+Never raises, returns None on full failure.
 """
 import json
 import logging
 from typing import Optional
 
 from google import genai
+
+from services.utils import WRITING_STYLE, strip_dashes
 
 from config import GEMINI_API_KEY, GEMINI_PRIMARY, GEMINI_FALLBACK, LLM_ENABLED
 from services import llm_budget
@@ -67,10 +69,10 @@ CURRENT WEIGHTED PROJECTION: {weighted_proj} PPR points this week
 Return ONLY valid JSON (no markdown):
 {{
   "news_summary": "<1-2 sentence summary of the most relevant recent news>",
-  "news_vs_history": "<CONSISTENT|CONCERNING|ENCOURAGING|CONTRADICTORY> — does recent news align with historical profile?",
+  "news_vs_history": "<CONSISTENT|CONCERNING|ENCOURAGING|CONTRADICTORY>: does recent news align with historical profile?",
   "stock_direction": "<BULLISH|BEARISH|NEUTRAL>",
   "stock_magnitude": "<HIGH|MEDIUM|LOW>",
-  "adp_alignment": "<OVERVALUED|FAIR_VALUE|UNDERVALUED> — given news and history, is current ADP appropriate?",
+  "adp_alignment": "<OVERVALUED|FAIR_VALUE|UNDERVALUED>: given news and history, is current ADP appropriate?",
   "short_term_outlook": "<1-2 sentences on next 4 weeks>",
   "long_term_outlook": "<1-2 sentences on rest of season / offseason>",
   "draft_recommendation": "<EARLY_TARGET|FAIR_VALUE|LATE_ROUND|AVOID|WATCHLIST_ONLY>"
@@ -89,7 +91,7 @@ Assign a concern score and explain your reasoning. Higher concern = more risk/un
 
 Return ONLY valid JSON (no markdown):
 {{
-  "concern_level": <1-10 integer — 1=no concerns, 10=major red flags>,
+  "concern_level": <1-10 integer: 1=no concerns, 10=major red flags>,
   "concern_summary": "<One direct sentence summarizing the primary concern or strength>",
   "bullish_factors": ["<factor 1>", "<factor 2>"],
   "bearish_factors": ["<factor 1>", "<factor 2>"],
@@ -107,13 +109,13 @@ Assess the overall sentiment and detect any contrarian signals.
 
 Return ONLY valid JSON (no markdown):
 {{
-  "sentiment_score": <-1.0 to 1.0 — negative=bearish, positive=bullish>,
+  "sentiment_score": <-1.0 to 1.0: negative=bearish, positive=bullish>,
   "sentiment_label": "<VERY_BULLISH|BULLISH|SLIGHTLY_BULLISH|NEUTRAL|SLIGHTLY_BEARISH|BEARISH|VERY_BEARISH>",
   "dominant_themes": ["<theme 1>", "<theme 2>"],
-  "sentiment_vs_stock": "<CONFIRMS|STRENGTHENS|WEAKENS|CONTRADICTS> — does sentiment match the stock direction?",
+  "sentiment_vs_stock": "<CONFIRMS|STRENGTHENS|WEAKENS|CONTRADICTS>: does sentiment match the stock direction?",
   "alignment_note": "<1 sentence explaining why sentiment confirms or contradicts the stock direction>",
-  "contrarian_flag": <true|false — true if market sentiment appears to be mispricing this player>,
-  "worry_score": <1-10 integer — reflects current news-cycle anxiety regardless of long-term outlook>
+  "contrarian_flag": <true|false: true if market sentiment appears to be mispricing this player>,
+  "worry_score": <1-10 integer: reflects current news-cycle anxiety regardless of long-term outlook>
 }}"""
 
 
@@ -138,9 +140,9 @@ async def run_full_analysis(
     Run all 4 Gemini passes and return the combined result dict.
 
     Returns None if Pass 1 or 2 fail (minimum viable output requires both).
-    Pass 3/4 failures degrade gracefully — their fields will be None.
+    Pass 3/4 failures degrade gracefully, their fields will be None.
     """
-    # Pass 1 — historical profile
+    # Pass 1, historical profile
     pass1 = await _run_pass(
         PASS1_PROMPT.format(
             player_name=player_name,
@@ -157,7 +159,7 @@ async def run_full_analysis(
     if pass1 is None:
         return None
 
-    # Pass 2 — news integration
+    # Pass 2, news integration
     # Runs on Flash-Lite (GEMINI_PRIMARY), not full Flash: Flash's free-tier RPD is ~20/day,
     # far too small to analyze a full roster. Flash-Lite (~500 RPD) is the only model with
     # the daily headroom; _run_pass still escalates to Flash on a hard failure.
@@ -177,7 +179,7 @@ async def run_full_analysis(
     if pass2 is None:
         return None
 
-    # Pass 3 — concern score (Flash-Lite; see Pass 2 note on RPD)
+    # Pass 3, concern score (Flash-Lite; see Pass 2 note on RPD)
     pass3 = await _run_pass(
         PASS3_PROMPT.format(
             pass1_json=json.dumps(pass1, indent=2),
@@ -187,7 +189,7 @@ async def run_full_analysis(
         pass_num=3,
     )
 
-    # Pass 4 — sentiment
+    # Pass 4, sentiment
     all_passes = {"pass1": pass1, "pass2": pass2, "pass3": pass3}
     pass4 = await _run_pass(
         PASS4_PROMPT.format(
@@ -265,22 +267,24 @@ async def _call_gemini(prompt: str, model: str) -> Optional[dict]:
 
 async def _call_gemini_text(prompt: str, model: str) -> Optional[str]:
     if not LLM_ENABLED:
-        logger.info(f"[Sentiment] LLM disabled (LLM_ENABLED=false) — skipping {model} call")
+        logger.info(f"[Sentiment] LLM disabled (LLM_ENABLED=false), skipping {model} call")
         return None
     if not llm_budget.can_spend(model):
-        logger.warning(f"[Sentiment] Daily budget exhausted for {model} — skipping call")
+        logger.warning(f"[Sentiment] Daily budget exhausted for {model}, skipping call")
         return None
     llm_budget.record_call(model)
     try:
         # Every pass expects a JSON object back. Forcing response_mime_type makes Gemini
         # emit raw JSON (no markdown fences / prose), which nearly eliminates the parse
         # failures that were leaving concern/sentiment fields null on some players.
-        response = _genai_client.models.generate_content(
+        # .aio = the SDK's async client; the sync call blocked the whole event loop for
+        # the seconds Gemini takes, stalling every other request during a roster run.
+        response = await _genai_client.aio.models.generate_content(
             model=model,
-            contents=prompt,
+            contents=prompt + WRITING_STYLE,
             config={"response_mime_type": "application/json"},
         )
-        return response.text
+        return strip_dashes(response.text)
     except Exception as e:
         logger.error(f"[Sentiment] Gemini call failed ({model}): {e}")
         return None

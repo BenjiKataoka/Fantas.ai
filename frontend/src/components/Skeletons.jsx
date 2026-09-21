@@ -1,6 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton'
 
-// Roster / lineup table placeholder — a header strip plus N player rows.
+// Roster / lineup table placeholder, a header strip plus N player rows.
 export function TableSkeleton({ rows = 8 }) {
   return (
     <div className="rounded-xl border border-line bg-surface overflow-hidden">
@@ -25,7 +25,7 @@ export function TableSkeleton({ rows = 8 }) {
   )
 }
 
-// Card feed placeholder — for news, tracker, and admin lists.
+// Card feed placeholder, for news, tracker, and admin lists.
 export function CardListSkeleton({ count = 5 }) {
   return (
     <div className="flex flex-col gap-3">

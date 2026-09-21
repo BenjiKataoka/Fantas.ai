@@ -8,6 +8,9 @@ engine = create_async_engine(
     connect_args={"ssl": "require"},
     pool_size=5,
     max_overflow=10,
+    # Neon closes idle connections; ping on checkout and transparently reconnect
+    # instead of handing a request a dead one (ConnectionDoesNotExistError).
+    pool_pre_ping=True,
     echo=False,  # Set True temporarily to debug SQL queries
 )
 
@@ -21,7 +24,7 @@ class Base(DeclarativeBase):
     pass
 
 async def get_db():
-    """FastAPI dependency — yields a DB session and closes it after the request."""
+    """FastAPI dependency, yields a DB session and closes it after the request."""
     async with AsyncSessionLocal() as session:
         try:
             yield session

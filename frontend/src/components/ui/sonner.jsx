@@ -1,6 +1,6 @@
 import { Toaster as SonnerToaster } from 'sonner'
 
-// App-wide toast host — dark themed to match the UI. Use `toast()` from 'sonner' to fire.
+// App-wide toast host, dark themed to match the UI. Use `toast()` from 'sonner' to fire.
 export function Toaster(props) {
   return (
     <SonnerToaster

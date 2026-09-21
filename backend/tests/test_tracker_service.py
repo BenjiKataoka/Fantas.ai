@@ -1,5 +1,5 @@
 """
-Tests for Phase 4.6 — Player Tracker.
+Tests for Phase 4.6, Player Tracker.
 Covers: ADP trend calc, star/unstar, tracker list, router endpoints, failure modes.
 Usage: python3 tests/test_tracker_service.py
 """
@@ -13,12 +13,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 1 — ADP trend calculation
+# SECTION 1, ADP trend calculation
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_adp_trend_tests():
     print("=" * 50)
-    print("TRACKER — ADP TREND TESTS")
+    print("TRACKER, ADP TREND TESTS")
     print("=" * 50)
 
     async def _test():
@@ -27,8 +27,8 @@ def run_adp_trend_tests():
         mock_db = AsyncMock()
         now = datetime.utcnow()
 
-        # [1] RISING — ADP improved by > 2 positions (lower number = better)
-        print("\n[1] RISING trend — ADP moved from 30 to 25...")
+        # [1] RISING, ADP improved by > 2 positions (lower number = better)
+        print("\n[1] RISING trend, ADP moved from 30 to 25...")
         recent_rows = [MagicMock(adp=24.0), MagicMock(adp=26.0)]  # avg 25
         old_rows = [MagicMock(adp=29.0), MagicMock(adp=31.0)]    # avg 30
 
@@ -46,10 +46,10 @@ def run_adp_trend_tests():
         result = await compute_adp_trend("player1", mock_db)
         assert result["trend"] == "RISING", f"Expected RISING, got {result['trend']}"
         assert result["delta"] < -2, f"Expected delta < -2, got {result['delta']}"
-        print(f"    PASS — trend=RISING, delta={result['delta']}")
+        print(f"    PASS, trend=RISING, delta={result['delta']}")
 
-        # [2] FALLING — ADP worsened by > 2 positions
-        print("\n[2] FALLING trend — ADP moved from 20 to 26...")
+        # [2] FALLING, ADP worsened by > 2 positions
+        print("\n[2] FALLING trend, ADP moved from 20 to 26...")
         recent_rows2 = [MagicMock(adp=25.0), MagicMock(adp=27.0)]  # avg 26
         old_rows2 = [MagicMock(adp=19.0), MagicMock(adp=21.0)]      # avg 20
 
@@ -66,10 +66,10 @@ def run_adp_trend_tests():
         result = await compute_adp_trend("player2", mock_db)
         assert result["trend"] == "FALLING", f"Expected FALLING, got {result['trend']}"
         assert result["delta"] > 2, f"Expected delta > 2, got {result['delta']}"
-        print(f"    PASS — trend=FALLING, delta={result['delta']}")
+        print(f"    PASS, trend=FALLING, delta={result['delta']}")
 
-        # [3] STABLE — within ±2 positions
-        print("\n[3] STABLE trend — ADP within 2 positions...")
+        # [3] STABLE, within ±2 positions
+        print("\n[3] STABLE trend, ADP within 2 positions...")
         recent_rows3 = [MagicMock(adp=15.0)]
         old_rows3 = [MagicMock(adp=15.5)]
 
@@ -85,7 +85,7 @@ def run_adp_trend_tests():
         mock_db.execute = mock_execute_stable
         result = await compute_adp_trend("player3", mock_db)
         assert result["trend"] == "STABLE", f"Expected STABLE, got {result['trend']}"
-        print(f"    PASS — trend=STABLE, delta={result['delta']}")
+        print(f"    PASS, trend=STABLE, delta={result['delta']}")
 
         # [4] Insufficient data → STABLE default
         print("\n[4] Insufficient data → STABLE with no crash...")
@@ -98,19 +98,19 @@ def run_adp_trend_tests():
         result = await compute_adp_trend("player4", mock_db)
         assert result["trend"] == "STABLE"
         assert result["today_avg"] is None
-        print(f"    PASS — empty data returns STABLE gracefully")
+        print(f"    PASS, empty data returns STABLE gracefully")
 
     asyncio.run(_test())
     print("\n✅ All ADP trend tests passed.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 2 — Star / Unstar
+# SECTION 2, Star / Unstar
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_star_unstar_tests():
     print("\n" + "=" * 50)
-    print("TRACKER — STAR / UNSTAR TESTS")
+    print("TRACKER, STAR / UNSTAR TESTS")
     print("=" * 50)
 
     async def _test():
@@ -148,7 +148,7 @@ def run_star_unstar_tests():
 
         assert result["status"] == "starred", f"Expected starred, got {result}"
         assert mock_db.add.called
-        print(f"    PASS — {result}")
+        print(f"    PASS, {result}")
 
         # [2] Star already-starred player
         print("\n[2] Already-starred player returns 'already_starred'...")
@@ -164,7 +164,7 @@ def run_star_unstar_tests():
         mock_db.get = mock_get_existing
         result = await tracker_service.star_player(1, "jj_id", mock_db)
         assert result["status"] == "already_starred"
-        print(f"    PASS — {result}")
+        print(f"    PASS, {result}")
 
         # [3] Unstar an active player
         print("\n[3] Unstar an active player...")
@@ -181,7 +181,7 @@ def run_star_unstar_tests():
         result = await tracker_service.unstar_player(1, "jj_id", mock_db)
         assert result["status"] == "unstarred"
         assert active_tracked.is_active is False
-        print(f"    PASS — {result}")
+        print(f"    PASS, {result}")
 
         # [4] Unstar player not in tracker
         print("\n[4] Unstar player not in tracker → 'not_found'...")
@@ -191,19 +191,19 @@ def run_star_unstar_tests():
         mock_db.get = mock_get_none
         result = await tracker_service.unstar_player(1, "nobody", mock_db)
         assert result["status"] == "not_found"
-        print(f"    PASS — {result}")
+        print(f"    PASS, {result}")
 
     asyncio.run(_test())
     print("\n✅ All star/unstar tests passed.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 3 — Combined score formula
+# SECTION 3, Combined score formula
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_combined_score_tests():
     print("\n" + "=" * 50)
-    print("TRACKER — COMBINED SCORE FORMULA TESTS")
+    print("TRACKER, COMBINED SCORE FORMULA TESTS")
     print("=" * 50)
 
     from services.sentiment_service import ADP_PENALTY
@@ -213,30 +213,30 @@ def run_combined_score_tests():
     print("\n[1] Worst-case: concern=10, worry=10, FALLING...")
     score = (10 * 0.50) + (10 * 0.30) + (ADP_PENALTY["FALLING"] * 0.20)
     assert score == 8.4, f"Expected 8.4, got {score}"
-    print(f"    PASS — combined_score={score}")
+    print(f"    PASS, combined_score={score}")
 
     # [2] Best case: concern=1, worry=1, RISING (-1)
     print("\n[2] Best-case: concern=1, worry=1, RISING...")
     score = round((1 * 0.50) + (1 * 0.30) + (ADP_PENALTY["RISING"] * 0.20), 2)
     assert score == 0.6, f"Expected 0.6, got {score}"
-    print(f"    PASS — combined_score={score}")
+    print(f"    PASS, combined_score={score}")
 
     # [3] Neutral: concern=5, worry=5, STABLE
     print("\n[3] Neutral: concern=5, worry=5, STABLE...")
     score = (5 * 0.50) + (5 * 0.30) + (ADP_PENALTY["STABLE"] * 0.20)
     assert score == 4.0, f"Expected 4.0, got {score}"
-    print(f"    PASS — combined_score={score}")
+    print(f"    PASS, combined_score={score}")
 
     print("\n✅ All combined score tests passed.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 4 — Router endpoints
+# SECTION 4, Router endpoints
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_router_tests():
     print("\n" + "=" * 50)
-    print("TRACKER — ROUTER TESTS")
+    print("TRACKER, ROUTER TESTS")
     print("=" * 50)
 
     from fastapi.testclient import TestClient
@@ -249,7 +249,7 @@ def run_router_tests():
 
     with TestClient(app) as client:
 
-        # [1] GET /api/tracker — returns list (empty is fine)
+        # [1] GET /api/tracker, returns list (empty is fine)
         print("\n[1] GET /api/tracker returns 200...")
         with patch("routers.tracker.tracker_service.get_tracked_players",
                    new=AsyncMock(return_value=[])):
@@ -258,43 +258,43 @@ def run_router_tests():
         data = resp.json()
         assert "tracked_players" in data
         assert "total" in data
-        print(f"    PASS — status=200, total={data['total']}")
+        print(f"    PASS, status=200, total={data['total']}")
 
-        # [2] GET /api/tracker/{player_id} — not found returns 404
+        # [2] GET /api/tracker/{player_id}, not found returns 404
         print("\n[2] GET /api/tracker/unknown returns 404...")
         with patch("routers.tracker.tracker_service.get_tracked_player_detail",
                    new=AsyncMock(return_value=None)):
             resp = client.get("/api/tracker/unknown_player_id")
         assert resp.status_code == 404
-        print(f"    PASS — 404 for untracked player")
+        print(f"    PASS, 404 for untracked player")
 
-        # [3] POST /api/tracker/star/{player_id} — success
+        # [3] POST /api/tracker/star/{player_id}, success
         print("\n[3] POST /api/tracker/star/test_player_id returns 200...")
         with patch("routers.tracker.tracker_service.star_player",
                    new=AsyncMock(return_value={"status": "starred", "player_id": "test_id"})):
             resp = client.post("/api/tracker/star/test_player_id")
         assert resp.status_code == 200
         assert resp.json()["status"] == "starred"
-        print(f"    PASS — star returned {resp.json()}")
+        print(f"    PASS, star returned {resp.json()}")
 
-        # [4] DELETE /api/tracker/star/{player_id} — not found returns 404
+        # [4] DELETE /api/tracker/star/{player_id}, not found returns 404
         print("\n[4] DELETE /api/tracker/star/unknown returns 404...")
         with patch("routers.tracker.tracker_service.unstar_player",
                    new=AsyncMock(return_value={"status": "not_found"})):
             resp = client.delete("/api/tracker/star/unknown")
         assert resp.status_code == 404
-        print(f"    PASS — 404 for unstarred player")
+        print(f"    PASS, 404 for unstarred player")
 
-        # [5] POST /api/tracker/refresh/{player_id} — success
+        # [5] POST /api/tracker/refresh/{player_id}, success
         print("\n[5] POST /api/tracker/refresh/test_id returns 200...")
         with patch("routers.tracker.tracker_service.refresh_profile",
                    new=AsyncMock(return_value=True)):
             resp = client.post("/api/tracker/refresh/test_player_id")
         assert resp.status_code == 200
         assert resp.json()["status"] == "refresh_triggered"
-        print(f"    PASS — refresh returned {resp.json()}")
+        print(f"    PASS, refresh returned {resp.json()}")
 
-        # [6] POST /api/tracker/analyze-roster — kicks off batch, returns counts
+        # [6] POST /api/tracker/analyze-roster, kicks off batch, returns counts
         print("\n[6] POST /api/tracker/analyze-roster returns queued counts...")
         with patch("routers.tracker.tracker_service.analyze_roster",
                    new=AsyncMock(return_value={"status": "started", "queued": 12,
@@ -303,18 +303,18 @@ def run_router_tests():
         assert resp.status_code == 200
         body = resp.json()
         assert body["queued"] == 12 and body["total"] == 15
-        print(f"    PASS — analyze-roster returned {body}")
+        print(f"    PASS, analyze-roster returned {body}")
 
-        # [7] GET /api/tracker/roster-analysis — static path not shadowed by {player_id}
+        # [7] GET /api/tracker/roster-analysis, static path not shadowed by {player_id}
         print("\n[7] GET /api/tracker/roster-analysis returns progress...")
         with patch("routers.tracker.tracker_service.roster_analysis_status",
                    new=AsyncMock(return_value={"total": 15, "ready": 9, "pending": 6})):
             resp = client.get("/api/tracker/roster-analysis")
         assert resp.status_code == 200, f"static route shadowed? got {resp.status_code}"
         assert resp.json()["ready"] == 9
-        print(f"    PASS — roster-analysis returned {resp.json()}")
+        print(f"    PASS, roster-analysis returned {resp.json()}")
 
-        # [8] GET /api/tracker/{id}/sentiment-history — chart series, range validated
+        # [8] GET /api/tracker/{id}/sentiment-history, chart series, range validated
         print("\n[8] GET /api/tracker/{id}/sentiment-history returns series...")
         with patch("routers.tracker.tracker_service.get_sentiment_history",
                    new=AsyncMock(return_value={"player_id": "4034", "range": "1m",
@@ -326,19 +326,19 @@ def run_router_tests():
         # bad range rejected by the route's pattern validation
         resp_bad = client.get("/api/tracker/4034/sentiment-history?range=decade")
         assert resp_bad.status_code == 422, f"bad range should 422, got {resp_bad.status_code}"
-        print("    PASS — series returned; invalid range rejected (422)")
+        print("    PASS, series returned; invalid range rejected (422)")
 
     app.dependency_overrides.clear()
     print("\n✅ All router tests passed.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 4.5 — Batch roster analysis (freshness skip + queueing)
+# SECTION 4.5, Batch roster analysis (freshness skip + queueing)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_batch_analysis_tests():
     print("\n" + "=" * 50)
-    print("TRACKER — BATCH ROSTER ANALYSIS")
+    print("TRACKER, BATCH ROSTER ANALYSIS")
     print("=" * 50)
 
     async def _test():
@@ -375,7 +375,7 @@ def run_batch_analysis_tests():
 
         assert result == {"status": "started", "queued": 2, "skipped_fresh": 1, "total": 3}, result
         assert set(captured["ids"]) == {"p2", "p3"}, captured
-        print(f"    PASS — {result}, queued ids={sorted(captured['ids'])}")
+        print(f"    PASS, {result}, queued ids={sorted(captured['ids'])}")
 
         # [2] All fresh → nothing queued, no worker spawned
         print("\n[2] All profiles fresh → all_fresh, queued=0...")
@@ -395,7 +395,7 @@ def run_batch_analysis_tests():
             await asyncio.sleep(0)
         assert result["status"] == "all_fresh" and result["queued"] == 0, result
         assert spawned["called"] is False, "worker should not spawn when all fresh"
-        print(f"    PASS — {result}")
+        print(f"    PASS, {result}")
 
         # [3] force=True re-queues even fresh players
         print("\n[3] force=True → all players queued despite fresh profiles...")
@@ -412,7 +412,7 @@ def run_batch_analysis_tests():
             result = await tracker_service.analyze_roster(1, mock_db3, force=True)
             await asyncio.sleep(0)
         assert result["queued"] == 2 and result["skipped_fresh"] == 0, result
-        print(f"    PASS — {result}")
+        print(f"    PASS, {result}")
 
         # [4] Empty roster → empty status, no crash
         print("\n[4] Empty roster → status=empty...")
@@ -420,7 +420,7 @@ def run_batch_analysis_tests():
         mock_db4.execute = AsyncMock(return_value=roster_of())
         result = await tracker_service.analyze_roster(1, mock_db4)
         assert result == {"status": "empty", "queued": 0, "skipped_fresh": 0, "total": 0}, result
-        print(f"    PASS — {result}")
+        print(f"    PASS, {result}")
 
         # [5] Concurrency guard: a run already in flight → already_running, no 2nd worker
         print("\n[5] Run already in flight → already_running, no duplicate worker...")
@@ -439,7 +439,7 @@ def run_batch_analysis_tests():
                 await asyncio.sleep(0)
             assert result["status"] == "already_running", result
             assert spawned5["called"] is False, "must not spawn a second worker"
-            print(f"    PASS — {result}")
+            print(f"    PASS, {result}")
         finally:
             tracker_service._roster_runs.discard(1)
 
@@ -448,12 +448,12 @@ def run_batch_analysis_tests():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 4.6 — Stock profile serializer (roster dropdown)
+# SECTION 4.6, Stock profile serializer (roster dropdown)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_stock_serializer_tests():
     print("\n" + "=" * 50)
-    print("TRACKER — STOCK PROFILE SERIALIZER")
+    print("TRACKER, STOCK PROFILE SERIALIZER")
     print("=" * 50)
     from services.tracker_service import serialize_stock_profile
 
@@ -462,7 +462,7 @@ def run_stock_serializer_tests():
     assert serialize_stock_profile(None) is None
     unfinished = MagicMock(last_full_analysis=None)
     assert serialize_stock_profile(unfinished) is None
-    print("    PASS — both return None")
+    print("    PASS, both return None")
 
     # [2] Completed profile → flat dict with key fields + ISO timestamp
     print("\n[2] Completed profile → serialized dict...")
@@ -482,16 +482,16 @@ def run_stock_serializer_tests():
     assert out["sentiment_score"] == 0.42
     assert out["last_full_analysis"] == ts.isoformat()
     assert "historical_context" not in out  # kept lean for roster payload
-    print(f"    PASS — {out['overall_direction']}/{out['overall_magnitude']}, concern={out['concern_level']}")
+    print(f"    PASS, {out['overall_direction']}/{out['overall_magnitude']}, concern={out['concern_level']}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 4.7 — Sentiment history snapshot (append-only, for the graph)
+# SECTION 4.7, Sentiment history snapshot (append-only, for the graph)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_sentiment_snapshot_tests():
     print("\n" + "=" * 50)
-    print("TRACKER — SENTIMENT HISTORY SNAPSHOT")
+    print("TRACKER, SENTIMENT HISTORY SNAPSHOT")
     print("=" * 50)
     from services.tracker_service import _append_sentiment_snapshot
     from models.tracker import PlayerSentimentHistory
@@ -506,23 +506,23 @@ def run_sentiment_snapshot_tests():
     row = db.add.call_args[0][0]
     assert isinstance(row, PlayerSentimentHistory)
     assert row.player_id == "p1" and row.sentiment_score == 0.42 and row.concern_level == 3
-    print(f"    PASS — added sentiment={row.sentiment_score}, concern={row.concern_level}")
+    print(f"    PASS, added sentiment={row.sentiment_score}, concern={row.concern_level}")
 
     # [2] Degraded run (null sentiment) → no row (would be a useless point)
     print("\n[2] Null sentiment_score → no snapshot written...")
     db2 = MagicMock()
     _append_sentiment_snapshot("p2", {"sentiment_score": None, "concern_level": 5}, db2)
     assert db2.add.call_count == 0, "must not write a null-sentiment point"
-    print("    PASS — skipped degraded run")
+    print("    PASS, skipped degraded run")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 4.8 — Sentiment history query (graph endpoint)
+# SECTION 4.8, Sentiment history query (graph endpoint)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_sentiment_history_query_tests():
     print("\n" + "=" * 50)
-    print("TRACKER — SENTIMENT HISTORY QUERY")
+    print("TRACKER, SENTIMENT HISTORY QUERY")
     print("=" * 50)
 
     class FakeResult:
@@ -557,44 +557,44 @@ def run_sentiment_history_query_tests():
         p0 = res["points"][0]
         assert p0 == {"t": "2026-08-04", "sentiment": 0.5, "concern": 4.0, "adp": 10.0, "rank": 5.0, "rostered": 95.0}, p0
         assert "outlook" not in p0  # dropped the synthetic composite
-        print(f"    PASS — {res['count']} pts, first={p0}")
+        print(f"    PASS, {res['count']} pts, first={p0}")
 
         # [2] No market data → adp/rank/rostered null, sentiment/concern still present
         print("\n[2] No market data → adp/rank/rostered null...")
         res = await tracker_service.get_sentiment_history("p1", "season", db_returning(s_rows, []))
         assert all(p["adp"] is None and p["rank"] is None and p["rostered"] is None for p in res["points"])
         assert res["points"][0]["sentiment"] == 0.5
-        print("    PASS — market null, sentiment intact")
+        print("    PASS, market null, sentiment intact")
 
         # [3] Unknown range falls back to season
         print("\n[3] Invalid range → season...")
         res = await tracker_service.get_sentiment_history("p1", "bogus", db_returning(s_rows, a_rows))
         assert res["range"] == "season", res["range"]
-        print(f"    PASS — range={res['range']}")
+        print(f"    PASS, range={res['range']}")
 
         # [4] No history → empty points
         print("\n[4] Empty history → no points...")
         res = await tracker_service.get_sentiment_history("p1", "1w", db_returning([], []))
         assert res["count"] == 0 and res["points"] == []
-        print(f"    PASS — {res}")
+        print(f"    PASS, {res}")
 
     asyncio.run(_test())
     print("\n✅ All sentiment history query tests passed.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 5 — Failure modes
+# SECTION 5, Failure modes
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_failure_tests():
     print("\n" + "=" * 50)
-    print("TRACKER — FAILURE MODE TESTS")
+    print("TRACKER, FAILURE MODE TESTS")
     print("=" * 50)
 
     async def _test():
         from services import tracker_service
 
-        # [1] star_player — player not in DB → error, no exception
+        # [1] star_player, player not in DB → error, no exception
         print("\n[1] star_player for unknown player_id → error, no crash...")
         mock_db = AsyncMock()
         mock_db.add = MagicMock()
@@ -606,17 +606,17 @@ def run_failure_tests():
         mock_db.get = mock_get_none
         result = await tracker_service.star_player(1, "bad_id", mock_db)
         assert result["status"] == "error", f"Expected error, got {result}"
-        print(f"    PASS — {result}")
+        print(f"    PASS, {result}")
 
-        # [2] get_tracked_players — DB failure → returns [], no crash
+        # [2] get_tracked_players, DB failure → returns [], no crash
         print("\n[2] get_tracked_players with DB failure → empty list, no crash...")
         mock_db2 = AsyncMock()
         mock_db2.execute = AsyncMock(side_effect=Exception("DB connection lost"))
         result = await tracker_service.get_tracked_players(1, mock_db2)
         assert result == [], f"Expected [], got {result}"
-        print(f"    PASS — empty list returned on DB failure")
+        print(f"    PASS, empty list returned on DB failure")
 
-        # [3] nflreadpy stats build — nflreadpy failure → context string fallback
+        # [3] nflreadpy stats build, nflreadpy failure → context string fallback
         print("\n[3] build_stats_context with nflreadpy failure → fallback string...")
         from services.nflreadpy_service import build_stats_context
         with patch("services.nflreadpy_service.get_historical_stats",
@@ -625,7 +625,7 @@ def run_failure_tests():
                    new=AsyncMock(return_value={})):
             ctx = await build_stats_context("Patrick Mahomes", "QB")
         assert ctx == "No historical stats available."
-        print(f"    PASS — fallback context: '{ctx}'")
+        print(f"    PASS, fallback context: '{ctx}'")
 
     asyncio.run(_test())
     print("\n✅ All failure mode tests passed.")

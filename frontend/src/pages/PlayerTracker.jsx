@@ -53,7 +53,7 @@ function PlayerPicker({ players, selectedId, onSelect }) {
             <span className={`font-mono text-xs font-semibold ${POS_COLORS[sel.position] || 'text-subtle'}`}>{sel.position}</span>
           </>
         ) : (
-          <span className="text-subtle text-sm">Select a player…</span>
+          <span className="text-subtle text-sm">Select a player...</span>
         )}
         <span className={`ml-auto text-subtle/60 text-xs transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
       </button>
@@ -124,7 +124,7 @@ export default function PlayerTracker() {
 
   useEffect(() => { fetchWatchlist() }, [fetchWatchlist])
 
-  // Keep a valid selection as the tab/list changes — default to the first player.
+  // Keep a valid selection as the tab/list changes, default to the first player.
   useEffect(() => {
     if (!list.length) { setSelectedId(null); return }
     if (!list.some(p => p.id === selectedId)) setSelectedId(list[0].id)
@@ -144,7 +144,7 @@ export default function PlayerTracker() {
 
   const handleStar = (playerId) => {
     setShowModal(false)
-    toast.success('Added to watchlist — generating profile…')
+    toast.success('Added to watchlist. Building their profile now.')
     setTab('watchlist')
     setTimeout(fetchWatchlist, 900)
   }
@@ -194,7 +194,7 @@ export default function PlayerTracker() {
       {list.length === 0 ? (
         <div className="text-center py-20 text-subtle/70">
           {tab === 'rostered'
-            ? <p className="text-sm">No roster loaded — set your league on the Dashboard.</p>
+            ? <p className="text-sm">No roster loaded. Pick your league on the Dashboard.</p>
             : <>
                 <p className="text-sm mb-1 text-subtle">Your watchlist is empty.</p>
                 <p className="text-xs mb-5">Add players you're eyeing on the waiver wire or in trades.</p>
@@ -274,7 +274,7 @@ export default function PlayerTracker() {
           {/* Chart */}
           <div className={`px-2 pb-2 pt-1 ${REVEAL}`} style={{ animationDelay: '210ms' }}>
             {histLoading && !history
-              ? <div className="h-[210px] flex items-center justify-center text-sm text-subtle">Loading…</div>
+              ? <div className="h-[210px] flex items-center justify-center text-sm text-subtle">Loading...</div>
               : <TrendChart points={history?.points || []} metric={metric} position={selected.position} />}
           </div>
 

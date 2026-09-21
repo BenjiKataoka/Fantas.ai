@@ -29,7 +29,7 @@ function formatSource(source) {
   return SOURCE_LABELS[key] || (source.charAt(0).toUpperCase() + source.slice(1).toLowerCase())
 }
 
-// news_type → chip styling. Presentational only, no LLM — the type is scraped.
+// news_type → chip styling. Presentational only, no LLM, the type is scraped.
 const TYPE_STYLES = {
   INJURY:      { label: 'Injury',      cls: 'text-bear border-bear/30 bg-bear/10' },
   TRANSACTION: { label: 'Transaction', cls: 'text-teal-300 border-teal-400/30 bg-teal-400/10' },
@@ -64,7 +64,7 @@ function NewsCard({ item, playerLabel, playerName }) {
   const isFull = item.analysis_tier === 'full'
   // On rostered-only (signal_only) cards the badge is just a rule-keyword echo that
   // mostly restates the headline + type chip. Only surface it when the event is HIGH
-  // magnitude (ruled out / IR / torn) — genuinely actionable at a glance. Full (starred)
+  // magnitude (ruled out / IR / torn), genuinely actionable at a glance. Full (starred)
   // analysis cards always show their badge.
   const showBadge = !!item.stock_direction && (isFull || item.stock_magnitude === 'HIGH')
   const url = item.source_url
@@ -113,7 +113,7 @@ function NewsCard({ item, playerLabel, playerName }) {
         </div>
       </div>
 
-      {/* Raw scraped body — the article itself, always shown when present */}
+      {/* Raw scraped body, the article itself, always shown when present */}
       {body && (
         <div>
           <p className={`text-xs text-content/80 leading-relaxed ${!expanded && longBody ? 'line-clamp-3' : ''}`}>
@@ -135,7 +135,7 @@ function NewsCard({ item, playerLabel, playerName }) {
         <p className="text-sm text-content/90 leading-relaxed border-l-2 border-brand/40 pl-3">{item.summary}</p>
       )}
 
-      {/* Signal / stock badge row — full Gemini direction, or a HIGH-magnitude rule signal */}
+      {/* Signal / stock badge row, full Gemini direction, or a HIGH-magnitude rule signal */}
       {showBadge && (
         <div className="flex items-center gap-3">
           <StockBadge direction={item.stock_direction} magnitude={item.stock_magnitude} size={isFull ? undefined : 'sm'} />
@@ -218,7 +218,7 @@ export default function NewsHub() {
           disabled={newsLoading}
           className="px-3 py-1.5 bg-raised hover:bg-line disabled:opacity-40 text-subtle hover:text-content text-xs font-medium rounded-lg border border-line transition-colors"
         >
-          {newsLoading ? 'Refreshing…' : 'Refresh'}
+          {newsLoading ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 

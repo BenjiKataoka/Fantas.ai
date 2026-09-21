@@ -4,7 +4,7 @@ from database import Base
 
 
 class MyRoster(Base):
-    """Per-user roster — which players each user owns in their fantasy league."""
+    """Per-user roster, which players each user owns in their fantasy league."""
     __tablename__ = "my_roster"
 
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)

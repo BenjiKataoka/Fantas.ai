@@ -26,9 +26,9 @@ def run_tests():
             PlayerNews, NewsAnalysis, NewsHistoryContext, BeatWriterSentiment,
             TrackedPlayer, PlayerHistoricalStats, PlayerADPHistory, PlayerStockProfile,
         )
-        print("    PASS — all 13 models imported")
+        print("    PASS, all 13 models imported")
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
         return
 
     # Test 2: Check key columns on each model
@@ -69,9 +69,9 @@ def run_tests():
         ok, missing = check_columns(model, expected)
         name = model.__tablename__
         if ok:
-            print(f"    PASS — {name}")
+            print(f"    PASS, {name}")
         else:
-            print(f"    FAIL — {name} missing columns: {missing}")
+            print(f"    FAIL, {name} missing columns: {missing}")
             all_passed = False
 
     # Test 3: Table names match expected
@@ -96,9 +96,9 @@ def run_tests():
     }
     missing_tables = expected_tables - actual_tables
     if not missing_tables:
-        print(f"    PASS — all 13 table names correct")
+        print(f"    PASS, all 13 table names correct")
     else:
-        print(f"    FAIL — missing table names: {missing_tables}")
+        print(f"    FAIL, missing table names: {missing_tables}")
 
     print("\n" + "=" * 50)
     print("MODELS TEST COMPLETE")

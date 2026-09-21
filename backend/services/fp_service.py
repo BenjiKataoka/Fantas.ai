@@ -30,7 +30,7 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.5",
 }
 
-# 4h cache — never scrape more than once per 4h window
+# 4h cache, never scrape more than once per 4h window
 _cache: dict = {}
 CACHE_TTL_HOURS = 4
 
@@ -51,7 +51,7 @@ async def get_fp_projections(week: int) -> dict[str, float]:
     Scrapes FantasyPros PPR projections for all skill positions for a given week.
     Returns {normalized_player_name: projected_points}.
     Sleeps 1-2s between each position to avoid rate limiting (5 positions = ~5-10s total).
-    Returns empty dict during offseason — FantasyPros tables are empty until season starts.
+    Returns empty dict during offseason, FantasyPros tables are empty until season starts.
     """
     cache_key = f"fp_proj_{week}"
     cached = _get_cache(cache_key)

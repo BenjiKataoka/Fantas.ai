@@ -5,7 +5,7 @@ from database import Base
 
 
 class User(Base):
-    """App users — each must be approved before accessing the app."""
+    """App users, each must be approved before accessing the app."""
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -21,8 +21,8 @@ class User(Base):
     sleeper_user_id = Column(String, nullable=True)   # Fetched from Sleeper API on save
 
     # ESPN credentials (only needed if user's league is on ESPN)
-    espn_s2 = Column(String, nullable=True)           # Cookie — treat as sensitive
-    swid = Column(String, nullable=True)              # Cookie — treat as sensitive
+    espn_s2 = Column(String, nullable=True)           # Cookie, treat as sensitive
+    swid = Column(String, nullable=True)              # Cookie, treat as sensitive
 
     # Per-user projection source weights
     weight_sleeper = Column(Float, default=0.35, nullable=False)

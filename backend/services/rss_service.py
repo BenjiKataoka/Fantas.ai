@@ -9,7 +9,7 @@ name, and matched items are emitted in the same raw shape the other news sources
 `news_scraper_service` resolves, dedupes, rule-filters, and tiers them like any other source.
 
 Scoping to the tracked-name set (not all of NFL) is what keeps the feed relevant and bounded
-— a league-wide RSS dump would be almost entirely noise.
+a league-wide RSS dump would be almost entirely noise.
 """
 import asyncio
 import logging
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # (source label, feed URL). Labels surface as `source` on the news card.
 # ESPN is intentionally NOT here: its public RSS is deprecated (returns HTTP 202 with
 # zero entries), and ESPN news already flows into the pipeline via the Sports API
-# (nfl_service.get_espn_news) — so ESPN coverage is present, just not through RSS.
+# (nfl_service.get_espn_news), so ESPN coverage is present, just not through RSS.
 FEEDS: list[tuple[str, str]] = [
     ("PFT",   "https://profootballtalk.nbcsports.com/feed/"),
     ("CBS",   "https://www.cbssports.com/rss/headlines/nfl/"),
@@ -66,11 +66,11 @@ def _parse_published(entry) -> Optional[datetime]:
 
 
 async def _fetch_feed(client: httpx.AsyncClient, source: str, url: str) -> list:
-    """Fetch + parse one feed. Failures are isolated — a dead feed never sinks the batch."""
+    """Fetch + parse one feed. Failures are isolated, a dead feed never sinks the batch."""
     try:
         resp = await client.get(url, headers={"User-Agent": _UA}, timeout=10.0)
         resp.raise_for_status()
-        # feedparser is blocking (pure CPU parse) — keep it off the event loop.
+        # feedparser is blocking (pure CPU parse), keep it off the event loop.
         parsed = await asyncio.to_thread(feedparser.parse, resp.content)
         return [(source, e) for e in parsed.entries]
     except Exception as e:
@@ -81,7 +81,7 @@ async def _fetch_feed(client: httpx.AsyncClient, source: str, url: str) -> list:
 def _build_matcher(player_names: Iterable[str]) -> list[tuple[str, str]]:
     """Return (normalized_name, canonical_name) pairs for substring matching.
 
-    Matching on the normalized FULL name ('nico collins') keeps false positives low —
+    Matching on the normalized FULL name ('nico collins') keeps false positives low,
     a lone first or last name would over-match.
     """
     seen: dict[str, str] = {}
@@ -98,7 +98,7 @@ async def fetch_rss_news(
 ) -> list[dict]:
     """Fetch all feeds and return raw news items for entries mentioning a tracked player.
 
-    One item per (entry, first matched player) — attaching to the first match avoids a
+    One item per (entry, first matched player), attaching to the first match avoids a
     source_url dedup collision when an article names two of your players.
     """
     matcher = _build_matcher(player_names)

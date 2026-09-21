@@ -1,3 +1,4 @@
+import { TriangleAlert } from 'lucide-react'
 import ConcernMeter from './ConcernMeter'
 import SentimentGauge from './SentimentGauge'
 import StockBadge from './StockBadge'
@@ -30,7 +31,7 @@ function FactorList({ label, items, tone }) {
 }
 
 /**
- * StockSection — the current-sentiment dropdown for a roster row.
+ * StockSection: the current-sentiment dropdown for a roster row.
  * `stock` is the serialized player_stock_profile (or null if never analyzed).
  */
 export default function StockSection({ stock }) {
@@ -53,7 +54,7 @@ export default function StockSection({ stock }) {
   } = stock
 
   // A transient failure on the scoring passes can leave these null. Show a clear notice
-  // instead of a blank meter area — it self-repairs on the next analysis.
+  // instead of a blank meter area, it self-repairs on the next analysis.
   const scoringIncomplete = concern_level == null && sentiment_score == null
 
   return (
@@ -74,11 +75,11 @@ export default function StockSection({ stock }) {
         )}
       </div>
 
-      {/* Meters — or a notice if the scoring passes didn't complete */}
+      {/* Meters, or a notice if the scoring passes didn't complete */}
       {scoringIncomplete ? (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-warn/10 border border-warn/30 text-xs text-content/80">
-          <span className="text-warn">⚠</span>
-          Sentiment scoring didn’t finish for this player — it’ll retry on the next analysis.
+          <TriangleAlert className="size-3.5 text-warn shrink-0" />
+          Sentiment scoring didn't finish for this player. It will retry on the next analysis.
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

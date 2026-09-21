@@ -33,9 +33,9 @@ async def run_tests():
     print("\n[1] Creating async engine...")
     try:
         from database import engine, AsyncSessionLocal
-        print("    PASS — engine created")
+        print("    PASS, engine created")
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
         return
 
     # Test 2: Can connect to Neon
@@ -46,9 +46,9 @@ async def run_tests():
             result = await session.execute(text("SELECT 1"))
             val = result.scalar()
             assert val == 1
-        print("    PASS — connected to Neon successfully")
+        print("    PASS, connected to Neon successfully")
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
         return
 
     # Test 3: All expected tables exist
@@ -70,18 +70,18 @@ async def run_tests():
         extra = [t for t in existing if t not in EXPECTED_TABLES and t != "alembic_version"]
 
         if not missing:
-            print(f"    PASS — all {len(EXPECTED_TABLES)} tables present:")
+            print(f"    PASS, all {len(EXPECTED_TABLES)} tables present:")
             for t in sorted(EXPECTED_TABLES):
                 print(f"           ✓ {t}")
         else:
-            print(f"    FAIL — missing tables: {missing}")
+            print(f"    FAIL, missing tables: {missing}")
             print("           Run: alembic upgrade head")
 
         if extra:
-            print(f"    NOTE — unexpected tables found (not a problem): {extra}")
+            print(f"    NOTE, unexpected tables found (not a problem): {extra}")
 
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
 
     # Test 4: Can write and read a row (players table)
     print("\n[4] Testing write + read on players table...")
@@ -110,9 +110,9 @@ async def run_tests():
             )
             await session.commit()
 
-        print("    PASS — write and read successful, test row cleaned up")
+        print("    PASS, write and read successful, test row cleaned up")
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
 
     print("\n" + "=" * 50)
     print("DATABASE TEST COMPLETE")

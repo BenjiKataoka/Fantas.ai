@@ -13,5 +13,5 @@ pyarrow
 google-genai
 sleeper-api-wrapper
 pyjwt[crypto]
-apscheduler
+apscheduler>=3.11,<4  # 4.x rewrites the AsyncIOScheduler API
 feedparser

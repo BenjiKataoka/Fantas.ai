@@ -1,5 +1,5 @@
 """
-News scraper orchestrator — Phase 4.5.
+News scraper orchestrator, Phase 4.5.
 
 Responsibilities:
 1. Determine which players are starred (any user) vs rostered-only vs untracked.
@@ -131,7 +131,7 @@ async def _build_player_context(player_id: str, db: AsyncSession) -> dict:
     }
 
 
-# ── News item resolution — match raw news to a player_id ──────────────────────
+# ── News item resolution, match raw news to a player_id ──────────────────────
 
 async def _resolve_player_id(
     player_name: str,
@@ -251,7 +251,7 @@ async def scrape_and_analyze(
         is_starred = player_id in starred_ids
         is_rostered = player_id in rostered_ids
 
-        # Check refresh window — TTL is per-player based on whether their team plays today
+        # Check refresh window, TTL is per-player based on whether their team plays today
         if not force_refresh:
             last_checked = await _get_last_checked(player_id, db)
             if is_starred:
@@ -310,7 +310,7 @@ async def scrape_and_analyze(
             rule_filtered += 1
             continue
 
-        # Injury/transaction-adjacent news bypasses the offseason gate for starred players —
+        # Injury/transaction-adjacent news bypasses the offseason gate for starred players,
         # a player ruled out on Friday still needs immediate Gemini analysis even in offseason.
         # offseason_significant is set by the rule filter for any injury/trade/signing keyword,
         # regardless of whether a specific rule matched.
@@ -321,7 +321,7 @@ async def scrape_and_analyze(
 
         # Starred: check if we should run Gemini
         if not should_run_gemini(filter_result, is_starred=True, season_type=effective_season_type):
-            # Rule matched — write result directly
+            # Rule matched, write result directly
             if filter_result.matched:
                 analysis = NewsAnalysis(
                     news_id=news_item.id,

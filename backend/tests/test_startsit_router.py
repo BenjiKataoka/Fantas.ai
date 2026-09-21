@@ -1,5 +1,5 @@
 """
-Tests for Phase 5 — Start/Sit advisor.
+Tests for Phase 5, Start/Sit advisor.
 Covers: injury modifier, lineup selection, FLEX logic, close decisions, offseason guard, router endpoints.
 Usage: python3 tests/test_startsit_router.py
 """
@@ -12,40 +12,40 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 1 — Injury modifier unit tests
+# SECTION 1, Injury modifier unit tests
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_injury_modifier_tests():
     print("=" * 50)
-    print("START/SIT — INJURY MODIFIER TESTS")
+    print("START/SIT, INJURY MODIFIER TESTS")
     print("=" * 50)
 
     from routers.startsit import _adjusted_proj
 
     cases = [
-        ("Active",       20.0, 20.0,  "Active — no penalty"),
-        ("Questionable", 20.0, 17.0,  "Questionable — 15% reduction"),
-        ("Doubtful",     20.0, 12.0,  "Doubtful — 40% reduction"),
-        ("Out",          20.0,  0.0,  "Out — zeroed"),
-        ("IR",           20.0,  0.0,  "IR — zeroed"),
-        ("Active",       None,  0.0,  "None projection — treated as 0"),
-        (None,           20.0, 20.0,  "None status — defaults to Active"),
-        ("Unknown",      20.0, 20.0,  "Unknown status — defaults to Active (1.0x)"),
+        ("Active",       20.0, 20.0,  "Active, no penalty"),
+        ("Questionable", 20.0, 17.0,  "Questionable, 15% reduction"),
+        ("Doubtful",     20.0, 12.0,  "Doubtful, 40% reduction"),
+        ("Out",          20.0,  0.0,  "Out, zeroed"),
+        ("IR",           20.0,  0.0,  "IR, zeroed"),
+        ("Active",       None,  0.0,  "None projection, treated as 0"),
+        (None,           20.0, 20.0,  "None status, defaults to Active"),
+        ("Unknown",      20.0, 20.0,  "Unknown status, defaults to Active (1.0x)"),
     ]
 
     for status, proj, expected, label in cases:
         result = _adjusted_proj(proj, status)
         assert result == expected, f"[{label}] Expected {expected}, got {result}"
-        print(f"    PASS — {label} → {result}")
+        print(f"    PASS, {label} → {result}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 2 — Close decision detection
+# SECTION 2, Close decision detection
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_close_decision_tests():
     print("\n" + "=" * 50)
-    print("START/SIT — CLOSE DECISION TESTS")
+    print("START/SIT, CLOSE DECISION TESTS")
     print("=" * 50)
 
     from routers.startsit import _close_decision
@@ -61,30 +61,30 @@ def run_close_decision_tests():
     assert result["start"]["name"] == "Player A"
     assert result["sit"]["name"] == "Player B"
     assert "matchup" in result["note"]
-    print(f"    PASS — note: '{result['note']}'")
+    print(f"    PASS, note: '{result['note']}'")
 
     # [2] Injured starter triggers stronger warning
-    print("\n[2] Questionable starter — stronger note...")
+    print("\n[2] Questionable starter, stronger note...")
     inj_starter = {**starter, "injury_status": "Questionable"}
     result2 = _close_decision("WR", inj_starter, alt, 0.8)
     assert "injury" in result2["note"].lower()
-    print(f"    PASS — note: '{result2['note']}'")
+    print(f"    PASS, note: '{result2['note']}'")
 
     # [3] Doubtful starter also triggers injury note
-    print("\n[3] Doubtful starter — injury note...")
+    print("\n[3] Doubtful starter, injury note...")
     dbt_starter = {**starter, "injury_status": "Doubtful"}
     result3 = _close_decision("FLEX", dbt_starter, alt, 1.0)
     assert "injury" in result3["note"].lower()
-    print(f"    PASS — note: '{result3['note']}'")
+    print(f"    PASS, note: '{result3['note']}'")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 3 — Lineup selection logic
+# SECTION 3, Lineup selection logic
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_lineup_logic_tests():
     print("\n" + "=" * 50)
-    print("START/SIT — LINEUP LOGIC TESTS")
+    print("START/SIT, LINEUP LOGIC TESTS")
     print("=" * 50)
 
     async def _test():
@@ -142,7 +142,7 @@ def run_lineup_logic_tests():
         assert "wr2" in starter_ids, "WR2 should be started"
         assert "te1" in starter_ids, "TE1 should be started"
         assert "k1" in starter_ids, "K1 should be started"
-        print(f"    PASS — positional starters: {sorted(starter_ids)}")
+        print(f"    PASS, positional starters: {sorted(starter_ids)}")
 
         # [2] FLEX picks best remaining RB/WR/TE
         print("\n[2] FLEX selects best remaining RB/WR/TE...")
@@ -152,7 +152,7 @@ def run_lineup_logic_tests():
             reverse=True,
         )
         assert flex_pool[0]["player_id"] == "rb3", f"RB3 (11.0) should be FLEX pick, got {flex_pool[0]['player_id']}"
-        print(f"    PASS — FLEX: {flex_pool[0]['name']} ({flex_pool[0]['adjusted_proj']})")
+        print(f"    PASS, FLEX: {flex_pool[0]['name']} ({flex_pool[0]['adjusted_proj']})")
 
         # [3] Out player is never started
         print("\n[3] Out player never started...")
@@ -169,7 +169,7 @@ def run_lineup_logic_tests():
         # rb1 Out → adjusted_proj=0 → sorts last
         assert by_pos_out["RB"][0]["player_id"] == "rb2", "RB2 should rank first when RB1 is Out"
         assert by_pos_out["RB"][0]["adjusted_proj"] == 14.0
-        print(f"    PASS — Out player sinks to bench, RB2 starts")
+        print(f"    PASS, Out player sinks to bench, RB2 starts")
 
         # [4] Close decision flagged correctly
         print("\n[4] Close decision flagged when margin < 2.0...")
@@ -179,18 +179,18 @@ def run_lineup_logic_tests():
         ]
         margin = close_starters[0]["adjusted_proj"] - close_starters[1]["adjusted_proj"]
         assert margin < CLOSE_DECISION_MARGIN, f"Expected close margin, got {margin}"
-        print(f"    PASS — margin {margin} < {CLOSE_DECISION_MARGIN} → flagged as close")
+        print(f"    PASS, margin {margin} < {CLOSE_DECISION_MARGIN} → flagged as close")
 
     asyncio.run(_test())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 4 — Router endpoint tests
+# SECTION 4, Router endpoint tests
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_router_tests():
     print("\n" + "=" * 50)
-    print("START/SIT — ROUTER TESTS")
+    print("START/SIT, ROUTER TESTS")
     print("=" * 50)
 
     from fastapi.testclient import TestClient
@@ -217,7 +217,7 @@ def run_router_tests():
             assert data["starters"] == []
             assert data["bench"] == []
             assert data["season_type"] == "off"
-            print(f"    PASS — offseason_note: '{data['offseason_note'][:60]}...'")
+            print(f"    PASS, offseason_note: '{data['offseason_note'][:60]}...'")
 
     # [2] In-season, no roster → 404
     print("\n[2] In-season, no roster found → 404...")
@@ -238,7 +238,7 @@ def run_router_tests():
             resp = client.get("/api/startsit/5")
             assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
             assert "roster" in resp.json()["detail"].lower()
-            print(f"    PASS — 404 with: {resp.json()['detail']}")
+            print(f"    PASS, 404 with: {resp.json()['detail']}")
     app.dependency_overrides.clear()
 
     # [3] In-season, roster present, no projections → 200 with warning
@@ -277,7 +277,7 @@ def run_router_tests():
                 # Roster query
                 result.all.return_value = roster_rows
             else:
-                # Projections query — empty
+                # Projections query, empty
                 result.scalars.return_value.all.return_value = []
             return result
 
@@ -294,11 +294,11 @@ def run_router_tests():
             data = resp.json()
             assert data["warning"] is not None
             assert "projection" in data["warning"].lower()
-            # All players present (bench + starters) — all adjusted_proj = 0 without projections
+            # All players present (bench + starters), all adjusted_proj = 0 without projections
             total = len(data["starters"]) + len(data["bench"])
             assert total == 7, f"Expected 7 players, got {total}"
-            print(f"    PASS — warning: '{data['warning'][:60]}...'")
-            print(f"    PASS — {len(data['starters'])} starters, {len(data['bench'])} bench")
+            print(f"    PASS, warning: '{data['warning'][:60]}...'")
+            print(f"    PASS, {len(data['starters'])} starters, {len(data['bench'])} bench")
     app.dependency_overrides.clear()
 
 

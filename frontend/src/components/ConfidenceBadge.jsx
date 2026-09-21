@@ -9,7 +9,7 @@ const STYLES = {
 const EXPLAIN = {
   HIGH:   'All 3 projection sources contributed',
   MEDIUM: '2 of 3 sources contributed',
-  LOW:    'Only 1 source available — treat with caution',
+  LOW:    'Only 1 source available. Treat with caution.',
 }
 
 export default function ConfidenceBadge({ flag }) {

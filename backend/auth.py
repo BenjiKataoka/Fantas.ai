@@ -9,7 +9,7 @@ Two modes:
 
 Users are provisioned on first authenticated request (is_approved defaults to False,
 except admins listed in CLERK_ADMIN_IDS). An unapproved user gets 403 until an admin
-approves them — this is the traffic gate.
+approves them, this is the traffic gate.
 """
 import base64
 import logging
@@ -23,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import (
+    ALLOWED_ORIGINS,
     AUTH_ENABLED,
     CLERK_ADMIN_IDS,
     CLERK_JWT_ISSUER,
@@ -34,7 +35,7 @@ from models.user import User
 
 logger = logging.getLogger(__name__)
 
-# Dev-fallback identity — reuses the existing placeholder row so local roster/tracker
+# Dev-fallback identity, reuses the existing placeholder row so local roster/tracker
 # data (tied to user_id=1) stays visible when running without Clerk.
 DEV_CLERK_ID = "placeholder"
 DEV_EMAIL = "placeholder@fantas.ai"
@@ -51,7 +52,7 @@ def _frontend_api_host() -> str:
     if not CLERK_PUBLISHABLE_KEY or "_" not in CLERK_PUBLISHABLE_KEY:
         raise RuntimeError("CLERK_PUBLISHABLE_KEY missing or malformed")
     encoded = CLERK_PUBLISHABLE_KEY.split("_", 2)[-1]
-    # base64 without padding — add it back
+    # base64 without padding, add it back
     padded = encoded + "=" * (-len(encoded) % 4)
     host = base64.b64decode(padded).decode().rstrip("$")
     return host
@@ -73,14 +74,19 @@ def _jwks_client() -> PyJWKClient:
 def _verify_token(token: str) -> dict:
     """Verify a Clerk session JWT against Clerk's JWKS. Returns the claims."""
     signing_key = _jwks_client().get_signing_key_from_jwt(token)
-    # Clerk uses `azp` (authorized party), not a standard `aud` — skip aud verification.
-    return jwt.decode(
+    # Clerk uses `azp` (authorized party), not a standard `aud`, skip aud verification.
+    claims = jwt.decode(
         token,
         signing_key.key,
         algorithms=["RS256"],
         issuer=_issuer(),
         options={"verify_aud": False},
     )
+    # Clerk: reject tokens minted for another origin (CSRF guard). Skip only if absent.
+    azp = claims.get("azp")
+    if azp and azp not in ALLOWED_ORIGINS:
+        raise jwt.InvalidTokenError(f"azp {azp!r} not in ALLOWED_ORIGINS")
+    return claims
 
 
 async def _fetch_clerk_user(clerk_id: str) -> tuple[str, str]:
@@ -137,7 +143,7 @@ async def _get_or_create_user(
     )
     db.add(user)
     # Commit immediately: a new unapproved user triggers a 403 below, and that exception
-    # would otherwise roll back the whole request session — losing the row and keeping the
+    # would otherwise roll back the whole request session, losing the row and keeping the
     # user out of the admin approval queue forever. (expire_on_commit=False keeps `user` usable.)
     await db.commit()
     logger.info(f"[Auth] Provisioned user clerk_id={clerk_id} approved={is_admin}")
@@ -197,7 +203,7 @@ async def get_current_user(
 
     user = await _get_or_create_user(db, clerk_id, email, username or email.split("@")[0], is_admin)
 
-    # Admins are always approved — heals the case where the row was created before the
+    # Admins are always approved, heals the case where the row was created before the
     # user was added to CLERK_ADMIN_IDS (first-admin bootstrap).
     if is_admin and not user.is_approved:
         from datetime import datetime

@@ -1,10 +1,10 @@
 """
-Projections router — on-demand weekly projections for the user's roster.
+Projections router, on-demand weekly projections for the user's roster.
 
 GET /api/projections/{week}
   Fetches fresh projections for the user's rostered players for the given week,
   using the user's saved weights from the users table.
-  Does not re-sync the full roster — reads player list from my_roster.
+  Does not re-sync the full roster, reads player list from my_roster.
 """
 import logging
 from fastapi import APIRouter, Depends, HTTPException
@@ -35,7 +35,7 @@ async def get_projections(
     """
     Returns projections for all of the user's rostered players for a given week.
     Uses the user's saved projection weights (falls back to defaults if not set).
-    Fetches fresh data from all 3 sources — does not read from the projections table.
+    Fetches fresh data from all 3 sources, does not read from the projections table.
     """
     if week < 1 or week > 18:
         raise HTTPException(status_code=400, detail="Week must be between 1 and 18.")

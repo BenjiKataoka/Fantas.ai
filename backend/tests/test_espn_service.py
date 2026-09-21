@@ -36,12 +36,12 @@ async def run_tests():
             status = "PASS" if result == expected else "FAIL"
             if status == "FAIL":
                 all_ok = False
-            print(f"    {status} — '{raw}' → '{result}' (expected '{expected}')")
+            print(f"    {status}, '{raw}' → '{result}' (expected '{expected}')")
 
         if all_ok:
             print("    All normalize_name cases passed")
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
 
     # ------------------------------------------------------------------ #
     # get_nfl_state
@@ -50,11 +50,11 @@ async def run_tests():
     try:
         from services.projection_service import get_nfl_state
         state = await get_nfl_state()
-        print(f"    PASS — week={state['week']} season={state['season']} season_type={state['season_type']}")
+        print(f"    PASS, week={state['week']} season={state['season']} season_type={state['season_type']}")
         if state["season_type"] == "off":
-            print("    NOTE — offseason: projection fetching will be skipped in roster endpoint (expected)")
+            print("    NOTE, offseason: projection fetching will be skipped in roster endpoint (expected)")
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
 
     # ------------------------------------------------------------------ #
     # get_espn_projections (public, no auth)
@@ -65,13 +65,13 @@ async def run_tests():
         projections = await get_espn_projections(season=2025, week=1)
         if projections:
             sample = list(projections.items())[:3]
-            print(f"    PASS — {len(projections)} players with projections")
+            print(f"    PASS, {len(projections)} players with projections")
             print(f"    Sample: {sample}")
         else:
-            print("    NOTE — 0 projections returned (expected during offseason)")
-            print("    PASS — endpoint responded without error")
+            print("    NOTE, 0 projections returned (expected during offseason)")
+            print("    PASS, endpoint responded without error")
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
 
     # ------------------------------------------------------------------ #
     # get_espn_roster (requires ESPN credentials in .env)
@@ -80,7 +80,7 @@ async def run_tests():
     try:
         from config import ESPN_S2, SWID, ESPN_LEAGUE_ID
         if not ESPN_S2 or not SWID or not ESPN_LEAGUE_ID:
-            print("    SKIP — ESPN credentials not set in .env (add ESPN_S2, SWID, ESPN_LEAGUE_ID to test)")
+            print("    SKIP, ESPN credentials not set in .env (add ESPN_S2, SWID, ESPN_LEAGUE_ID to test)")
         else:
             from services.espn_service import get_espn_roster
             roster = await get_espn_roster(
@@ -90,12 +90,12 @@ async def run_tests():
                 season=2025,
             )
             if roster:
-                print(f"    PASS — {len(roster)} players returned from ESPN roster")
+                print(f"    PASS, {len(roster)} players returned from ESPN roster")
                 print(f"    Sample: {roster[:2]}")
             else:
-                print("    WARN — roster returned empty (check credentials or season year)")
+                print("    WARN, roster returned empty (check credentials or season year)")
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
 
     print("\n" + "=" * 50)
     print("ESPN SERVICE TEST COMPLETE")

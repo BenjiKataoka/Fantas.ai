@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from config import ALLOWED_ORIGINS
 from services.scheduler_service import start_scheduler, shutdown_scheduler
 
 
@@ -19,11 +20,7 @@ app = FastAPI(title="Fantas.ai", version="0.1.0", lifespan=lifespan)
 # Allow requests from the React frontend (Vercel + local dev)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "https://*.vercel.app",
-    ],
+    allow_origins=ALLOWED_ORIGINS,  # exact origins; "*.vercel.app" never matched
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -6,7 +6,7 @@ from database import Base
 
 
 class Player(Base):
-    """Global NFL player pool — shared across all users."""
+    """Global NFL player pool, shared across all users."""
     __tablename__ = "players"
 
     player_id = Column(String, primary_key=True)  # Sleeper ID as canonical

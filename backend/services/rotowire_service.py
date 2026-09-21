@@ -39,7 +39,7 @@ def scrape_rotowire_news(force_refresh: bool = False, ttl_minutes: int = CACHE_T
     """
     Scrape the public RotoWire NFL news feed.
     Returns list of dicts: {player_name, headline, news_body, published_at, source_url, source}.
-    Does NOT scrape the paywalled ANALYSIS section — Gemini generates analysis instead.
+    Does NOT scrape the paywalled ANALYSIS section, Gemini generates analysis instead.
     """
     if not force_refresh and _is_cache_valid():
         return _cache["data"]
@@ -70,7 +70,7 @@ def _parse_news_page(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
     items = []
 
-    # RotoWire news cards — each article is a .news-update block
+    # RotoWire news cards, each article is a .news-update block
     news_blocks = soup.select(".news-update")
     if not news_blocks:
         # Fallback: try generic article containers
@@ -87,7 +87,7 @@ def _parse_news_page(html: str) -> list[dict]:
 def _parse_news_block(block) -> Optional[dict]:
     """Parse a single RotoWire news block. Returns None if unparseable."""
     try:
-        # Player name — typically in a link within a header or player-name span
+        # Player name, typically in a link within a header or player-name span
         player_el = (
             block.select_one(".news-update__player-link")
             or block.select_one(".player-name")
@@ -99,7 +99,7 @@ def _parse_news_block(block) -> Optional[dict]:
         if not player_name:
             return None
 
-        # Headline — bold summary line
+        # Headline, bold summary line
         headline_el = (
             block.select_one(".news-update__headline")
             or block.select_one(".news-headline")
@@ -107,7 +107,7 @@ def _parse_news_block(block) -> Optional[dict]:
         )
         headline = headline_el.get_text(strip=True) if headline_el else ""
 
-        # News body — the NEWS section only, NOT the ANALYSIS section
+        # News body, the NEWS section only, NOT the ANALYSIS section
         # RotoWire labels these as separate paragraphs: first is news, second is analysis
         body_el = (
             block.select_one(".news-update__news")
@@ -131,7 +131,7 @@ def _parse_news_block(block) -> Optional[dict]:
         # Truncate body to 2000 chars
         news_body = news_body[:2000] if news_body else None
 
-        # Source URL — canonical link to the news item
+        # Source URL, canonical link to the news item
         link_el = block.select_one("a[href*='/football/news/']") or block.find("a", href=True)
         source_url = None
         if link_el:
@@ -141,7 +141,7 @@ def _parse_news_block(block) -> Optional[dict]:
             elif href:
                 source_url = f"https://www.rotowire.com{href}"
 
-        # Published timestamp — RotoWire uses relative or absolute time strings
+        # Published timestamp, RotoWire uses relative or absolute time strings
         time_el = block.select_one("time") or block.select_one(".news-update__timestamp")
         published_at = _parse_timestamp(time_el)
 

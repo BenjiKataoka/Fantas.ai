@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 1 — TTL helper functions
+# SECTION 1, TTL helper functions
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_ttl_tests():
@@ -24,7 +24,7 @@ def run_ttl_tests():
     )
 
     print("=" * 50)
-    print("NEWS SCRAPER — TTL HELPER TESTS")
+    print("NEWS SCRAPER, TTL HELPER TESTS")
     print("=" * 50)
 
     # [1] Starred TTLs by season type
@@ -35,7 +35,7 @@ def run_ttl_tests():
     assert _starred_ttl_minutes("regular", team_playing_today=True) == 60
     assert _starred_ttl_minutes("post", team_playing_today=True) == 60
     assert _starred_ttl_minutes("post", team_playing_today=False) == 120
-    print(f"    PASS — off=1440m, pre=240m, regular game-day=60m, regular non-game=120m")
+    print(f"    PASS, off=1440m, pre=240m, regular game-day=60m, regular non-game=120m")
 
     # [2] Rostered-only TTLs
     print("\n[2] Rostered-only TTLs...")
@@ -43,7 +43,7 @@ def run_ttl_tests():
     assert _rostered_ttl_minutes("pre") == 4 * 60
     assert _rostered_ttl_minutes("regular") == 4 * 60
     assert _rostered_ttl_minutes("post") == 4 * 60
-    print(f"    PASS — off=None, pre/regular/post=240m")
+    print(f"    PASS, off=None, pre/regular/post=240m")
 
     # [3] _is_due logic
     print("\n[3] _is_due() logic...")
@@ -64,20 +64,20 @@ def run_ttl_tests():
     checked_30m_ago = now - timedelta(minutes=30)
     assert _is_due(checked_30m_ago, 60) is False
 
-    print(f"    PASS — all _is_due() cases correct")
+    print(f"    PASS, all _is_due() cases correct")
 
     print("\n✅ All TTL tests passed.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 2 — Injury/transaction bypass
+# SECTION 2, Injury/transaction bypass
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_bypass_tests():
     from services.rule_filter_service import apply_rule_filter, should_run_gemini
 
     print("\n" + "=" * 50)
-    print("NEWS SCRAPER — INJURY/TRANSACTION BYPASS TESTS")
+    print("NEWS SCRAPER, INJURY/TRANSACTION BYPASS TESTS")
     print("=" * 50)
 
     # The bypass is implemented in news_scraper_service via `effective_season_type`.
@@ -87,10 +87,10 @@ def run_bypass_tests():
     # Bypass uses offseason_significant (set by keyword scan), not news_type_hint
     print("\n[1] Injury-adjacent news in offseason → bypass → Gemini runs for starred...")
     r = apply_rule_filter("Hopkins dealing with knee soreness", None, "off")
-    # "knee" doesn't trigger a rule, but "injur" keyword isn't in text —
+    # "knee" doesn't trigger a rule, but "injur" keyword isn't in text,
     # use a headline that has an injury keyword but no exact rule match
     r2 = apply_rule_filter("Hopkins hamstring soreness week to week", None, "off")
-    # "hamstring" matches the BEARISH MEDIUM rule — rule matched, Gemini skipped
+    # "hamstring" matches the BEARISH MEDIUM rule, rule matched, Gemini skipped
     # Use a softer injury mention that triggers offseason_significant but no rule
     r3 = apply_rule_filter("Hopkins nursing a minor injury, day-to-day", None, "off")
     assert r3.offseason_significant is True, \
@@ -98,7 +98,7 @@ def run_bypass_tests():
     effective = "regular" if r3.offseason_significant and True else "off"
     result = should_run_gemini(r3, is_starred=True, season_type=effective)
     assert result is True
-    print(f"    PASS — offseason_significant={r3.offseason_significant}, effective_season=regular, gemini={result}")
+    print(f"    PASS, offseason_significant={r3.offseason_significant}, effective_season=regular, gemini={result}")
 
     # [2] Trade news in offseason → bypass → Gemini runs
     print("\n[2] Trade news in offseason → bypass → Gemini runs...")
@@ -108,7 +108,7 @@ def run_bypass_tests():
     effective = "regular" if r.offseason_significant else "off"
     result = should_run_gemini(r, is_starred=True, season_type=effective)
     assert result is True
-    print(f"    PASS — offseason_significant={r.offseason_significant}, gemini={result}")
+    print(f"    PASS, offseason_significant={r.offseason_significant}, gemini={result}")
 
     # [3] Routine offseason update → no bypass → Gemini blocked
     print("\n[3] Routine offseason update → no bypass → Gemini blocked...")
@@ -116,18 +116,18 @@ def run_bypass_tests():
     assert r.offseason_significant is False
     result = should_run_gemini(r, is_starred=True, season_type="off")
     assert result is False
-    print(f"    PASS — no bypass, Gemini blocked for routine offseason update")
+    print(f"    PASS, no bypass, Gemini blocked for routine offseason update")
 
     print("\n✅ All bypass tests passed.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 3 — Orchestration (mocked DB + services)
+# SECTION 3, Orchestration (mocked DB + services)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_orchestration_tests():
     print("\n" + "=" * 50)
-    print("NEWS SCRAPER — ORCHESTRATION TESTS")
+    print("NEWS SCRAPER, ORCHESTRATION TESTS")
     print("=" * 50)
 
     async def _test():
@@ -220,7 +220,7 @@ def run_orchestration_tests():
 
         assert summary["skipped_untracked"] >= 1, \
             f"Expected at least 1 untracked skip, got {summary['skipped_untracked']}"
-        print(f"    PASS — skipped_untracked={summary['skipped_untracked']}")
+        print(f"    PASS, skipped_untracked={summary['skipped_untracked']}")
 
         # [2] Deduplication: same source_url skipped on second pass
         print("\n[2] Deduplication skips already-seen source_urls...")
@@ -263,19 +263,19 @@ def run_orchestration_tests():
 
         assert summary["skipped_dedup"] >= 1, \
             f"Expected at least 1 dedup skip, got {summary['skipped_dedup']}"
-        print(f"    PASS — skipped_dedup={summary['skipped_dedup']}")
+        print(f"    PASS, skipped_dedup={summary['skipped_dedup']}")
 
     asyncio.run(_test())
     print("\n✅ All orchestration tests passed.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 4 — Failure modes (both source APIs down)
+# SECTION 4, Failure modes (both source APIs down)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_scraper_failure_tests():
     print("\n" + "=" * 50)
-    print("NEWS SCRAPER — SOURCE FAILURE MODES")
+    print("NEWS SCRAPER, SOURCE FAILURE MODES")
     print("=" * 50)
 
     async def _test():
@@ -314,7 +314,7 @@ def run_scraper_failure_tests():
 
         assert summary["new_items"] == 0
         assert summary["gemini_ran"] == 0
-        print(f"    PASS — summary: {summary}")
+        print(f"    PASS, summary: {summary}")
 
         # [2] Schedule API fails → scraper continues with empty teams set
         print("\n[2] Schedule API fails → scraper uses empty teams set, continues...")
@@ -335,7 +335,7 @@ def run_scraper_failure_tests():
             )
 
         assert "new_items" in summary  # completed without exception
-        print(f"    PASS — completed with empty teams set")
+        print(f"    PASS, completed with empty teams set")
 
     asyncio.run(_test())
     print("\n✅ All scraper failure mode tests passed.")

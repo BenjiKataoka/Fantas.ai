@@ -51,7 +51,7 @@ class NewsAnalysis(Base):
 
 class NewsHistoryContext(Base):
     """Rolling 500-word context summary of the last 10 news items per player.
-    Regenerated after each new news item — used as Pass 2 input for the news analyzer."""
+    Regenerated after each new news item, used as Pass 2 input for the news analyzer."""
     __tablename__ = "news_history_context"
 
     player_id = Column(String, ForeignKey("players.player_id"), primary_key=True)

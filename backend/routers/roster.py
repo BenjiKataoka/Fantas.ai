@@ -31,7 +31,7 @@ def _resolve_league_season(nfl_state: dict) -> int:
     The season whose Sleeper leagues we should look at.
 
     Sleeper always reports the upcoming season in `nfl_state` (e.g. 2026), but during
-    the offseason those leagues don't exist yet — so fall back to the completed season.
+    the offseason those leagues don't exist yet, so fall back to the completed season.
     Both /api/leagues and /api/roster MUST use this so the dropdown and the roster
     validation agree on which season's leagues are eligible. Never hardcode the year.
     """
@@ -75,7 +75,7 @@ async def get_my_roster(
     Fetches the user's roster from Sleeper, syncs players + roster into Neon,
     and returns the full roster with player details.
     """
-    # Fetch NFL state first — used for season/week throughout this handler
+    # Fetch NFL state first, used for season/week throughout this handler
     nfl_state = await get_nfl_state()
 
     # Resolve username → user_id
@@ -116,7 +116,7 @@ async def get_my_roster(
         position = p.get("position", "")
         if position not in RELEVANT_POSITIONS:
             continue
-        # Sleeper returns espn_id as int — cast to str for VARCHAR column
+        # Sleeper returns espn_id as int, cast to str for VARCHAR column
         espn_id = p.get("espn_id")
         espn_id_str = str(espn_id) if espn_id is not None else None
         players_to_upsert.append({

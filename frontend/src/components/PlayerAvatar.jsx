@@ -1,15 +1,15 @@
 import { useState } from 'react'
 
 /**
- * PlayerAvatar — player headshot from Sleeper's CDN, keyed by the Sleeper player_id
+ * PlayerAvatar: player headshot from Sleeper's CDN, keyed by the Sleeper player_id
  * that every roster/news/startsit record already carries. No API call, no token cost.
  * Falls back to the player's initials on a missing/broken image (e.g. team DEF, rookies
  * without a photo yet).
  *
  * Props:
- *   playerId — Sleeper player_id (string)
- *   name     — full name (for initials fallback + alt text)
- *   size     — pixel diameter (default 32)
+ *   playerId: Sleeper player_id (string)
+ *   name: full name (for initials fallback + alt text)
+ *   size: pixel diameter (default 32)
  */
 const SIZES = {
   sm: 28,

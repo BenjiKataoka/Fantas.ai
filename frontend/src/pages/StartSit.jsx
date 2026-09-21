@@ -46,7 +46,7 @@ function LineupRow({ p }) {
       </td>
       <td className="px-3 py-2.5 text-right font-mono tabular-nums text-sm font-medium">
         <span className={projColor(p.adjusted_proj)}>
-          {p.adjusted_proj != null ? p.adjusted_proj.toFixed(1) : '—'}
+          {p.adjusted_proj != null ? p.adjusted_proj.toFixed(1) : '-'}
         </span>
       </td>
     </tr>
@@ -133,7 +133,7 @@ export default function StartSit() {
                 <tbody className="divide-y divide-line/40">
                   {sortedStarters.length > 0
                     ? sortedStarters.map(p => <LineupRow key={`${p.slot}-${p.player_id}`} p={p} />)
-                    : <tr><td colSpan={3} className="px-3 py-6 text-center text-subtle/60 text-sm">No starters could be set — sync projections on the Dashboard.</td></tr>
+                    : <tr><td colSpan={3} className="px-3 py-6 text-center text-subtle/60 text-sm">No starters could be set. Refresh projections on the Dashboard.</td></tr>
                   }
                 </tbody>
               </table>
@@ -161,7 +161,7 @@ export default function StartSit() {
                           </td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-sm font-medium">
                             <span className={projColor(p.adjusted_proj)}>
-                              {p.adjusted_proj != null ? p.adjusted_proj.toFixed(1) : '—'}
+                              {p.adjusted_proj != null ? p.adjusted_proj.toFixed(1) : '-'}
                             </span>
                           </td>
                         </tr>
@@ -180,7 +180,7 @@ export default function StartSit() {
                 {close_decisions.map((d, i) => <CloseDecision key={`${d.slot}-${i}`} d={d} />)}
               </div>
             ) : (
-              <p className="text-xs text-subtle/70">No close calls — every slot has a clear starter.</p>
+              <p className="text-xs text-subtle/70">No close calls this week. Every slot has a clear starter.</p>
             )}
           </div>
         </div>

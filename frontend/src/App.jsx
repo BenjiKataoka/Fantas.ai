@@ -1,3 +1,4 @@
+import { TriangleAlert, Hourglass } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import {
@@ -74,7 +75,7 @@ function Landing() {
       <BrandMark className="text-4xl" />
       <p className="text-content text-lg font-display mt-5 mb-1">The player stock exchange.</p>
       <p className="text-subtle text-sm mb-8">
-        Multi-source projections, AI news &amp; sentiment analysis, and weekly start/sit — for your redraft PPR league.
+        Projections from three sources, news and sentiment tracking, and weekly start/sit calls for your redraft PPR league.
       </p>
       <div className="flex items-center justify-center gap-3">
         <SignInButton mode="modal">
@@ -101,7 +102,7 @@ function PendingScreen() {
         <div className="ml-auto"><UserButton afterSignOutUrl="/" /></div>
       </div>
       <CenteredShell>
-        <div className="text-5xl mb-4">⏳</div>
+        <Hourglass className="size-10 text-subtle mx-auto mb-4" />
         <h2 className="text-xl font-display font-semibold text-content mb-2">Awaiting approval</h2>
         <p className="text-subtle">
           Your account was created and is pending admin approval. You'll have access as soon as
@@ -115,7 +116,7 @@ function PendingScreen() {
 function ErrorScreen() {
   return (
     <CenteredShell>
-      <div className="text-5xl mb-4">⚠️</div>
+      <TriangleAlert className="size-10 text-warn mx-auto mb-4" />
       <h2 className="text-xl font-display font-semibold text-content mb-2">Couldn't reach the server</h2>
       <p className="text-subtle mb-6">Something went wrong verifying your account. Try again.</p>
       <button
@@ -168,7 +169,7 @@ function AuthedApp() {
   }, [])
 
   if (status === 'loading') {
-    return <CenteredShell><Spinner label="Verifying your account…" /></CenteredShell>
+    return <CenteredShell><Spinner label="Verifying your account..." /></CenteredShell>
   }
   if (status === 'pending') return <PendingScreen />
   if (status === 'error') return <ErrorScreen />
@@ -188,7 +189,7 @@ export default function App() {
   return (
     <>
       <ClerkLoading>
-        <CenteredShell><Spinner label="Loading…" /></CenteredShell>
+        <CenteredShell><Spinner label="Loading..." /></CenteredShell>
       </ClerkLoading>
       <ClerkLoaded>
         <Show when="signed-out"><Landing /></Show>

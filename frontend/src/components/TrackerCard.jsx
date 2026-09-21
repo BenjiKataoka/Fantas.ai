@@ -1,3 +1,4 @@
+import { Star, TriangleAlert } from 'lucide-react'
 import StockBadge from './StockBadge'
 import ConcernMeter from './ConcernMeter'
 import SentimentGauge from './SentimentGauge'
@@ -56,7 +57,7 @@ function FactorList({ items, type }) {
 }
 
 /**
- * TrackerCard — full profile card for a starred player.
+ * TrackerCard: full profile card for a starred player.
  * props: player (from GET /api/tracker), onUnstar(id), onRefresh(id)
  */
 export default function TrackerCard({ player, onUnstar, onRefresh }) {
@@ -89,9 +90,9 @@ export default function TrackerCard({ player, onUnstar, onRefresh }) {
           <button
             onClick={() => onUnstar(player_id)}
             title="Unstar player"
-            className="px-2.5 py-1 text-xs text-warn hover:brightness-110 bg-warn/10 hover:bg-warn/20 rounded-lg border border-warn/30 transition-all"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-warn hover:brightness-110 bg-warn/10 hover:bg-warn/20 rounded-lg border border-warn/30 transition-all"
           >
-            ★ Starred
+            <Star className="size-3 fill-current" />Starred
           </button>
         </div>
       </div>
@@ -99,7 +100,7 @@ export default function TrackerCard({ player, onUnstar, onRefresh }) {
       {!profile_ready ? (
         <div className="flex items-center gap-3 py-4 text-subtle">
           <div className="w-4 h-4 border-2 border-line border-t-brand rounded-full animate-spin shrink-0" />
-          <span className="text-sm">Generating profile… (15-30 sec)</span>
+          <span className="text-sm">Generating profile... (15-30 sec)</span>
         </div>
       ) : (
         <>
@@ -120,7 +121,7 @@ export default function TrackerCard({ player, onUnstar, onRefresh }) {
 
           {contrarian_flag && (
             <div className="flex items-start gap-2 p-2.5 bg-warn/10 border border-warn/30 rounded-lg">
-              <span className="text-warn shrink-0">⚠</span>
+              <TriangleAlert className="size-3.5 text-warn shrink-0 mt-0.5" />
               <p className="text-xs text-warn/80">Contrarian signal detected.{sentiment_vs_stock ? ` ${sentiment_vs_stock}` : ''}</p>
             </div>
           )}

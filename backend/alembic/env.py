@@ -49,7 +49,7 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    # Use a sync driver (psycopg2-style URL) for Alembic — swap asyncpg → psycopg2
+    # Use a sync driver (psycopg2-style URL) for Alembic, swap asyncpg → psycopg2
     # Alembic doesn't support asyncpg directly, so we use the sync pool here only
     sync_url = DATABASE_URL.replace("postgresql+asyncpg", "postgresql+psycopg2")
     from sqlalchemy import create_engine

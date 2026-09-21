@@ -1,5 +1,5 @@
 /**
- * ConcernMeter — 1-10 bar for concern_level. Bull ≤3 · Warn 4-6 · Bear ≥7.
+ * ConcernMeter: 1-10 bar for concern_level. Bull ≤3 · Warn 4-6 · Bear ≥7.
  */
 export default function ConcernMeter({ score }) {
   if (score == null) return null

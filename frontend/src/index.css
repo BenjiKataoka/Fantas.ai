@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* ── The Fantasy Exchange — design tokens ──────────────────────────────────────
+/* ── The Fantasy Exchange, design tokens ──────────────────────────────────────
    Ink trading-floor base, one violet brand accent, green/red reserved for market
    direction. Mono tabular figures are the "terminal" signal. */
 @theme {

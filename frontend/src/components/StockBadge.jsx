@@ -5,7 +5,7 @@ const DIRECTION_STYLES = {
 }
 
 /**
- * StockBadge — BULLISH/BEARISH/NEUTRAL direction + optional magnitude.
+ * StockBadge: BULLISH/BEARISH/NEUTRAL direction + optional magnitude.
  * size: "sm" (table cells) | "md" (default).
  */
 export default function StockBadge({ direction, magnitude, size = 'md' }) {

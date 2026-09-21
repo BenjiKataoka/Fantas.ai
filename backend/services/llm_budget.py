@@ -1,11 +1,11 @@
 """
-Daily LLM spend guard — a hard ceiling on Gemini calls per UTC day to protect the
+Daily LLM spend guard, a hard ceiling on Gemini calls per UTC day to protect the
 free-tier key. In-memory counter keyed by date; resets automatically at UTC midnight
 (and on process restart, which is acceptable for a soft budget).
 
 Tracks two things:
   1. A global daily call cap (LLM_DAILY_CALL_CAP) across all models.
-  2. Per-model daily request ceilings (GEMINI_RPD_LIMITS) — the free tier meters each
+  2. Per-model daily request ceilings (GEMINI_RPD_LIMITS), the free tier meters each
      model separately, and full Flash has a tiny ~20/day limit while Flash-Lite has ~500.
 
 Shared by news_analysis_service and sentiment_service via can_spend()/record_call().
@@ -39,7 +39,7 @@ def can_spend(model: str | None = None) -> bool:
     """
     True if a Gemini call is allowed right now.
 
-    Checks the global daily cap, and — when `model` is given — that model's own RPD
+    Checks the global daily cap, and, when `model` is given, that model's own RPD
     ceiling. A model with headroom is never blocked by another model's exhaustion.
     """
     _roll_if_new_day()
@@ -62,11 +62,11 @@ def record_call(model: str | None = None) -> None:
         if limit is not None and _state["by_model"][model] == limit:
             logger.warning(
                 f"[LLMBudget] Per-model daily limit reached for {model} "
-                f"({limit}) — calls to this model suppressed until UTC midnight."
+                f"({limit}), calls to this model suppressed until UTC midnight."
             )
     if _state["count"] == LLM_DAILY_CALL_CAP:
         logger.warning(
-            f"[LLMBudget] Global daily cap reached ({LLM_DAILY_CALL_CAP}) — "
+            f"[LLMBudget] Global daily cap reached ({LLM_DAILY_CALL_CAP}), "
             "further Gemini calls suppressed until UTC midnight."
         )
 

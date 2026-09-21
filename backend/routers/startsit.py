@@ -59,9 +59,9 @@ def _build_player_dict(player_row, proj_row) -> dict:
 def _close_decision(slot: str, starter: dict, alt: dict, margin: float) -> dict:
     # Warn louder if the recommended starter has an injury tag
     if starter["injury_status"] in ("Questionable", "Doubtful"):
-        note = "Slim margin — monitor injury status closely before lock"
+        note = "Slim margin, monitor injury status closely before lock"
     else:
-        note = "Slim margin — consider checking matchup before lock"
+        note = "Slim margin, consider checking matchup before lock"
     return {
         "slot": slot,
         "start": {
@@ -169,7 +169,7 @@ async def get_start_sit(
             starters.append({**starter, "slot": pos})
             bench_ids.add(starter["player_id"])
 
-            # Flag close decisions (skip K — thin rosters make this noise)
+            # Flag close decisions (skip K, thin rosters make this noise)
             alt = pool[i + 1] if i + 1 < len(pool) else None
             if alt and pos != "K":
                 margin = starter["adjusted_proj"] - alt["adjusted_proj"]
@@ -209,7 +209,7 @@ async def get_start_sit(
     )
 
     logger.info(
-        f"[Start/Sit] Week {week} — {len(starters)} starters, "
+        f"[Start/Sit] Week {week}, {len(starters)} starters, "
         f"{len(bench)} bench, {len(close_decisions)} close decisions"
     )
 

@@ -96,7 +96,7 @@ function TopBar({ rosterData, lastRefresh, onRefresh, loading }) {
   const week         = rosterData?.week
   const starters     = (rosterData?.roster || []).filter(p => p.is_starter)
   const totalPts     = starters.reduce((s, p) => s + (p.weighted_proj || 0), 0)
-  const weekLabel    = !rosterData ? '—' : seasonType === 'off' ? `${season} Offseason` : `Week ${week} · ${season}`
+  const weekLabel    = !rosterData ? '-' : seasonType === 'off' ? `${season} Offseason` : `Week ${week} · ${season}`
   const refreshLabel = lastRefresh ? lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null
 
   return (
@@ -121,7 +121,7 @@ function TopBar({ rosterData, lastRefresh, onRefresh, loading }) {
           disabled={loading}
           className="px-3 py-1.5 bg-raised hover:bg-line disabled:opacity-40 text-subtle hover:text-content text-xs font-medium rounded-lg border border-line transition-colors"
         >
-          {loading ? 'Loading…' : 'Refresh'}
+          {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
     </div>
@@ -146,7 +146,7 @@ function WeightSidebar() {
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-line">
         <span className={`text-xs font-mono ${sumOk ? 'text-subtle' : 'text-bear'}`}>Total: {sum}%</span>
         <button onClick={() => saveWeights(weights)} disabled={!sumOk || saving} className={`px-3 py-1 text-xs ${btnPrimary}`}>
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
       {saveError && <p className="text-bear text-xs mt-2">{saveError}</p>}
@@ -215,7 +215,7 @@ export default function Dashboard() {
           <div className="bg-surface border border-line rounded-xl p-5">
             <h3 className="text-sm font-display font-semibold text-content mb-3">Alerts</h3>
             {newsLoading && !newsData
-              ? <p className="text-xs text-subtle">Loading news…</p>
+              ? <p className="text-xs text-subtle">Loading news...</p>
               : <AlertFeed items={newsData?.news ?? []} playerMap={playerMap} />
             }
           </div>

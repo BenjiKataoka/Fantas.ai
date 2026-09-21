@@ -1,5 +1,5 @@
 """
-2-pass Gemini news analysis pipeline — runs for starred players only.
+2-pass Gemini news analysis pipeline, runs for starred players only.
 
 Pass 1 (GEMINI_PRIMARY, flash-lite):
   Input: raw news + player context + weighted projection + Sleeper trending + snap/target stats
@@ -21,6 +21,8 @@ from datetime import datetime
 from typing import Optional
 
 from google import genai
+
+from services.utils import WRITING_STYLE, strip_dashes
 from google.genai import types
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -84,7 +86,7 @@ Return ONLY valid JSON (no markdown):
 
 CONTEXT_REGENERATION_PROMPT = """Summarize the following recent news items for {player_name} in 500 words or less.
 Focus on: injury timeline, depth chart status, contract situation, recent performance trends.
-Be factual and concise — this summary will be used as context for future AI analysis.
+Be factual and concise. This summary will be used as context for future AI analysis.
 
 NEWS ITEMS (most recent first):
 {news_items}
@@ -106,7 +108,7 @@ async def analyze_news_item(
       player_name, position, nfl_team, weighted_proj (float|None),
       trending_status (str), stats_context (str)
 
-    Returns a NewsAnalysis ORM object (not yet committed — caller commits).
+    Returns a NewsAnalysis ORM object (not yet committed, caller commits).
     Returns None if Gemini fails entirely.
     """
     # Pass 1
@@ -119,7 +121,7 @@ async def analyze_news_item(
     if pass1.get("stock_magnitude") == "HIGH" and pass1.get("confidence_score", 0) < 0.75:
         pass1["stock_magnitude"] = "MEDIUM"
 
-    # Pass 2 — only when needs_context_check=True
+    # Pass 2, only when needs_context_check=True
     context_notes = None
     contradictions_flagged = False
     contradiction_detail = None
@@ -228,7 +230,7 @@ async def _update_history_context(player_id: str, player_name: str, db: AsyncSes
         news_items=news_text[:4000],  # cap input to avoid token blowout
     )
 
-    # Use flash-lite for context regeneration — cheap and sufficient
+    # Use flash-lite for context regeneration, cheap and sufficient
     summary = await _call_gemini_text(prompt, model=GEMINI_PRIMARY)
     if not summary:
         return
@@ -274,18 +276,19 @@ async def _call_gemini_text(prompt: str, model: str) -> Optional[str]:
     """Call Gemini and return raw text. Returns None on failure, when LLM is disabled,
     or when the daily call cap is exhausted."""
     if not LLM_ENABLED:
-        logger.info(f"[NewsAnalysis] LLM disabled (LLM_ENABLED=false) — skipping {model} call")
+        logger.info(f"[NewsAnalysis] LLM disabled (LLM_ENABLED=false), skipping {model} call")
         return None
     if not llm_budget.can_spend(model):
-        logger.warning(f"[NewsAnalysis] Daily budget exhausted for {model} — skipping call")
+        logger.warning(f"[NewsAnalysis] Daily budget exhausted for {model}, skipping call")
         return None
     llm_budget.record_call(model)
     try:
-        response = _genai_client.models.generate_content(
+        # .aio = async client, so a Gemini call doesn't block the event loop.
+        response = await _genai_client.aio.models.generate_content(
             model=model,
-            contents=prompt,
+            contents=prompt + WRITING_STYLE,
         )
-        return response.text
+        return strip_dashes(response.text)
     except Exception as e:
         logger.error(f"[NewsAnalysis] Gemini call failed ({model}): {e}")
         return None

@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import InjuryBadge from './InjuryBadge'
 import ProjectionBar from './ProjectionBar'
@@ -36,7 +37,7 @@ function SectionHeader({ label, count }) {
 }
 
 function StartSitCell({ rec }) {
-  if (!rec) return <span className="text-subtle/40 text-xs">—</span>
+  if (!rec) return <span className="text-subtle/40 text-xs">-</span>
   if (rec.slot) {
     return (
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-bull/10 border border-bull/30 text-bull text-xs font-semibold">
@@ -60,7 +61,7 @@ function CollapseRow({ open, colSpan, children }) {
   useEffect(() => {
     if (open) {
       setRender(true)
-      // Two rAFs so the browser paints the 0fr state before we flip to 1fr — otherwise
+      // Two rAFs so the browser paints the 0fr state before we flip to 1fr, otherwise
       // it mounts already-open and the transition never runs.
       const id = requestAnimationFrame(() => requestAnimationFrame(() => setExpanded(true)))
       return () => cancelAnimationFrame(id)
@@ -96,7 +97,7 @@ function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
       {/* Player */}
       <td className={COL_CELL}>
         <div className="flex items-center gap-2.5">
-          <span className={`text-subtle/50 text-xs transition-transform ${isOpen ? 'rotate-90 text-brand' : ''}`}>▸</span>
+          <ChevronRight className={`size-3.5 shrink-0 text-subtle/50 transition-transform ${isOpen ? 'rotate-90 text-brand' : ''}`} />
           <PlayerAvatar playerId={player_id} name={name} size="md" />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -121,7 +122,7 @@ function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
       <td className={`${COL_CELL} text-center`}><ProjectionBar value={espn_proj} injuryStatus={injury_status} /></td>
       <td className={`${COL_CELL} text-center`}><ProjectionBar value={fp_proj} injuryStatus={injury_status} /></td>
 
-      {/* Weighted — the hero column */}
+      {/* Weighted, the hero column */}
       <td className={`${COL_CELL} text-center bg-ink/40`}>
         <ProjectionBar value={weighted_proj} injuryStatus={injury_status} strong />
       </td>
@@ -139,7 +140,7 @@ function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
             )}
           </div>
         ) : (
-          <span className="text-subtle/40 text-xs">—</span>
+          <span className="text-subtle/40 text-xs">-</span>
         )}
       </td>
 
@@ -155,8 +156,8 @@ function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
 }
 
 /**
- * newsMap     — { player_id: most-recent news card } from AppContext
- * startSitMap — { player_id: { slot } } for recommended starters; absent = SIT
+ * newsMap: { player_id: most-recent news card } from AppContext
+ * startSitMap: { player_id: { slot } } for recommended starters; absent = SIT
  */
 export default function RosterTable({ players, newsMap = {}, startSitMap = {} }) {
   const [openId, setOpenId] = useState(null)
@@ -167,7 +168,7 @@ export default function RosterTable({ players, newsMap = {}, startSitMap = {} })
   return (
     <div className="rounded-xl border border-line bg-surface">
       {/* table-fixed + colgroup lock column widths (so the expandable row never reflows
-          the table) AND size the table to exactly fit its container — no horizontal
+          the table) AND size the table to exactly fit its container, no horizontal
           scroll, so opening a card never lets you swipe past the left/right edges.
           (A dedicated mobile pass comes after deploy.) */}
       <table className="w-full table-fixed text-left">

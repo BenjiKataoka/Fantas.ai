@@ -7,7 +7,7 @@ function projColor(value, injuryStatus) {
 }
 
 export default function ProjectionBar({ value, injuryStatus, strong = false }) {
-  if (value == null) return <span className="font-mono text-sm text-subtle/40">—</span>
+  if (value == null) return <span className="font-mono text-sm text-subtle/40">-</span>
   return (
     <span className={`font-mono tabular-nums ${strong ? 'text-base font-bold' : 'text-sm font-medium'} ${projColor(value, injuryStatus)}`}>
       {value.toFixed(1)}

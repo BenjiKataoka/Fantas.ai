@@ -1,10 +1,10 @@
 """
-nflreadpy data loader — historical stats, snap counts, depth charts.
+nflreadpy data loader, historical stats, snap counts, depth charts.
 
 Uses get_nfl_state() to determine the current season so this never needs
 manual updates when a new NFL season starts.
 
-All functions return empty dicts/strings on failure — never raise.
+All functions return empty dicts/strings on failure, never raise.
 """
 import logging
 from typing import Optional
@@ -22,7 +22,7 @@ def _get_seasons(completed_season: int, n: int = 3) -> list[int]:
 
 
 def _normalize_for_match(name) -> str:
-    """Lowercase, strip punctuation — used to match nflreadpy names to ours."""
+    """Lowercase, strip punctuation, used to match nflreadpy names to ours."""
     import re
     if not isinstance(name, str):
         return ""

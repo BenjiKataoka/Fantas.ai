@@ -1,5 +1,5 @@
 /**
- * SentimentGauge — bar for sentiment_score (-1.0 to 1.0). Left negative, right positive.
+ * SentimentGauge: bar for sentiment_score (-1.0 to 1.0). Left negative, right positive.
  */
 export default function SentimentGauge({ score, label }) {
   if (score == null) return null

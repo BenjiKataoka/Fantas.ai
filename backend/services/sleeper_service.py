@@ -68,7 +68,7 @@ async def get_leagues(user_id: str, season: int = CURRENT_SEASON) -> list:
 
 
 async def get_eligible_leagues(user_id: str, season: int = CURRENT_SEASON) -> list:
-    """Returns only redraft PPR leagues — filters out dynasty, keeper, and non-PPR."""
+    """Returns only redraft PPR leagues, filters out dynasty, keeper, and non-PPR."""
     all_leagues = await get_leagues(user_id, season)
     eligible = []
     for league in all_leagues:
@@ -110,7 +110,7 @@ async def get_roster(league_id: str, user_id: str) -> Optional[dict]:
 
 
 async def get_all_players() -> dict:
-    """Returns Sleeper's full NFL player map. Heavy call — cache for 24h."""
+    """Returns Sleeper's full NFL player map. Heavy call, cache for 24h."""
     cache_key = "sleeper_all_players"
     cached = _get_cache(cache_key)
     if cached:
@@ -132,7 +132,7 @@ async def get_projections(season: int, week: int) -> dict:
     """
     Returns Sleeper projections keyed by player_id: {player_id: stats_dict}.
 
-    Uses api.sleeper.com (not api.sleeper.app/v1) — the app host returns player shells
+    Uses api.sleeper.com (not api.sleeper.app/v1), the app host returns player shells
     with empty stats. The stats host returns a LIST of {player_id, stats, ...} which we
     reshape into a dict so callers can look up by player_id.
     """

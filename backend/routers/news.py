@@ -48,7 +48,7 @@ async def get_news(
     nfl_state = await get_nfl_state()
     season_type = nfl_state.get("season_type", "off")
 
-    # Run scraper / queue drainer — game-day check is now per-player inside the scraper
+    # Run scraper / queue drainer, game-day check is now per-player inside the scraper
     scrape_summary = await scrape_and_analyze(
         db=db,
         season_type=season_type,

@@ -1,5 +1,5 @@
 """
-Tests for Phase 4.5 — News Analyzer.
+Tests for Phase 4.5, News Analyzer.
 Covers: rule_filter_service, news_queue_service, news_analysis_service (mocked Gemini),
         and the /api/news router (TestClient).
 
@@ -11,48 +11,48 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 1 — Rule Filter
+# SECTION 1, Rule Filter
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_rule_filter_tests():
     from services.rule_filter_service import apply_rule_filter, should_run_gemini
 
     print("=" * 50)
-    print("RULE FILTER — UNIT TESTS")
+    print("RULE FILTER, UNIT TESTS")
     print("=" * 50)
 
-    # [1] BEARISH HIGH — ruled out
+    # [1] BEARISH HIGH, ruled out
     print("\n[1] 'ruled out' → BEARISH/HIGH...")
     r = apply_rule_filter("Ja'Marr Chase ruled out Sunday", None, "regular")
     assert r.matched
     assert r.direction == "BEARISH"
     assert r.magnitude == "HIGH"
     assert r.confidence == 0.95
-    print(f"    PASS — {r.direction}/{r.magnitude} conf={r.confidence}")
+    print(f"    PASS, {r.direction}/{r.magnitude} conf={r.confidence}")
 
-    # [2] BEARISH HIGH — torn
+    # [2] BEARISH HIGH, torn
     print("\n[2] 'torn ACL' → BEARISH/HIGH...")
     r = apply_rule_filter("Player tears ACL", "Season-ending injury confirmed", "regular")
     assert r.matched
     assert r.direction == "BEARISH"
     assert r.magnitude == "HIGH"
-    print(f"    PASS — {r.direction}/{r.magnitude}")
+    print(f"    PASS, {r.direction}/{r.magnitude}")
 
-    # [3] BULLISH HIGH — activated from IR
+    # [3] BULLISH HIGH, activated from IR
     print("\n[3] 'activated from IR' → BULLISH/HIGH...")
     r = apply_rule_filter("Christian McCaffrey activated from IR", None, "regular")
     assert r.matched
     assert r.direction == "BULLISH"
     assert r.magnitude == "HIGH"
-    print(f"    PASS — {r.direction}/{r.magnitude}")
+    print(f"    PASS, {r.direction}/{r.magnitude}")
 
-    # [4] NEUTRAL LOW — veteran day off
+    # [4] NEUTRAL LOW, veteran day off
     print("\n[4] 'veteran day off' → NEUTRAL/LOW...")
     r = apply_rule_filter("Davante Adams given veteran day off Wednesday", None, "regular")
     assert r.matched
     assert r.direction == "NEUTRAL"
     assert r.magnitude == "LOW"
-    print(f"    PASS — {r.direction}/{r.magnitude}")
+    print(f"    PASS, {r.direction}/{r.magnitude}")
 
     # [5] No match → should pass to Gemini (in-season)
     print("\n[5] Unmatched news (in-season) → Gemini=True for starred...")
@@ -60,14 +60,14 @@ def run_rule_filter_tests():
     assert not r.matched
     result = should_run_gemini(r, is_starred=True, season_type="regular")
     assert result is True
-    print(f"    PASS — matched={r.matched}, gemini={result}")
+    print(f"    PASS, matched={r.matched}, gemini={result}")
 
     # [6] Rostered-only → never Gemini
     print("\n[6] Rostered-only player → Gemini=False regardless...")
     r = apply_rule_filter("Player injured in practice", None, "regular")
     result = should_run_gemini(r, is_starred=False, season_type="regular")
     assert result is False
-    print(f"    PASS — gemini={result}")
+    print(f"    PASS, gemini={result}")
 
     # [7] Offseason + significant keyword → Gemini allowed for starred
     # Use a trade-adjacent headline that doesn't match any rule pattern exactly
@@ -76,7 +76,7 @@ def run_rule_filter_tests():
     result = should_run_gemini(r, is_starred=True, season_type="off")
     assert not r.matched, "Expected no rule match for trade rumors headline"
     assert result is True, f"Expected Gemini=True for offseason trade news, got {result}"
-    print(f"    PASS — offseason_significant={r.offseason_significant}, gemini={result}")
+    print(f"    PASS, offseason_significant={r.offseason_significant}, gemini={result}")
 
     # [8] Offseason + routine noise → Gemini=False for starred
     print("\n[8] Offseason + OTA mention → Gemini=False for starred...")
@@ -84,7 +84,7 @@ def run_rule_filter_tests():
     result = should_run_gemini(r, is_starred=True, season_type="off")
     # rule matched as NEUTRAL/LOW → should_run_gemini returns False (rule matched)
     assert result is False
-    print(f"    PASS — matched={r.matched}, gemini={result}")
+    print(f"    PASS, matched={r.matched}, gemini={result}")
 
     print("\n✅ All rule filter tests passed.")
 
@@ -93,7 +93,7 @@ def run_classify_type_tests():
     from services.rule_filter_service import classify_news_type
 
     print("\n" + "=" * 50)
-    print("RULE FILTER — NEWS TYPE CLASSIFIER")
+    print("RULE FILTER, NEWS TYPE CLASSIFIER")
     print("=" * 50)
 
     # The motivating case: obvious injury news that trips no DIRECTION rule.
@@ -112,7 +112,7 @@ def run_classify_type_tests():
     for text, expected in cases.items():
         got = classify_news_type(text)
         assert got == expected, f"{text!r} → {got}, expected {expected}"
-        print(f"    PASS — {expected:11} ← {text!r}")
+        print(f"    PASS, {expected:11} ← {text!r}")
 
     print("\n[3] no false-positive from ambiguous words ('came back', 'quarterback')...")
     assert classify_news_type("He came back to lead the quarterback room") == "GENERAL"
@@ -127,23 +127,23 @@ def run_classify_type_tests():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 2 — Queue Service
+# SECTION 2, Queue Service
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_queue_tests():
     from services.news_queue_service import NewsAnalysisQueue, QueuedItem
 
     print("\n" + "=" * 50)
-    print("NEWS QUEUE — UNIT TESTS")
+    print("NEWS QUEUE, UNIT TESTS")
     print("=" * 50)
 
     queue = NewsAnalysisQueue()
 
     # [1] Fresh queue allows calls
-    print("\n[1] Fresh queue — can_call=True...")
+    print("\n[1] Fresh queue, can_call=True...")
     assert queue.can_call()
     assert queue.calls_remaining() == 10
-    print(f"    PASS — calls_remaining={queue.calls_remaining()}")
+    print(f"    PASS, calls_remaining={queue.calls_remaining()}")
 
     # [2] Fill up the window
     print("\n[2] Fill window to limit...")
@@ -151,24 +151,24 @@ def run_queue_tests():
         queue.record_call()
     assert not queue.can_call()
     assert queue.calls_remaining() == 0
-    print(f"    PASS — can_call={queue.can_call()} remaining={queue.calls_remaining()}")
+    print(f"    PASS, can_call={queue.can_call()} remaining={queue.calls_remaining()}")
 
     # [3] Dequeue returns None when rate-limited
     print("\n[3] Dequeue while rate-limited → None...")
     queue.enqueue(QueuedItem(news_id=99, player_id="p1", player_name="Test Player", is_starred=True))
     item = queue.dequeue()
     assert item is None
-    print(f"    PASS — dequeue returned None under rate limit")
+    print(f"    PASS, dequeue returned None under rate limit")
 
-    # [4] Priority — starred before rostered-only
-    print("\n[4] Priority ordering — starred first...")
+    # [4] Priority, starred before rostered-only
+    print("\n[4] Priority ordering, starred first...")
     queue2 = NewsAnalysisQueue()
     queue2.enqueue(QueuedItem(news_id=1, player_id="p_rostered", player_name="Rostered", is_starred=False))
     queue2.enqueue(QueuedItem(news_id=2, player_id="p_starred", player_name="Starred", is_starred=True))
     first = queue2.dequeue()
     assert first is not None
     assert first.is_starred is True, f"Expected starred first, got is_starred={first.is_starred}"
-    print(f"    PASS — first dequeued: {first.player_name} (starred={first.is_starred})")
+    print(f"    PASS, first dequeued: {first.player_name} (starred={first.is_starred})")
 
     # [5] Duplicate prevention
     print("\n[5] Duplicate news_id rejected...")
@@ -178,13 +178,13 @@ def run_queue_tests():
     assert added1 is True
     assert added2 is False
     assert queue3.pending_count() == 1
-    print(f"    PASS — duplicate rejected, queue depth={queue3.pending_count()}")
+    print(f"    PASS, duplicate rejected, queue depth={queue3.pending_count()}")
 
     print("\n✅ All queue tests passed.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 3 — News Analysis Service (mocked Gemini)
+# SECTION 3, News Analysis Service (mocked Gemini)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_analysis_service_tests():
@@ -192,7 +192,7 @@ def run_analysis_service_tests():
     from unittest.mock import AsyncMock, patch, MagicMock
 
     print("\n" + "=" * 50)
-    print("NEWS ANALYSIS SERVICE — UNIT TESTS (mocked Gemini)")
+    print("NEWS ANALYSIS SERVICE, UNIT TESTS (mocked Gemini)")
     print("=" * 50)
 
     async def _test():
@@ -230,7 +230,7 @@ def run_analysis_service_tests():
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
         mock_db.flush = AsyncMock()
-        mock_db.add = MagicMock()  # Session.add() is sync — not a coroutine
+        mock_db.add = MagicMock()  # Session.add() is sync, not a coroutine
 
         with patch(
             "services.news_analysis_service._call_gemini",
@@ -246,7 +246,7 @@ def run_analysis_service_tests():
         assert result.stock_magnitude == "HIGH"
         assert result.confidence_score == 0.95
         assert result.contradictions_flagged is False
-        print("\n[1] PASS — Pass 1 BEARISH/HIGH with no context check")
+        print("\n[1] PASS, Pass 1 BEARISH/HIGH with no context check")
 
         # [2] HIGH magnitude blocked when confidence < 0.75
         print("\n[2] HIGH magnitude blocked at confidence=0.60...")
@@ -263,13 +263,13 @@ def run_analysis_service_tests():
         assert result2 is not None
         assert result2.stock_magnitude == "MEDIUM", \
             f"Expected MEDIUM (downgraded from HIGH), got {result2.stock_magnitude}"
-        print(f"    PASS — magnitude downgraded to {result2.stock_magnitude}")
+        print(f"    PASS, magnitude downgraded to {result2.stock_magnitude}")
 
         # [3] needs_context_check=True triggers Pass 2
         print("\n[3] needs_context_check=True → Pass 2 fires...")
         needs_check_response = {**pass1_response, "needs_context_check": True, "confidence_score": 0.80}
         pass2_response = {
-            "context_notes": "Prior report said he'd play — contradiction.",
+            "context_notes": "Prior report said he'd play, contradiction.",
             "contradictions_flagged": True,
             "contradiction_detail": "Monday practice report said full participant.",
             "final_confidence": 0.85,
@@ -297,14 +297,14 @@ def run_analysis_service_tests():
         assert result3.contradictions_flagged is True
         assert result3.contradiction_detail is not None
         assert call_count["n"] == 2, f"Expected 2 Gemini calls (Pass 1 + Pass 2), got {call_count['n']}"
-        print(f"    PASS — contradictions_flagged={result3.contradictions_flagged}, calls={call_count['n']}")
+        print(f"    PASS, contradictions_flagged={result3.contradictions_flagged}, calls={call_count['n']}")
 
     asyncio.run(_test())
     print("\n✅ All news analysis service tests passed.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SECTION 4 — /api/news router (TestClient)
+# SECTION 4, /api/news router (TestClient)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_router_tests():
@@ -317,7 +317,7 @@ def run_router_tests():
     app.dependency_overrides[get_current_user] = lambda: MagicMock(id=1, is_approved=True, clerk_id="test")
 
     print("\n" + "=" * 50)
-    print("/api/news ROUTER — INTEGRATION TESTS (mocked scraper)")
+    print("/api/news ROUTER, INTEGRATION TESTS (mocked scraper)")
     print("=" * 50)
 
     mock_scrape_summary = {
@@ -330,7 +330,7 @@ def run_router_tests():
         "queue_status": {"calls_in_window": 1, "calls_remaining": 9, "pending_items": 0, "window_resets_at": None},
     }
 
-    # Both requests share one TestClient — keeps one event loop alive across calls
+    # Both requests share one TestClient, keeps one event loop alive across calls
     with patch(
         "routers.news.scrape_and_analyze",
         new=AsyncMock(return_value=mock_scrape_summary)
@@ -348,13 +348,13 @@ def run_router_tests():
             assert "total" in data
             assert "season_type" in data
             assert "scrape_summary" in data
-            print(f"    PASS — status=200, total={data['total']}, season_type={data['season_type']}")
+            print(f"    PASS, status=200, total={data['total']}, season_type={data['season_type']}")
 
             # [2] force_refresh=true is accepted
             print("\n[2] GET /api/news?force_refresh=true returns 200...")
             resp = client.get("/api/news?force_refresh=true")
             assert resp.status_code == 200
-            print(f"    PASS — force_refresh accepted")
+            print(f"    PASS, force_refresh accepted")
 
     app.dependency_overrides.clear()
     print("\n✅ All router tests passed.")
@@ -364,7 +364,39 @@ def run_router_tests():
 # MAIN
 # ══════════════════════════════════════════════════════════════════════════════
 
+def run_async_client_tests():
+    """Both Gemini callers must await the SDK's async client (.aio). A sync
+    generate_content inside an async def blocks the whole FastAPI event loop."""
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from services import news_analysis_service, sentiment_service
+
+    print("\n" + "=" * 50)
+    print("GEMINI, ASYNC CLIENT (no event-loop blocking)")
+    print("=" * 50)
+
+    for svc in (news_analysis_service, sentiment_service):
+        client = MagicMock()
+        client.aio.models.generate_content = AsyncMock(return_value=MagicMock(text='{"ok": true}'))
+        with patch.object(svc, "_genai_client", client), \
+             patch.object(svc, "LLM_ENABLED", True), \
+             patch.object(svc.llm_budget, "can_spend", return_value=True), \
+             patch.object(svc.llm_budget, "record_call"):
+            out = asyncio.run(svc._call_gemini_text("prompt", "gemini-3.1-flash-lite"))
+        assert out == '{"ok": true}', out
+        assert client.aio.models.generate_content.await_count == 1
+        assert not client.models.generate_content.called, "sync client used, blocks the event loop"
+        print(f"    PASS, {svc.__name__.split('.')[-1]} awaits client.aio")
+    from services.utils import strip_dashes, WRITING_STYLE
+    assert strip_dashes("Hamstring issue — could sit") == "Hamstring issue, could sit"
+    assert strip_dashes("out 1–3 weeks") == "out 1-3 weeks"
+    assert "—" not in WRITING_STYLE and "em-dash" in WRITING_STYLE
+    print("    PASS, Gemini output is de-dashed (ranges keep a hyphen)")
+    print("\n✅ Async client tests passed.")
+
+
 if __name__ == "__main__":
+    run_async_client_tests()
     run_rule_filter_tests()
     run_classify_type_tests()
     run_queue_tests()

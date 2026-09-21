@@ -6,7 +6,7 @@ from database import Base
 
 
 class TrackedPlayer(Base):
-    """Per-user watchlist — any NFL player a user has starred."""
+    """Per-user watchlist, any NFL player a user has starred."""
     __tablename__ = "tracked_players"
 
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
@@ -70,7 +70,7 @@ class PlayerADPHistory(Base):
     adp_stdev = Column(Float, nullable=True)
     position_rank = Column(Integer, nullable=True)    # in-season: derived from ESPN weekly projections
     overall_rank = Column(Integer, nullable=True)
-    percent_rostered = Column(Float, nullable=True)   # ESPN % rostered — live in-season momentum
+    percent_rostered = Column(Float, nullable=True)   # ESPN % rostered, live in-season momentum
     recorded_at = Column(TIMESTAMP, server_default=func.now())
 
     # Relationships
@@ -79,17 +79,17 @@ class PlayerADPHistory(Base):
 
 class PlayerStockProfile(Base):
     """Full 4-pass Gemini stock analysis result for a tracked player.
-    One row per player — updated on re-analysis."""
+    One row per player, updated on re-analysis."""
     __tablename__ = "player_stock_profile"
 
     player_id = Column(String, ForeignKey("players.player_id"), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    # Pass 2 — overall stock
+    # Pass 2, overall stock
     overall_direction = Column(String, nullable=True)    # BULLISH/BEARISH/NEUTRAL
     overall_magnitude = Column(String, nullable=True)    # HIGH/MEDIUM/LOW
 
-    # Pass 3 — concern score
+    # Pass 3, concern score
     concern_level = Column(Integer, nullable=True)       # 1-10
     concern_summary = Column(Text, nullable=True)        # One direct sentence
     worry_score = Column(Integer, nullable=True)         # 1-10 (current news cycle)
@@ -101,7 +101,7 @@ class PlayerStockProfile(Base):
     adp_trend = Column(String, nullable=True)            # RISING/FALLING/STABLE
     adp_trend_delta = Column(Float, nullable=True)       # 14-day change
 
-    # Pass 4 — sentiment
+    # Pass 4, sentiment
     sentiment_score = Column(Float, nullable=True)       # -1.0 to 1.0
     sentiment_label = Column(String, nullable=True)
     sentiment_confidence = Column(Float, nullable=True)
@@ -111,7 +111,7 @@ class PlayerStockProfile(Base):
     alignment_note = Column(Text, nullable=True)
     contrarian_flag = Column(Boolean, default=False)
 
-    # Pass 1 — historical
+    # Pass 1, historical
     historical_context = Column(Text, nullable=True)     # 200-word career summary
     short_term_outlook = Column(Text, nullable=True)
     long_term_outlook = Column(Text, nullable=True)
@@ -125,7 +125,7 @@ class PlayerStockProfile(Base):
 
 
 class PlayerSentimentHistory(Base):
-    """Append-only sentiment snapshots per player — one row per completed analysis.
+    """Append-only sentiment snapshots per player, one row per completed analysis.
 
     Unlike player_stock_profile (which is overwritten each run to hold the CURRENT
     values), this table keeps every dated point so we can chart sentiment over time.
@@ -135,10 +135,10 @@ class PlayerSentimentHistory(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     player_id = Column(String, ForeignKey("players.player_id"), nullable=False, index=True)
-    sentiment_score = Column(Float, nullable=True)      # -1.0..1.0 — the primary line
+    sentiment_score = Column(Float, nullable=True)      # -1.0..1.0: the primary line
     sentiment_label = Column(String, nullable=True)
-    concern_level = Column(Integer, nullable=True)      # 1-10 — optional overlay line
+    concern_level = Column(Integer, nullable=True)      # 1-10, optional overlay line
     worry_score = Column(Integer, nullable=True)        # 1-10
     combined_score = Column(Float, nullable=True)
-    overall_direction = Column(String, nullable=True)   # BULLISH/BEARISH/NEUTRAL — point color
+    overall_direction = Column(String, nullable=True)   # BULLISH/BEARISH/NEUTRAL, point color
     recorded_at = Column(TIMESTAMP, server_default=func.now(), index=True)

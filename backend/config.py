@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv, find_dotenv
 
-# find_dotenv() walks up from this file's location to find .env — works regardless of CWD
+# find_dotenv() walks up from this file's location to find .env, works regardless of CWD
 load_dotenv(find_dotenv())
 
 DATABASE_URL: str = os.environ["DATABASE_URL"]
@@ -20,10 +20,10 @@ DEFAULT_WEIGHTS = {
 }
 
 # Gemini models (upgraded Sep 2026 from the 2.0 family)
-# Free tier is Flash-class only — Pro moved behind billing May 2026.
-# gemini-3.1-flash-lite: stable, cheap/high-volume primary — used for the cheap
+# Free tier is Flash-class only, Pro moved behind billing May 2026.
+# gemini-3.1-flash-lite: stable, cheap/high-volume primary, used for the cheap
 #   passes (news Pass 1, context regen; tracker Pass 1 + Pass 4).
-# gemini-3.7-flash:      stable, more capable fallback — used for the harder passes
+# gemini-3.7-flash:      stable, more capable fallback, used for the harder passes
 #   (news Pass 2 contradiction detection; tracker Pass 2 + Pass 3).
 # Override via env if Google shifts the current free Flash IDs (check AI Studio).
 GEMINI_PRIMARY = os.environ.get("GEMINI_PRIMARY", "gemini-3.1-flash-lite")
@@ -33,7 +33,7 @@ GEMINI_FALLBACK = os.environ.get("GEMINI_FALLBACK", "gemini-3.7-flash")
 GEMINI_CALLS_PER_WINDOW = 10
 
 # Global kill switch for all LLM/Gemini API calls. Set LLM_ENABLED=false in .env to
-# halt every Gemini call (news + tracker) without touching the network — pipelines
+# halt every Gemini call (news + tracker) without touching the network, pipelines
 # fall back to rule-based signals. Useful for testing the rest of the app for free.
 LLM_ENABLED: bool = os.environ.get("LLM_ENABLED", "true").strip().lower() not in ("false", "0", "no")
 
@@ -52,7 +52,7 @@ GEMINI_RPD_LIMITS: dict[str, int] = {
 }
 
 # ── Background scheduler (APScheduler, in-process) ──────────────────────────────
-# OFF by default so it never fires during tests/local dev — flip on in deployment.
+# OFF by default so it never fires during tests/local dev, flip on in deployment.
 # Two daily UTC jobs: ADP refresh (LLM-free) and sentiment refresh (LLM, budget-gated).
 SCHEDULER_ENABLED: bool = os.environ.get("SCHEDULER_ENABLED", "false").strip().lower() in ("true", "1", "yes")
 SCHEDULER_ADP_HOUR: int = int(os.environ.get("SCHEDULER_ADP_HOUR", "8"))          # daily ADP/rank refresh
@@ -72,3 +72,12 @@ CLERK_ADMIN_IDS: set[str] = {
 }
 
 AUTH_ENABLED: bool = bool(CLERK_SECRET_KEY)
+
+# Exact frontend origins (comma-separated). One list drives BOTH CORS and the Clerk
+# `azp` check. Exact strings only, Starlette CORS does not expand wildcards.
+# Production: add the Vercel URL, e.g. ALLOWED_ORIGINS=https://fantas-ai.vercel.app
+ALLOWED_ORIGINS: list[str] = [
+    s.strip() for s in os.environ.get(
+        "ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"
+    ).split(",") if s.strip()
+]

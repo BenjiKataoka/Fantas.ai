@@ -1,5 +1,5 @@
 """
-Settings router — per-user projection weight management.
+Settings router, per-user projection weight management.
 
 GET  /api/settings  → returns current weights for the placeholder user
 PUT  /api/settings  → validates and saves new weights to the users table
@@ -65,7 +65,7 @@ async def update_settings(
         f"sleeper={body.weight_sleeper} espn={body.weight_espn} fp={body.weight_fp}"
     )
 
-    # Return the same shape as GET (weights only) — a mixed-in message field would
+    # Return the same shape as GET (weights only), a mixed-in message field would
     # pollute the frontend weights object and break slider redistribution.
     return {
         "weight_sleeper": user.weight_sleeper,

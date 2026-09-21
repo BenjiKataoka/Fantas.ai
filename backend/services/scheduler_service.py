@@ -4,7 +4,7 @@ Autonomous background scheduler (APScheduler, in-process).
 Two daily UTC jobs:
   - Market refresh (LLM-free): append today's ESPN rank/ADP/%rostered per tracked player.
   - Sentiment refresh (LLM):   re-analyze STALE tracked players, appending sentiment
-                               history — budget/RPD-gated, paced, overlap-guarded.
+                               history, budget/RPD-gated, paced, overlap-guarded.
 
 Gated behind SCHEDULER_ENABLED so it never fires in tests/dev. The job functions are
 independently callable (and exposed via admin endpoints) for on-demand runs + testing;
@@ -27,7 +27,7 @@ _scheduler: Optional[AsyncIOScheduler] = None
 
 async def refresh_market_job() -> dict:
     """Append today's market snapshot for every tracked player (LLM-free):
-    ESPN in-season **position rank** (derived from weekly projections — moves as
+    ESPN in-season **position rank** (derived from weekly projections, moves as
     projections update), frozen ADP, and live **% rostered**.
 
     One ESPN pull covers the whole pool; players are matched by normalized name. In-season
@@ -45,7 +45,7 @@ async def refresh_market_job() -> dict:
     state = await get_nfl_state()
     pool = await espn_service.get_espn_market_pool(state["season"], state["week"])
     if not pool:
-        logger.warning("[Scheduler] ESPN market pool empty — skipping")
+        logger.warning("[Scheduler] ESPN market pool empty, skipping")
         return {"players": 0, "matched": 0, "missed": 0, "pool": 0}
 
     now = datetime.utcnow()
@@ -70,7 +70,7 @@ async def refresh_market_job() -> dict:
         await db.commit()
 
     result = {"players": len(players), "matched": matched, "missed": missed, "pool": len(pool)}
-    logger.info(f"[Scheduler] market refresh done — {result}")
+    logger.info(f"[Scheduler] market refresh done, {result}")
     return result
 
 
@@ -121,7 +121,7 @@ async def refresh_sentiment_job(force: bool = False) -> dict:
 
     global _sentiment_running
     if _sentiment_running:
-        logger.info("[Scheduler] sentiment refresh already running — skipping")
+        logger.info("[Scheduler] sentiment refresh already running, skipping")
         return {"status": "already_running"}
 
     _sentiment_running = True
@@ -131,7 +131,7 @@ async def refresh_sentiment_job(force: bool = False) -> dict:
         async with AsyncSessionLocal() as db:
             stale, skipped_fresh = await tracker_service.get_stale_trackable_players(db, force=force)
 
-        logger.info(f"[Scheduler] sentiment refresh starting — {len(stale)} stale, "
+        logger.info(f"[Scheduler] sentiment refresh starting, {len(stale)} stale, "
                     f"{skipped_fresh} fresh")
         rep_user_id = await _representative_user_id()
         loop = asyncio.get_event_loop()
@@ -142,7 +142,7 @@ async def refresh_sentiment_job(force: bool = False) -> dict:
             lite = snap["by_model"].get(GEMINI_PRIMARY, {})
             if snap["remaining"] < PASSES_PER_PLAYER or lite.get("remaining", 0) < PASSES_PER_PLAYER:
                 budget_stopped = True
-                logger.warning("[Scheduler] sentiment refresh halted — budget headroom "
+                logger.warning("[Scheduler] sentiment refresh halted, budget headroom "
                                f"below {PASSES_PER_PLAYER} passes; {analyzed} done, "
                                f"{len(stale) - analyzed} deferred to next run")
                 break
@@ -167,7 +167,7 @@ async def refresh_sentiment_job(force: bool = False) -> dict:
         "failed": failed,
         "budget_stopped": budget_stopped,
     }
-    logger.info(f"[Scheduler] sentiment refresh done — {result}")
+    logger.info(f"[Scheduler] sentiment refresh done, {result}")
     return result
 
 
@@ -177,7 +177,7 @@ def start_scheduler() -> None:
     """Start the scheduler if enabled. Idempotent; called from the FastAPI lifespan."""
     global _scheduler
     if not SCHEDULER_ENABLED:
-        logger.info("[Scheduler] disabled (SCHEDULER_ENABLED=false) — jobs run only on manual trigger")
+        logger.info("[Scheduler] disabled (SCHEDULER_ENABLED=false), jobs run only on manual trigger")
         return
     if _scheduler is not None:
         return
@@ -187,7 +187,7 @@ def start_scheduler() -> None:
     _scheduler.add_job(refresh_sentiment_job, CronTrigger(hour=SCHEDULER_SENTIMENT_HOUR, minute=0),
                        id="sentiment_refresh", replace_existing=True, max_instances=1, coalesce=True)
     _scheduler.start()
-    logger.info(f"[Scheduler] started — ADP @ {SCHEDULER_ADP_HOUR:02d}:00 UTC, "
+    logger.info(f"[Scheduler] started, ADP @ {SCHEDULER_ADP_HOUR:02d}:00 UTC, "
                 f"sentiment @ {SCHEDULER_SENTIMENT_HOUR:02d}:00 UTC")
 
 

@@ -40,7 +40,7 @@ class QueuedItem:
 class NewsAnalysisQueue:
     """
     In-memory queue with rolling window rate limiter.
-    Thread safety is not required — FastAPI runs in a single async event loop.
+    Thread safety is not required, FastAPI runs in a single async event loop.
     """
 
     def __init__(self):
@@ -140,7 +140,7 @@ class NewsAnalysisQueue:
 
 
 # ── Module-level singleton ─────────────────────────────────────────────────────
-# One queue per process — shared across all requests in the FastAPI event loop.
+# One queue per process, shared across all requests in the FastAPI event loop.
 _queue: Optional[NewsAnalysisQueue] = None
 
 

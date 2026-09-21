@@ -11,7 +11,7 @@ ADP trend = compare today vs 14 days ago across both sources.
   FALLING = worsened (higher ADP) by > 2 positions on average
   STABLE  = within ±2 positions
 
-Never raises — returns empty dict / STABLE on failure.
+Never raises, returns empty dict / STABLE on failure.
 """
 import logging
 from datetime import date, datetime, timedelta
@@ -48,7 +48,7 @@ ADP_HISTORY_RETENTION_DAYS = 400
 async def fetch_and_store_adp(player_id: str, player_name: str, db: AsyncSession) -> dict:
     """
     Fetch today's ADP from FFC + FantasyPros for a player and store a snapshot
-    in player_adp_history. Returns {ffc_adp, fp_adp} — values are None if not found.
+    in player_adp_history. Returns {ffc_adp, fp_adp}, values are None if not found.
 
     Prunes entries older than 30 days for this player to keep the table lean.
     """

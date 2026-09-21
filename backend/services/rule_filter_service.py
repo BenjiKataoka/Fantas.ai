@@ -17,9 +17,9 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # Keywords that map to a stock direction + magnitude + confidence without Gemini
-# Rules are evaluated in order — first match wins.
+# Rules are evaluated in order, first match wins.
 RULES = [
-    # BEARISH HIGH — playing status / serious injury
+    # BEARISH HIGH, playing status / serious injury
     {
         "patterns": [
             r"\bruled out\b",
@@ -37,7 +37,7 @@ RULES = [
         "news_type_hint": "INJURY",
         "offseason_significant": True,
     },
-    # BEARISH MEDIUM — soft injury / game-time doubt
+    # BEARISH MEDIUM, soft injury / game-time doubt
     {
         "patterns": [
             r"\bdoubtful\b",
@@ -57,7 +57,7 @@ RULES = [
         "news_type_hint": "INJURY",
         "offseason_significant": False,
     },
-    # BEARISH MEDIUM — roster / depth chart demotion
+    # BEARISH MEDIUM, roster / depth chart demotion
     {
         "patterns": [
             r"\bdemoted\b",
@@ -73,7 +73,7 @@ RULES = [
         "news_type_hint": "DEPTH_CHART",
         "offseason_significant": True,
     },
-    # BULLISH HIGH — return from injury / contract extension
+    # BULLISH HIGH, return from injury / contract extension
     {
         "patterns": [
             r"\bactivated from IR\b",
@@ -91,7 +91,7 @@ RULES = [
         "news_type_hint": "INJURY",
         "offseason_significant": True,
     },
-    # BULLISH MEDIUM — depth chart promotion / signing
+    # BULLISH MEDIUM, depth chart promotion / signing
     {
         "patterns": [
             r"\bnamed.*starter\b",
@@ -107,7 +107,7 @@ RULES = [
         "news_type_hint": "DEPTH_CHART",
         "offseason_significant": True,
     },
-    # NEUTRAL LOW — routine noise
+    # NEUTRAL LOW, routine noise
     {
         "patterns": [
             r"\blimited practice\b",
@@ -144,7 +144,7 @@ OFFSEASON_KEYWORDS = [
 ]
 
 
-# Category classifier — assigns a news_type even when NO direction rule fired, so
+# Category classifier, assigns a news_type even when NO direction rule fired, so
 # labeling no longer piggybacks on scoring. Order matters: first category wins.
 # Kept deliberately injury-forward (the most common + most actionable fantasy news);
 # ambiguous body-part words ("back", "quad") are omitted to avoid false positives.
@@ -163,7 +163,7 @@ NEWS_TYPE_KEYWORDS: list[tuple[str, list[str]]] = [
         r"\bholdout\b", r"\bguaranteed?\b", r"\bcap hit\b",
     ]),
     ("TRANSACTION", [
-        # "sign" needs transaction context — bare "sign"/"signs of" over-matches noise
+        # "sign" needs transaction context, bare "sign"/"signs of" over-matches noise
         # like "bad sign". Past-tense "signed" and "re-sign" are safe on their own.
         r"\bre-?signs?\b", r"\bsigned\b", r"\bsigns (?:with|to|for|a\b|an\b)",
         r"\bsigning (?:with|a\b|of\b|bonus)",
@@ -237,7 +237,7 @@ def apply_rule_filter(
                 )
                 return result
 
-    # No rule matched — check if this item is offseason-significant for the gate decision
+    # No rule matched, check if this item is offseason-significant for the gate decision
     is_offseason_significant = _is_offseason_significant(text)
 
     return FilterResult(
@@ -264,7 +264,7 @@ def should_run_gemini(
         return False
 
     if filter_result.matched:
-        # Rule already has a confident answer — Gemini not needed
+        # Rule already has a confident answer, Gemini not needed
         return False
 
     if season_type == "off":

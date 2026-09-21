@@ -1,11 +1,11 @@
 """
 Auth-adjacent endpoints:
 
-  GET  /api/me                       — current user's identity + role (any approved user)
-  GET  /api/admin/users              — list all users (admin only)
-  POST /api/admin/approve/{user_id}  — approve a pending user (admin only)
-  POST /api/admin/revoke/{user_id}   — revoke a user's access (admin only)
-  GET  /api/admin/llm-usage          — today's Gemini call budget (admin only)
+  GET  /api/me                      , current user's identity + role (any approved user)
+  GET  /api/admin/users             , list all users (admin only)
+  POST /api/admin/approve/{user_id} , approve a pending user (admin only)
+  POST /api/admin/revoke/{user_id}  , revoke a user's access (admin only)
+  GET  /api/admin/llm-usage         , today's Gemini call budget (admin only)
 
 The approval gate: new users are provisioned unapproved and get 403 on every data
 endpoint until an admin approves them here.
@@ -42,7 +42,7 @@ async def get_me(user: User = Depends(get_current_user)):
 
 @router.get("/admin/users")
 async def list_users(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    """All users, newest first — the approval queue."""
+    """All users, newest first, the approval queue."""
     result = await db.execute(select(User).order_by(User.created_at.desc().nullslast()))
     users = result.scalars().all()
     return {
@@ -112,8 +112,8 @@ async def run_sentiment_refresh(
     force: bool = False, admin: User = Depends(require_admin)
 ):
     """Manually trigger the sentiment refresh (LLM). Re-analyzes stale tracked players,
-    appending sentiment-history points. Spawned as a background task — a full pass can
-    take minutes — so this returns immediately. Poll /admin/llm-usage to watch spend."""
+    appending sentiment-history points. Spawned as a background task, a full pass can
+    take minutes, so this returns immediately. Poll /admin/llm-usage to watch spend."""
     import asyncio
 
     from services.scheduler_service import refresh_sentiment_job

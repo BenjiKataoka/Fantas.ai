@@ -11,8 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import SLEEPER_USERNAME
 assert SLEEPER_USERNAME, "SLEEPER_USERNAME must be set in .env"
 # LEAGUE_ID is resolved dynamically for the current season inside run_tests()
-# (never hardcode a season-specific league — it breaks on the yearly rollover).
-INVALID_LEAGUE_ID = "1180196968005595136"  # Dynasty league — should be rejected
+# (never hardcode a season-specific league, it breaks on the yearly rollover).
+INVALID_LEAGUE_ID = "1180196968005595136"  # Dynasty league, should be rejected
 
 
 async def run_tests():
@@ -32,12 +32,12 @@ async def run_tests():
         leagues = await get_eligible_leagues(user_id, season=season)
         assert isinstance(leagues, list), "Expected a list"
         assert len(leagues) >= 1, "Expected at least 1 eligible league"
-        LEAGUE_ID = leagues[0]["league_id"]  # dynamic — first eligible league this season
-        print(f"    PASS — {len(leagues)} eligible league(s) for season {season}:")
+        LEAGUE_ID = leagues[0]["league_id"]  # dynamic, first eligible league this season
+        print(f"    PASS, {len(leagues)} eligible league(s) for season {season}:")
         for l in leagues:
             print(f"           • {l['name']} ({l['league_id']})")
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
         return
 
     # Test 2: Dynasty league is filtered out
@@ -45,18 +45,18 @@ async def run_tests():
     try:
         ids = {l["league_id"] for l in leagues}
         assert INVALID_LEAGUE_ID not in ids, "Dynasty league should not appear in eligible list"
-        print(f"    PASS — dynasty league correctly excluded")
+        print(f"    PASS, dynasty league correctly excluded")
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
 
     # Async prep is done. TestClient requests run in a SEPARATE phase (run_client_tests)
-    # so they don't share this asyncio.run loop — otherwise asyncpg connections opened in
+    # so they don't share this asyncio.run loop, otherwise asyncpg connections opened in
     # the request handler get stuck on a closed loop (see CLAUDE.md testing conventions).
     return LEAGUE_ID
 
 
 def run_client_tests(league_id):
-    """TestClient phase — runs after the async loop has closed. Uses the context-manager
+    """TestClient phase, runs after the async loop has closed. Uses the context-manager
     form so one anyio portal stays alive across both requests."""
     from fastapi import Depends
     from fastapi.testclient import TestClient
@@ -66,7 +66,7 @@ def run_client_tests(league_id):
     from models.user import User
 
     # /api/roster reads and mutates the user (credentials, weights), so return a real
-    # session-attached placeholder row (id=1) — the pre-auth behavior.
+    # session-attached placeholder row (id=1), the pre-auth behavior.
     async def _override_user(db=Depends(get_db)):
         user = await db.get(User, 1)
         if user is None:
@@ -86,7 +86,7 @@ def run_client_tests(league_id):
             data = resp.json()
             assert "roster" in data, "Missing 'roster' key"
             assert len(data["roster"]) > 0, "Roster is empty"
-            print(f"    PASS — {data['total_players']} players returned, {data['starters']} starters")
+            print(f"    PASS, {data['total_players']} players returned, {data['starters']} starters")
             print(f"           season_type={data.get('season_type')} week={data.get('week')}")
             print(f"           First 3 players:")
             for p in data["roster"][:3]:
@@ -97,12 +97,12 @@ def run_client_tests(league_id):
             missing = [k for p in data["roster"] for k in proj_keys if k not in p]
             if not missing:
                 sample = data["roster"][0]
-                print(f"    PASS — projection fields present on all players")
+                print(f"    PASS, projection fields present on all players")
                 print(f"           Sample: sleeper={sample['sleeper_proj']} espn={sample['espn_proj']} fp={sample['fp_proj']} weighted={sample['weighted_proj']} confidence={sample['confidence_flag']}")
             else:
-                print(f"    FAIL — missing projection keys: {set(missing)}")
+                print(f"    FAIL, missing projection keys: {set(missing)}")
         except Exception as e:
-            print(f"    FAIL — {e}")
+            print(f"    FAIL, {e}")
             return
 
         # Test 6: Invalid league ID is rejected
@@ -110,9 +110,9 @@ def run_client_tests(league_id):
         try:
             resp = client.get(f"/api/roster?sleeper_username={SLEEPER_USERNAME}&league_id={INVALID_LEAGUE_ID}")
             assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
-            print(f"    PASS — dynasty league correctly rejected with 400")
+            print(f"    PASS, dynasty league correctly rejected with 400")
         except Exception as e:
-            print(f"    FAIL — {e}")
+            print(f"    FAIL, {e}")
 
     app.dependency_overrides.clear()
     print("\n" + "=" * 50)
@@ -138,23 +138,23 @@ def verify_db():
         cur.execute("SELECT COUNT(*) FROM players WHERE sleeper_id IS NOT NULL")
         count = cur.fetchone()[0]
         if count > 0:
-            print(f"    PASS — {count} players saved in Neon")
+            print(f"    PASS, {count} players saved in Neon")
         else:
-            print(f"    FAIL — no players found in DB")
+            print(f"    FAIL, no players found in DB")
 
         # Test 5: my_roster populated
         print(f"\n[5] Verifying my_roster was populated in Neon...")
         cur.execute("SELECT COUNT(*) FROM my_roster WHERE user_id = 1")
         count = cur.fetchone()[0]
         if count > 0:
-            print(f"    PASS — {count} roster rows saved in Neon")
+            print(f"    PASS, {count} roster rows saved in Neon")
         else:
-            print(f"    FAIL — no roster rows found")
+            print(f"    FAIL, no roster rows found")
 
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"    FAIL — {e}")
+        print(f"    FAIL, {e}")
 
 
 if __name__ == "__main__":

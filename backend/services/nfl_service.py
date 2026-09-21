@@ -83,7 +83,7 @@ def _parse_espn_news(data: dict) -> list[dict]:
         published_str = article.get("published", "")
         published_at = _parse_espn_timestamp(published_str)
 
-        # Source URL — use web link if available
+        # Source URL, use web link if available
         links = article.get("links", {})
         web_href = links.get("web", {}).get("href")
         mobile_href = links.get("mobile", {}).get("href")
@@ -147,7 +147,7 @@ def _parse_espn_injuries(data: dict) -> list[dict]:
     items = []
     for injury in data.get("items", []):
         athlete_ref = injury.get("athlete", {})
-        # $ref links look like: .../athletes/12345 — extract the ID
+        # $ref links look like: .../athletes/12345, extract the ID
         athlete_url = athlete_ref.get("$ref", "")
         espn_athlete_id = athlete_url.rstrip("/").split("/")[-1] if athlete_url else None
 
@@ -233,7 +233,7 @@ async def get_teams_playing_today(force_refresh: bool = False) -> set[str]:
     """
     Returns a set of NFL team abbreviations (e.g. {"KC", "SF", "DAL"}) that
     have a game scheduled today, using the ESPN scoreboard endpoint.
-    Cache TTL: 1h — schedule doesn't change during the day.
+    Cache TTL: 1h, schedule doesn't change during the day.
     Returns empty set if the request fails or no games today.
     """
     from datetime import date

@@ -9,7 +9,7 @@ import { Toaster } from '@/components/ui/sonner'
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 if (!PUBLISHABLE_KEY) {
-  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY — run `clerk env pull` in frontend/')
+  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY. Run `clerk env pull` in frontend/')
 }
 
 createRoot(document.getElementById('root')).render(

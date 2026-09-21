@@ -1,3 +1,4 @@
+import { TriangleAlert } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { getLeagues } from '../services/api'
 import { useApp } from '../context/AppContext'
@@ -36,7 +37,7 @@ function WeightsSection() {
       title="Projection Weights"
       description="How Sleeper, ESPN, and FantasyPros projections are blended into the weighted score. Must total 100%."
     >
-      {!weightsLoaded ? <Spinner label="Loading weights…" /> : (
+      {!weightsLoaded ? <Spinner label="Loading weights..." /> : (
         <div className="flex flex-col gap-5 max-w-sm">
           <WeightSlider label="Sleeper"     value={weights.weight_sleeper} onChange={v => handleChange('weight_sleeper', v)} />
           <WeightSlider label="ESPN"        value={weights.weight_espn}    onChange={v => handleChange('weight_espn', v)} />
@@ -45,7 +46,7 @@ function WeightsSection() {
       )}
       <div className="flex items-center gap-4 mt-6">
         <button onClick={handleSave} disabled={!sumOk || saving} className={`px-4 py-2 ${btnPrimary}`}>
-          {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Weights'}
+          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Weights'}
         </button>
         <span className={`text-sm font-mono tabular-nums ${sumOk ? 'text-subtle' : 'text-bear'}`}>Total: {sum}%</span>
       </div>
@@ -111,7 +112,7 @@ function LeagueSection() {
               disabled={loading || !username.trim()}
               className="px-3 py-2 bg-raised hover:bg-line disabled:opacity-40 text-content text-sm rounded-lg border border-line transition-colors"
             >
-              {loading ? '…' : 'Find'}
+              {loading ? '...' : 'Find'}
             </button>
           </div>
         </div>
@@ -143,10 +144,10 @@ function ESPNSection() {
       description="ESPN S2 cookie and SWID are required to sync your ESPN roster and projections."
     >
       <div className="flex items-start gap-3 p-3 bg-warn/10 border border-warn/30 rounded-lg max-w-sm">
-        <span className="text-warn text-sm mt-0.5">⚠</span>
+        <TriangleAlert className="size-4 text-warn mt-0.5 shrink-0" />
         <p className="text-sm text-content/80">
-          ESPN credentials currently live in server config. Per-user ESPN entry is coming soon —
-          your current credentials are active and working.
+          ESPN credentials are set in the server config for now, and they're working.
+          Per-user ESPN login is planned.
         </p>
       </div>
     </Section>

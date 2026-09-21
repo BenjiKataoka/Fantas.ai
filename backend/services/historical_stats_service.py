@@ -4,7 +4,7 @@ Historical stats caching service.
 Pulls season-level stats from nflreadpy_service and stores them in the
 player_historical_stats table. Refreshes once per day.
 
-Never raises — returns {} on failure.
+Never raises, returns {} on failure.
 """
 import logging
 from datetime import datetime, timedelta
@@ -48,7 +48,7 @@ async def sync_historical_stats(
         if existing and not force_refresh:
             # Check freshness via the most recent season row
             # We use the DB's recorded_at if available, else just use existing data
-            # (PlayerHistoricalStats has no updated_at — treat any existing row as fresh
+            # (PlayerHistoricalStats has no updated_at, treat any existing row as fresh
             #  for the rest of this calendar day by using a simple in-memory guard)
             return _rows_to_dict(existing)
 

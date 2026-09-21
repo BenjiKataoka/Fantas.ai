@@ -1,7 +1,7 @@
 """
 Tests for the background scheduler (Phase 5).
 Covers: trackable-player collection, the ADP refresh job (success + per-player failure
-isolation), and start/shutdown gating. Job logic is tested directly — not cron timing.
+isolation), and start/shutdown gating. Job logic is tested directly, not cron timing.
 Usage: python3 tests/test_scheduler_service.py
 """
 import asyncio
@@ -27,7 +27,7 @@ class FakeSession:
 
 def run_trackable_tests():
     print("=" * 50)
-    print("SCHEDULER — TRACKABLE PLAYERS")
+    print("SCHEDULER, TRACKABLE PLAYERS")
     print("=" * 50)
 
     async def _test():
@@ -39,7 +39,7 @@ def run_trackable_tests():
         ]))
         res = await tracker_service.get_trackable_players(db)
         assert res == [("p1", "Alice"), ("p2", "Bob")], res
-        print(f"    PASS — {res}")
+        print(f"    PASS, {res}")
 
     asyncio.run(_test())
     print("✅ trackable players ok")
@@ -47,7 +47,7 @@ def run_trackable_tests():
 
 def run_market_job_tests():
     print("\n" + "=" * 50)
-    print("SCHEDULER — MARKET REFRESH JOB (ESPN rank + %rostered)")
+    print("SCHEDULER, MARKET REFRESH JOB (ESPN rank + %rostered)")
     print("=" * 50)
 
     pool = {
@@ -74,7 +74,7 @@ def run_market_job_tests():
         # verify a stored row carries rank + %rostered
         row = mock_db.add.call_args_list[0][0][0]
         assert row.source == "ESPN" and row.position_rank == 3 and row.percent_rostered == 99.9
-        print(f"    PASS — {res}, first row RB{row.position_rank}, {row.percent_rostered}% rostered")
+        print(f"    PASS, {res}, first row RB{row.position_rank}, {row.percent_rostered}% rostered")
 
         # [2] Empty pool (ESPN down) → no-op, no crash
         print("\n[2] Empty ESPN pool → skip cleanly...")
@@ -83,7 +83,7 @@ def run_market_job_tests():
              patch("services.espn_service.get_espn_market_pool", new=AsyncMock(return_value={})):
             res = await scheduler_service.refresh_market_job()
         assert res == {"players": 0, "matched": 0, "missed": 0, "pool": 0}, res
-        print(f"    PASS — {res}")
+        print(f"    PASS, {res}")
 
     asyncio.run(_test())
     print("✅ market job ok")
@@ -91,7 +91,7 @@ def run_market_job_tests():
 
 def run_sentiment_job_tests():
     print("\n" + "=" * 50)
-    print("SCHEDULER — SENTIMENT REFRESH JOB (stale-only + budget gate)")
+    print("SCHEDULER, SENTIMENT REFRESH JOB (stale-only + budget gate)")
     print("=" * 50)
 
     async def _test():
@@ -118,7 +118,7 @@ def run_sentiment_job_tests():
             res = await scheduler_service.refresh_sentiment_job()
         assert res == {"stale": 2, "analyzed": 2, "skipped_fresh": 3, "failed": 0, "budget_stopped": False}, res
         assert analyzed == ["p1", "p2"], analyzed
-        print(f"    PASS — {res}")
+        print(f"    PASS, {res}")
 
         # [2] Budget below a full player's passes → stops before spending, none analyzed
         print("\n[2] Budget headroom below 4 passes → halts cleanly...")
@@ -134,7 +134,7 @@ def run_sentiment_job_tests():
             res = await scheduler_service.refresh_sentiment_job()
         assert res["budget_stopped"] is True and res["analyzed"] == 0, res
         assert spy.await_count == 0, spy.await_count
-        print(f"    PASS — {res}")
+        print(f"    PASS, {res}")
 
         # [3] Overlap guard rejects a concurrent run
         print("\n[3] Already-running guard...")
@@ -144,7 +144,7 @@ def run_sentiment_job_tests():
             assert res == {"status": "already_running"}, res
         finally:
             scheduler_service._sentiment_running = False
-        print(f"    PASS — {res}")
+        print(f"    PASS, {res}")
 
     asyncio.run(_test())
     print("✅ sentiment job ok")
@@ -152,7 +152,7 @@ def run_sentiment_job_tests():
 
 def run_lifecycle_tests():
     print("\n" + "=" * 50)
-    print("SCHEDULER — START/SHUTDOWN GATING")
+    print("SCHEDULER, START/SHUTDOWN GATING")
     print("=" * 50)
     from services import scheduler_service
 
@@ -162,7 +162,7 @@ def run_lifecycle_tests():
     with patch("services.scheduler_service.SCHEDULER_ENABLED", False):
         scheduler_service.start_scheduler()
     assert scheduler_service._scheduler is None
-    print("    PASS — nothing started when disabled")
+    print("    PASS, nothing started when disabled")
 
     # [2] Enabled → creates scheduler, registers both jobs, starts; shutdown clears it
     print("\n[2] SCHEDULER_ENABLED=true → wires both jobs...")
@@ -177,7 +177,7 @@ def run_lifecycle_tests():
         scheduler_service.shutdown_scheduler()
         assert inst.shutdown.called
         assert scheduler_service._scheduler is None
-    print("    PASS — 2 jobs registered, start+shutdown called")
+    print("    PASS, 2 jobs registered, start+shutdown called")
 
 
 if __name__ == "__main__":

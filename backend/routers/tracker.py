@@ -1,11 +1,11 @@
 """
 Player Tracker endpoints.
 
-POST   /api/tracker/star/{player_id}        — star a player, triggers profile generation
-DELETE /api/tracker/star/{player_id}        — unstar a player
-GET    /api/tracker                         — all starred players with stock profiles
-GET    /api/tracker/{player_id}             — single player detail
-POST   /api/tracker/refresh/{player_id}     — manually re-run 4-pass analysis
+POST   /api/tracker/star/{player_id}       , star a player, triggers profile generation
+DELETE /api/tracker/star/{player_id}       , unstar a player
+GET    /api/tracker                        , all starred players with stock profiles
+GET    /api/tracker/{player_id}            , single player detail
+POST   /api/tracker/refresh/{player_id}    , manually re-run 4-pass analysis
 
 user_id is a placeholder until Clerk auth is wired in Phase 5.
 """
@@ -123,7 +123,7 @@ async def star_player(
 ):
     """
     Star a player. Triggers the 4-pass Gemini stock analysis in the background.
-    The profile may take 15-30 seconds to generate — poll GET /api/tracker/{player_id}
+    The profile may take 15-30 seconds to generate, poll GET /api/tracker/{player_id}
     and check profile_ready=true.
     """
     result = await tracker_service.star_player(user.id, player_id, db)
@@ -141,7 +141,7 @@ async def unstar_player(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Unstar a player (soft delete — stock profile is retained)."""
+    """Unstar a player (soft delete, stock profile is retained)."""
     result = await tracker_service.unstar_player(user.id, player_id, db)
     await db.commit()
 
@@ -179,7 +179,7 @@ async def analyze_roster(
 ):
     """
     Deep-dive every player on the user's roster in the background (skipping any with a
-    fresh profile). Returns immediately with queued/skipped counts — poll
+    fresh profile). Returns immediately with queued/skipped counts, poll
     GET /api/tracker/roster-analysis to watch it complete. Pass force=true to re-run
     even fresh profiles.
     """
@@ -232,7 +232,7 @@ async def refresh_tracker_player(
 ):
     """
     Manually re-run the 4-pass Gemini analysis for a starred player.
-    Use sparingly — each call consumes 4 Gemini API requests.
+    Use sparingly, each call consumes 4 Gemini API requests.
     """
     success = await tracker_service.refresh_profile(user.id, player_id, db, reason="manual")
     await db.commit()

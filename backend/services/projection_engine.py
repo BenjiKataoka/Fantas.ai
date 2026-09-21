@@ -20,7 +20,7 @@ def compute_weighted_projection(
     """
     Computes a weighted average across available projection sources.
 
-    weights: {"sleeper": float, "espn": float, "fp": float} — must sum to 1.0.
+    weights: {"sleeper": float, "espn": float, "fp": float}, must sum to 1.0.
     If None, DEFAULT_WEIGHTS from config is used.
 
     If a source value is None, its weight is redistributed proportionally

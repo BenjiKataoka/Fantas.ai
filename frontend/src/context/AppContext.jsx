@@ -77,7 +77,7 @@ export function AppProvider({ children }) {
       const res = await getNews(forceRefresh)
       setNewsData(res.data)
     } catch {
-      // silently fail — news is optional
+      // silently fail, news is optional
     } finally {
       setNewsLoading(false)
     }
@@ -100,7 +100,7 @@ export function AppProvider({ children }) {
       const res = await getStartSit(wk)
       setStartSitData(res.data)
     } catch {
-      // silently fail — start/sit is optional (e.g. no projections synced yet)
+      // silently fail, start/sit is optional (e.g. no projections synced yet)
     } finally {
       setStartSitLoading(false)
     }
@@ -148,7 +148,7 @@ export function AppProvider({ children }) {
         await fetchRoster()
         return
       }
-      toast.success(`Analyzing ${data.queued} player${data.queued > 1 ? 's' : ''}…`)
+      toast.success(`Analyzing ${data.queued} player${data.queued > 1 ? 's' : ''}...`)
       setAnalysis({ running: true, ready: data.skipped_fresh, total: data.total, pending: data.queued })
       pollAnalysis()
     } catch (err) {
@@ -197,7 +197,7 @@ export function AppProvider({ children }) {
     setSaveError(null)
     try {
       const res = await updateSettings(newWeights)
-      // Store ONLY weight keys — a stray response field would corrupt balanceWeights (→ NaN).
+      // Store ONLY weight keys, a stray response field would corrupt balanceWeights (→ NaN).
       const { weight_sleeper, weight_espn, weight_fp } = res.data
       setWeights({ weight_sleeper, weight_espn, weight_fp })
       toast.success('Projection weights saved')

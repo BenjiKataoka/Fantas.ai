@@ -20,7 +20,7 @@ from services.utils import normalize_name  # re-exported for external use
 
 logger = logging.getLogger(__name__)
 
-# Cache for NFL state — avoids hitting Sleeper on every roster request
+# Cache for NFL state, avoids hitting Sleeper on every roster request
 _nfl_state_cache: dict = {}
 
 
@@ -29,7 +29,7 @@ async def get_nfl_state() -> dict:
     """
     Returns current NFL state from Sleeper: {week, season, season_type}.
     season_type values: "pre", "regular", "post", "off"
-    Cached for 1 hour — avoids a live API call on every roster request.
+    Cached for 1 hour, avoids a live API call on every roster request.
     Defaults to {week: 1, season: 2025, season_type: "off"} if unavailable.
 
     """

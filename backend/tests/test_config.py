@@ -23,22 +23,22 @@ def run_tests():
         )
         print("\n[1] Config imported successfully")
     except Exception as e:
-        print(f"\n[1] FAIL — could not import config: {e}")
+        print(f"\n[1] FAIL, could not import config: {e}")
         return
 
     # DATABASE_URL
     if DATABASE_URL and DATABASE_URL.startswith("postgresql+asyncpg://"):
-        print("[2] PASS — DATABASE_URL present and uses asyncpg driver")
+        print("[2] PASS, DATABASE_URL present and uses asyncpg driver")
     else:
-        print(f"[2] FAIL — DATABASE_URL missing or wrong format: {DATABASE_URL!r}")
+        print(f"[2] FAIL, DATABASE_URL missing or wrong format: {DATABASE_URL!r}")
 
     # GEMINI_API_KEY
     if GEMINI_API_KEY and len(GEMINI_API_KEY) > 10:
-        print("[3] PASS — GEMINI_API_KEY present")
+        print("[3] PASS, GEMINI_API_KEY present")
     else:
-        print("[3] FAIL — GEMINI_API_KEY missing or too short")
+        print("[3] FAIL, GEMINI_API_KEY missing or too short")
 
-    # Optional credentials — warn but don't fail
+    # Optional credentials, warn but don't fail
     from config import ESPN_LEAGUE_ID, ESPN_S2, SWID, SLEEPER_USERNAME
     optional = {
         "ESPN_LEAGUE_ID": ESPN_LEAGUE_ID,
@@ -55,9 +55,9 @@ def run_tests():
     weights = DEFAULT_WEIGHTS
     total = sum(weights.values())
     if abs(total - 1.0) < 0.001:
-        print(f"\n[5] PASS — default weights sum to 1.0: {weights}")
+        print(f"\n[5] PASS, default weights sum to 1.0: {weights}")
     else:
-        print(f"\n[5] FAIL — weights do not sum to 1.0: {weights} (sum={total})")
+        print(f"\n[5] FAIL, weights do not sum to 1.0: {weights} (sum={total})")
 
     # Gemini model names
     print(f"\n[6] Gemini primary model: {GEMINI_PRIMARY}")

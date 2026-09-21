@@ -2,7 +2,7 @@
 Tests for the RSS news source (Phase 5+).
 Covers: name matching + scoping, HTML/body handling, published parsing, the min-length
 name filter, empty-scope short-circuit, per-feed failure isolation, and caching.
-Network + feedparser are mocked — no real feeds are hit.
+Network + feedparser are mocked, no real feeds are hit.
 Usage: python3 tests/test_rss_service.py
 """
 import asyncio
@@ -22,25 +22,25 @@ def _entry(title, summary="", link="https://ex.com/a", published=(2026, 9, 18, 1
 
 
 def run_helper_tests():
-    print("=" * 50); print("RSS — HELPERS"); print("=" * 50)
+    print("=" * 50); print("RSS, HELPERS"); print("=" * 50)
 
     assert rss_service._strip_html("<p>Hello <b>world</b></p>") == "Hello world"
-    print("    PASS — strip_html")
+    print("    PASS, strip_html")
 
     dt = rss_service._parse_published(_entry("x"))
     assert dt == datetime(2026, 9, 18, 14, 30, 0), dt
     assert rss_service._parse_published(SimpleNamespace()) is None
-    print("    PASS — parse_published (struct + missing)")
+    print("    PASS, parse_published (struct + missing)")
 
     # min-length filter drops "Ja"; dedups; keeps punctuated names normalized
     m = dict(rss_service._build_matcher(["Nico Collins", "Ja", "A.J. Brown", "Nico Collins"]))
     assert m == {"nico collins": "Nico Collins", "aj brown": "A.J. Brown"}, m
-    print("    PASS — build_matcher (min-len + dedup)")
+    print("    PASS, build_matcher (min-len + dedup)")
     print("✅ helpers ok")
 
 
 def run_match_tests():
-    print("\n" + "=" * 50); print("RSS — MATCH + SCOPE"); print("=" * 50)
+    print("\n" + "=" * 50); print("RSS, MATCH + SCOPE"); print("=" * 50)
 
     feed = [
         ("PFT",   _entry("Nico Collins (hamstring) uncertain for Week 2", "<p>The Texans WR is banged up.</p>", "https://pft.com/1")),
@@ -64,11 +64,11 @@ def run_match_tests():
         assert nico["source"] == "PFT"
         assert nico["news_body"] == "The Texans WR is banged up."      # HTML stripped
         assert nico["published_at"] == datetime(2026, 9, 18, 14, 30, 0)
-        print("    PASS — matched Nico, correct fields + HTML strip")
+        print("    PASS, matched Nico, correct fields + HTML strip")
 
         lamb = by_url["https://cbs.com/3"]
         assert len(lamb["news_body"]) == rss_service._MAX_BODY            # body truncated
-        print("    PASS — matched CeeDee, body truncated to cap")
+        print("    PASS, matched CeeDee, body truncated to cap")
         print(f"    (unrelated + no-link items dropped: {len(feed)} in → {len(items)} out)")
 
     asyncio.run(_test())
@@ -76,14 +76,14 @@ def run_match_tests():
 
 
 def run_edgecase_tests():
-    print("\n" + "=" * 50); print("RSS — EMPTY SCOPE / FAILURE / CACHE"); print("=" * 50)
+    print("\n" + "=" * 50); print("RSS, EMPTY SCOPE / FAILURE / CACHE"); print("=" * 50)
 
     async def _empty():
         spy = AsyncMock(return_value=[])
         with patch.object(rss_service, "_fetch_feed", new=spy):
             out = await rss_service.fetch_rss_news([], force_refresh=True)
         assert out == [] and spy.await_count == 0, (out, spy.await_count)
-        print("    PASS — empty scope short-circuits (no network)")
+        print("    PASS, empty scope short-circuits (no network)")
     asyncio.run(_empty())
 
     async def _isolation():
@@ -112,7 +112,7 @@ def run_edgecase_tests():
         # PFT failed but the other 3 feeds still produced matched items.
         assert len(out) >= 1, out
         assert all(i["player_name"] == "Nico Collins" for i in out)
-        print(f"    PASS — dead feed isolated, {len(out)} items from surviving feeds")
+        print(f"    PASS, dead feed isolated, {len(out)} items from surviving feeds")
     asyncio.run(_isolation())
 
     async def _cache():
@@ -125,7 +125,7 @@ def run_edgecase_tests():
             b = await rss_service.fetch_rss_news(["Nico Collins"], force_refresh=False)  # served from cache
         assert len(a) == 1 and len(b) == 1
         assert spy.await_count == 1, f"cache miss: fetched {spy.await_count}x"
-        print("    PASS — second call served from cache (no re-fetch)")
+        print("    PASS, second call served from cache (no re-fetch)")
     asyncio.run(_cache())
     print("✅ edge cases ok")
 

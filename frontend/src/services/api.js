@@ -5,7 +5,7 @@ const api = axios.create({
   timeout: 30000,
 })
 
-// Clerk token injection — a component inside <ClerkProvider> registers getToken here,
+// Clerk token injection, a component inside <ClerkProvider> registers getToken here,
 // and every request attaches the current session JWT for the backend to verify.
 let _tokenGetter = null
 export function setTokenGetter(fn) {
@@ -18,13 +18,13 @@ api.interceptors.request.use(async (config) => {
       const token = await _tokenGetter()
       if (token) config.headers.Authorization = `Bearer ${token}`
     } catch {
-      // no token available (signed out) — request goes through unauthenticated
+      // no token available (signed out), request goes through unauthenticated
     }
   }
   return config
 })
 
-// Log errors centrally — individual hooks handle UI state
+// Log errors centrally, individual hooks handle UI state
 api.interceptors.response.use(
   (res) => res,
   (err) => {

@@ -1,8 +1,8 @@
 """
 ESPN Fantasy API integration via direct httpx calls (no espn-api library).
 
-- get_espn_projections: Public endpoint — no auth required.
-- get_espn_roster: Authenticated roster sync — requires ESPN_S2 + SWID cookies.
+- get_espn_projections: Public endpoint, no auth required.
+- get_espn_roster: Authenticated roster sync, requires ESPN_S2 + SWID cookies.
 """
 import json
 import logging
@@ -68,7 +68,7 @@ async def get_espn_projections_full(
 ) -> tuple[dict[str, float], dict[str, float]]:
     """
     Fetches ESPN public projected fantasy points for all skill-position players.
-    No authentication required. Single fetch, cached — returns TWO views:
+    No authentication required. Single fetch, cached, returns TWO views:
       (by_espn_id, by_normalized_name)
 
     The name map is a fallback for players whose Sleeper record has no espn_id
@@ -77,7 +77,7 @@ async def get_espn_projections_full(
 
     Sorted by PPR draft rank so the returned pool is the fantasy-relevant players
     (an unplayed week has no applied totals to sort on). Projections are read from
-    each player's stats array — see _extract_espn_proj.
+    each player's stats array, see _extract_espn_proj.
     """
     cache_key = f"espn_proj_{season}_{week}"
     cached = _get_cache(cache_key)
@@ -140,7 +140,7 @@ async def get_espn_market_pool(season: int, week: int) -> dict[str, dict]:
       { norm_name: {espn_id, position, position_rank, overall_rank, adp, percent_rostered} }
 
     In-season, ADP is frozen, so the meaningful "rank" is derived from ESPN's WEEKLY
-    projected points (higher points = better rank), grouped by position — this moves as
+    projected points (higher points = better rank), grouped by position, this moves as
     projections update. ADP and % rostered come from each player's ownership block.
     Players with no projection this week (bye/inactive) keep null ranks but still carry
     ADP / % rostered. Cached 6h.
@@ -245,10 +245,10 @@ async def get_espn_roster(
                 params={"view": ["mTeam", "mRoster"]},
             )
             if resp.status_code == 401:
-                logger.error("[ESPN] get_espn_roster: 401 — ESPN cookies expired or invalid")
+                logger.error("[ESPN] get_espn_roster: 401, ESPN cookies expired or invalid")
                 return []
             if resp.status_code == 404:
-                logger.error(f"[ESPN] get_espn_roster: 404 — league {league_id} not found for season {season}")
+                logger.error(f"[ESPN] get_espn_roster: 404, league {league_id} not found for season {season}")
                 return []
             resp.raise_for_status()
             data = resp.json()

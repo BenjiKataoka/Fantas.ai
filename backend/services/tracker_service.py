@@ -72,7 +72,7 @@ async def star_player(
 
         await db.flush()
 
-        # Trigger analysis (fire-and-forget — don't block the API response)
+        # Trigger analysis (fire-and-forget, don't block the API response)
         asyncio.create_task(_run_analysis_for_player(user_id, player_id, player, db))
 
         return {"status": "starred", "player_id": player_id}
@@ -193,7 +193,7 @@ async def refresh_profile(
 
 # User IDs with a roster deep-dive currently in flight. Prevents a second click (or a
 # second browser tab) from spawning a duplicate worker and doubling Gemini spend.
-# In-memory only — cleared on process restart, which is fine for a soft guard.
+# In-memory only, cleared on process restart, which is fine for a soft guard.
 _roster_runs: set[int] = set()
 
 
@@ -206,7 +206,7 @@ async def _season_ttl_hours(db: AsyncSession) -> float:
         state = await get_nfl_state()
         return 24.0 if state.get("season_type") == "off" else 6.0
     except Exception:
-        return 24.0  # conservative default — avoids needless re-analysis on a state miss
+        return 24.0  # conservative default, avoids needless re-analysis on a state miss
 
 
 async def _profile_is_fresh(player_id: str, db: AsyncSession, ttl_hours: float) -> bool:
@@ -228,7 +228,7 @@ async def analyze_roster(user_id: int, db: AsyncSession, force: bool = False) ->
 
     Profiles are global (keyed by player_id), so this reuses analysis another user
     already paid for. Runs as a single paced background worker to respect the
-    Flash-Lite rate limit — returns immediately with the queued/skipped counts.
+    Flash-Lite rate limit, returns immediately with the queued/skipped counts.
     """
     player_ids = (
         await db.execute(select(MyRoster.player_id).where(MyRoster.user_id == user_id))
@@ -265,7 +265,7 @@ async def analyze_roster(user_id: int, db: AsyncSession, force: bool = False) ->
 async def get_trackable_players(db: AsyncSession) -> list[tuple[str, str]]:
     """Distinct (player_id, name) for every player anyone rosters or has starred.
 
-    The scheduler refreshes exactly this set — never all of NFL — and it's deduped
+    The scheduler refreshes exactly this set, never all of NFL, and it's deduped
     because ADP/profiles are global (keyed by player_id).
     """
     stmt = text(
@@ -286,7 +286,7 @@ async def get_stale_trackable_players(
     """Split the global trackable set into (stale, count_of_fresh_skipped).
 
     "Stale" = no complete profile, or one older than the season-aware TTL. This is the
-    scheduler's work list — fresh profiles are reused, never re-analyzed.
+    scheduler's work list, fresh profiles are reused, never re-analyzed.
     """
     players = await get_trackable_players(db)
     ttl = await _season_ttl_hours(db)
@@ -301,7 +301,7 @@ async def analyze_one_player(user_id: int, player_id: str) -> bool:
     """Load a player and run the full 4-pass profile. Returns True if it ran.
 
     Public entry point for callers outside a request (the scheduler) that have only a
-    player_id. Opens its own sessions — same as the fire-and-forget analysis path.
+    player_id. Opens its own sessions, same as the fire-and-forget analysis path.
     """
     from database import AsyncSessionLocal
 
@@ -374,7 +374,7 @@ async def _run_analysis_for_player(
     user_id: int,
     player_id: str,
     player: Player,
-    db: AsyncSession,  # kept for signature compatibility but NOT used — session is closed by the time this task runs
+    db: AsyncSession,  # kept for signature compatibility but NOT used, session is closed by the time this task runs
 ) -> None:
     """
     Assembles context and runs the 4-pass Gemini pipeline.
@@ -493,7 +493,7 @@ async def _get_current_projection(player_id: str, db: AsyncSession) -> Optional[
 def _append_sentiment_snapshot(player_id: str, result: dict, db: AsyncSession) -> None:
     """Append one dated sentiment point for the over-time graph.
 
-    Skips degraded runs (null sentiment_score) — a null point is useless on a chart,
+    Skips degraded runs (null sentiment_score), a null point is useless on a chart,
     and the freshness-retry will re-run and bank a real point once scoring succeeds.
     Added to the session; committed by the caller alongside the profile upsert.
     """
@@ -588,7 +588,7 @@ def serialize_stock_profile(profile: Optional[PlayerStockProfile]) -> Optional[d
 
     Returns None when there's no finished analysis, so callers can show an
     "not analyzed yet" state. Omits the 200-word historical_context to keep roster
-    payloads light — the tracker detail view fetches that separately.
+    payloads light, the tracker detail view fetches that separately.
     """
     if not profile or not profile.last_full_analysis:
         return None
@@ -636,17 +636,17 @@ async def get_stock_profiles_for(player_ids: list[str], db: AsyncSession) -> dic
 
 # range → (window length, SQL date_trunc bucket or None for raw points)
 _RANGE_CONFIG = {
-    "1w":     (timedelta(days=7),   None),    # raw points — recent detail
+    "1w":     (timedelta(days=7),   None),    # raw points, recent detail
     "1m":     (timedelta(days=31),  "day"),   # daily average
-    "season": (timedelta(days=240), "week"),  # weekly average — whole trail
+    "season": (timedelta(days=240), "week"),  # weekly average, whole trail
 }
 
 
 async def get_sentiment_history(player_id: str, rng: str, db: AsyncSession) -> dict:
     """Chart-ready metric series for one player, downsampled by range.
 
-    Returns the real per-date metrics — sentiment, concern, overall ADP, and position
-    rank — each on its own scale; the frontend focuses one metric at a time on a real,
+    Returns the real per-date metrics, sentiment, concern, overall ADP, and position
+    rank, each on its own scale; the frontend focuses one metric at a time on a real,
     player-scaled axis. Aggregated server-side (date_trunc + AVG): 1w = raw, 1m = daily
     average, season = weekly average. ADP/rank are joined from player_adp_history.
     """
@@ -689,7 +689,7 @@ async def get_sentiment_history(player_id: str, rng: str, db: AsyncSession) -> d
     s_rows = (await db.execute(s_stmt, sp)).mappings().all()
     a_rows = (await db.execute(a_stmt, ap)).mappings().all()
 
-    # Merge on the UNION of dates from both tables — market metrics (rank/%rostered)
+    # Merge on the UNION of dates from both tables, market metrics (rank/%rostered)
     # accrue on their own schedule and must show even on dates with no sentiment point.
     sent_by_t = {
         r["t"].date().isoformat(): (

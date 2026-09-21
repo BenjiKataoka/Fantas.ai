@@ -39,14 +39,14 @@ function importance(i) {
 const recency = (i) => (i.published_at ? new Date(i.published_at).getTime() : 0)
 
 /**
- * AlertFeed — a curated (not chronological) sidebar of the roster's meaningful news.
+ * AlertFeed: a curated (not chronological) sidebar of the roster's meaningful news.
  * Filters to actionable items, keeps the single most-important alert per player, and
  * ranks by importance then recency so one player can't flood the feed.
  *
  * Props:
- *   items     — news cards from AppContext newsData.news
- *   playerMap — { player_id: { name, position } } from rosterData
- *   maxItems  — max alerts to display (default 6)
+ *   items: news cards from AppContext newsData.news
+ *   playerMap: { player_id: { name, position } } from rosterData
+ *   maxItems: max alerts to display (default 6)
  */
 export default function AlertFeed({ items = [], playerMap = {}, maxItems = 6 }) {
   // 1) keep only meaningful items, 2) best one per player, 3) rank, 4) cap.

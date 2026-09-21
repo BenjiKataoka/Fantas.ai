@@ -14,7 +14,7 @@ function tier(v) {
   return { arrow: '·', color: 'text-warn' }
 }
 
-const SPEED = 0.3 // px per frame (~18px/s) — a calm drift
+const SPEED = 0.3 // px per frame (~18px/s), a calm drift
 
 export default function Ticker() {
   const { rosterData } = useApp()
