@@ -47,3 +47,6 @@ Thumbs.db
 # Markdown planning/memory files
 *.md
 memory/
+
+# graphify knowledge graph (generated, rebuild with: graphify update .)
+graphify-out/

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import {
   Show, SignInButton, SignUpButton, UserButton,
   ClerkLoading, ClerkLoaded,
@@ -128,6 +128,27 @@ function ErrorScreen() {
   )
 }
 
+// Routed content, keyed on the path so each navigation replays a subtle enter
+// transition (fade + slight rise). Pages read shared state from AppContext, so the
+// per-route remount is cheap. Must live inside <BrowserRouter> to use useLocation.
+function RoutedMain({ isAdmin }) {
+  const location = useLocation()
+  return (
+    <main className="max-w-7xl mx-auto px-6 py-8">
+      <div key={location.pathname} className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out">
+        <Routes location={location}>
+          <Route path="/"         element={<Dashboard />} />
+          <Route path="/news"     element={<NewsHub />} />
+          <Route path="/tracker"  element={<PlayerTracker />} />
+          <Route path="/startsit" element={<StartSit />} />
+          <Route path="/settings" element={<Settings />} />
+          {isAdmin && <Route path="/admin" element={<Admin />} />}
+        </Routes>
+      </div>
+    </main>
+  )
+}
+
 // ── Authenticated app (post sign-in) ──────────────────────────────────────────
 
 function AuthedApp() {
@@ -157,16 +178,7 @@ function AuthedApp() {
       <div className="min-h-screen bg-ink text-content">
         <NavBar isAdmin={me?.is_admin} />
         <Ticker />
-        <main className="max-w-7xl mx-auto px-6 py-8">
-          <Routes>
-            <Route path="/"         element={<Dashboard />} />
-            <Route path="/news"     element={<NewsHub />} />
-            <Route path="/tracker"  element={<PlayerTracker />} />
-            <Route path="/startsit" element={<StartSit />} />
-            <Route path="/settings" element={<Settings />} />
-            {me?.is_admin && <Route path="/admin" element={<Admin />} />}
-          </Routes>
-        </main>
+        <RoutedMain isAdmin={me?.is_admin} />
       </div>
     </BrowserRouter>
   )
