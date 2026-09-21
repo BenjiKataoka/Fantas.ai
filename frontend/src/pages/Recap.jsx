@@ -6,7 +6,7 @@ import { RecapSkeleton } from '../components/Skeletons'
 import { REVEAL } from '@/lib/utils'
 
 const SOURCE_NAMES = { sleeper: 'Sleeper', espn: 'ESPN', fp: 'FantasyPros', weighted: 'Your blend' }
-const POS_COLORS = { QB: 'text-violet-300', RB: 'text-teal-300', WR: 'text-sky-300', TE: 'text-amber-300' }
+const POS_COLORS = { QB: 'text-pos-qb', RB: 'text-pos-rb', WR: 'text-pos-wr', TE: 'text-pos-te' }
 
 const fmt = (v) => (v == null ? '-' : v.toFixed(1))
 const Num = ({ children, className = '' }) => <span className={`font-mono tabular-nums ${className}`}>{children}</span>

@@ -1,10 +1,12 @@
 import { Toaster as SonnerToaster } from 'sonner'
+import { useTheme } from '@/lib/theme'
 
-// App-wide toast host, dark themed to match the UI. Use `toast()` from 'sonner' to fire.
+// App-wide toast host, follows the light/dark theme. Use `toast()` from 'sonner' to fire.
 export function Toaster(props) {
+  const theme = useTheme()
   return (
     <SonnerToaster
-      theme="dark"
+      theme={theme}
       richColors
       position="bottom-right"
       toastOptions={{

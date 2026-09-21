@@ -8,10 +8,10 @@ const SLOT_ORDER = { QB: 0, RB: 1, WR: 2, TE: 3, FLEX: 4, K: 5 }
 
 // Position/slot tints kept clear of the bull-green / bear-red market colors.
 const SLOT_COLORS = {
-  QB:   'text-violet-300',
-  RB:   'text-teal-300',
-  WR:   'text-sky-300',
-  TE:   'text-amber-300',
+  QB:   'text-pos-qb',
+  RB:   'text-pos-rb',
+  WR:   'text-pos-wr',
+  TE:   'text-pos-te',
   FLEX: 'text-brand',
   K:    'text-subtle',
 }

@@ -1,70 +1,105 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* ── The Fantasy Exchange, design tokens ──────────────────────────────────────
-   Ink trading-floor base, one violet brand accent, green/red reserved for market
-   direction. Mono tabular figures are the "terminal" signal. */
-@theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Space Grotesk', 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+/* ── Design tokens: a day game (light) and a night game (dark) ─────────────────
+   Utilities point at CSS variables, so the whole app re-themes by swapping the
+   variable set on <html>. The accent is ink in light mode and white in dark mode;
+   first-down yellow (--mark) is reserved for "the line to beat". */
+@theme inline {
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Saira Condensed', 'IBM Plex Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
 
-  --color-ink: #0a0d14;
-  --color-surface: #12161f;
-  --color-raised: #171c27;
-  --color-line: #242b3a;
-  --color-content: #e7eaf2;
-  --color-subtle: #8892a6;
+  --color-ink: var(--page);          /* page background (name kept from the old palette) */
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-content: var(--content);
+  --color-subtle: var(--subtle);
 
-  --color-brand: #7c5cff;
-  --color-brand-fg: #f5f3ff;
-  --color-bull: #34d399;
-  --color-bear: #f76b6b;
-  --color-warn: #f5b841;
+  --color-brand: var(--brand);
+  --color-brand-fg: var(--brand-fg);
+  --color-bull: var(--bull);
+  --color-bear: var(--bear);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
+  --color-mark: var(--mark);
+  --color-mark-fg: var(--mark-fg);
+
+  --color-pos-qb: var(--pos-qb);
+  --color-pos-rb: var(--pos-rb);
+  --color-pos-wr: var(--pos-wr);
+  --color-pos-te: var(--pos-te);
 
   /* shadcn token → color-utility mapping (skeleton/tooltip/sonner inherit these) */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+  --color-background: var(--page);
+  --color-foreground: var(--content);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--content);
+  --color-popover: var(--raised);
+  --color-popover-foreground: var(--content);
+  --color-primary: var(--brand);
+  --color-primary-foreground: var(--brand-fg);
+  --color-muted: var(--raised);
+  --color-muted-foreground: var(--subtle);
+  --color-accent: var(--raised);
+  --color-accent-foreground: var(--content);
+  --color-destructive: var(--bear);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--content);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
 }
 
-/* shadcn semantic vars, set to the Exchange palette so its components match. */
+/* Day game: newsprint white, ink type. */
 :root {
-  --radius: 0.625rem;
-  --background: #0a0d14;
-  --foreground: #e7eaf2;
-  --card: #12161f;
-  --card-foreground: #e7eaf2;
-  --popover: #171c27;
-  --popover-foreground: #e7eaf2;
-  --primary: #7c5cff;
-  --primary-foreground: #f5f3ff;
-  --secondary: #171c27;
-  --secondary-foreground: #e7eaf2;
-  --muted: #171c27;
-  --muted-foreground: #8892a6;
-  --accent: #1c2230;
-  --accent-foreground: #e7eaf2;
-  --destructive: #f76b6b;
-  --border: #242b3a;
-  --input: #2a3242;
-  --ring: #7c5cff;
+  color-scheme: light;
+  --radius: 0.5rem;
+  --page: #f6f7f5;
+  --surface: #ffffff;
+  --raised: #eef0ed;
+  --line: #dcdfdb;
+  --content: #121417;
+  --subtle: #5f656d;
+  --brand: #121417;
+  --brand-fg: #ffffff;
+  --bull: #0e7a3f;
+  --bear: #c22233;
+  --warn: #9a5b00;
+  --info: #0f6e6e;
+  --mark: #f2d200;
+  --mark-fg: #121417;   /* ink on yellow in both modes */
+  --pos-qb: #9a4a12;
+  --pos-rb: #0f6e6e;
+  --pos-wr: #1f5fad;
+  --pos-te: #8a2f6b;
+  --chart-grid: rgb(18 20 23 / 0.08);
+  --chart-label: rgb(18 20 23 / 0.5);
+}
+
+/* Night game: navy, not black; floodlight-white type. */
+:root.dark {
+  color-scheme: dark;
+  --page: #0f141b;
+  --surface: #151c25;
+  --raised: #1c2530;
+  --line: #2a3440;
+  --content: #eef2f6;
+  --subtle: #8b96a3;
+  --brand: #eef2f6;
+  --brand-fg: #0f141b;
+  --bull: #3fb97a;
+  --bear: #f0525f;
+  --warn: #f5a524;
+  --info: #4fc7c0;
+  --pos-qb: #f0b35a;
+  --pos-rb: #4fc7c0;
+  --pos-wr: #7db3f5;
+  --pos-te: #e08bc4;
+  --chart-grid: rgb(255 255 255 / 0.07);
+  --chart-label: rgb(255 255 255 / 0.45);
 }
 
 @layer base {

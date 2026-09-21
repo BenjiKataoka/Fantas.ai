@@ -1,4 +1,5 @@
-import { TriangleAlert, Hourglass } from 'lucide-react'
+import { TriangleAlert, Hourglass, Sun, Moon } from 'lucide-react'
+import { useTheme, setTheme } from '@/lib/theme'
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import {
@@ -10,6 +11,7 @@ import NewsHub from './pages/NewsHub'
 import PlayerTracker from './pages/PlayerTracker'
 import StartSit from './pages/StartSit'
 import Recap from './pages/Recap'
+import Waivers from './pages/Waivers'
 import Settings from './pages/Settings'
 import Admin from './pages/Admin'
 import Spinner from './components/Spinner'
@@ -21,15 +23,32 @@ const NAV_LINKS = [
   { to: '/news',     label: 'News' },
   { to: '/tracker',  label: 'Tracker' },
   { to: '/startsit', label: 'Start/Sit' },
+  { to: '/waivers',  label: 'Waivers' },
   { to: '/recap',    label: 'Recap' },
   { to: '/settings', label: 'Settings' },
 ]
 
 function BrandMark({ className = '' }) {
   return (
-    <span className={`font-display font-bold tracking-tight select-none ${className}`}>
-      <span className="text-brand">◆</span> <span className="text-content">FANTAS</span><span className="text-brand">.</span><span className="text-content">AI</span>
+    <span className={`font-display font-bold uppercase tracking-wide text-content select-none ${className}`}>
+      Fantas.ai
     </span>
+  )
+}
+
+function ThemeToggle() {
+  const theme = useTheme()
+  const next = theme === 'dark' ? 'light' : 'dark'
+  const Icon = theme === 'dark' ? Sun : Moon
+  return (
+    <button
+      onClick={() => setTheme(next)}
+      aria-label={`Switch to ${next} mode`}
+      title={`Switch to ${next} mode`}
+      className="rounded-md p-1.5 text-subtle hover:text-content hover:bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-content/30"
+    >
+      <Icon className="size-4" />
+    </button>
   )
 }
 
@@ -54,7 +73,8 @@ function NavBar({ isAdmin }) {
           {label}
         </NavLink>
       ))}
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-3">
+        <ThemeToggle />
         <UserButton afterSignOutUrl="/" />
       </div>
     </nav>
@@ -75,8 +95,7 @@ function Landing() {
   return (
     <CenteredShell>
       <BrandMark className="text-4xl" />
-      <p className="text-content text-lg font-display mt-5 mb-1">The player stock exchange.</p>
-      <p className="text-subtle text-sm mb-8">
+      <p className="text-subtle text-sm mt-5 mb-8">
         Projections from three sources, news and sentiment tracking, and weekly start/sit calls for your redraft PPR league.
       </p>
       <div className="flex items-center justify-center gap-3">
@@ -147,6 +166,7 @@ function RoutedMain({ isAdmin }) {
           <Route path="/tracker"  element={<PlayerTracker />} />
           <Route path="/startsit" element={<StartSit />} />
           <Route path="/recap"    element={<Recap />} />
+          <Route path="/waivers"  element={<Waivers />} />
           <Route path="/settings" element={<Settings />} />
           {isAdmin && <Route path="/admin" element={<Admin />} />}
         </Routes>

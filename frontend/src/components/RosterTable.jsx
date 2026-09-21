@@ -1,11 +1,12 @@
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import InjuryBadge from './InjuryBadge'
 import ProjectionBar from './ProjectionBar'
 import ConfidenceBadge from './ConfidenceBadge'
 import PlayerAvatar from './PlayerAvatar'
 import StockSection from './StockSection'
+import CollapseRow from './CollapseRow'
 
 // Concern is 1-10 from the AI analysis. 8+ is rare (2 of 15 on a typical roster), so the
 // icon stays meaningful instead of decorating everyone.
@@ -36,10 +37,10 @@ function ConcernFlag({ stock }) {
 
 // Position tints chosen to stay clear of the bull-green / bear-red market colors.
 const POS_COLORS = {
-  QB: 'text-violet-300',
-  RB: 'text-teal-300',
-  WR: 'text-sky-300',
-  TE: 'text-amber-300',
+  QB: 'text-pos-qb',
+  RB: 'text-pos-rb',
+  WR: 'text-pos-wr',
+  TE: 'text-pos-te',
   K:  'text-subtle',
 }
 
@@ -69,39 +70,6 @@ function StartSitCell({ rec }) {
     <span className="px-1.5 py-0.5 rounded bg-raised border border-line text-subtle text-xs font-medium">
       SIT
     </span>
-  )
-}
-
-// Expansion row that animates open (down) AND closed (up). Stays mounted through the
-// close transition, then unmounts once the collapse finishes.
-function CollapseRow({ open, colSpan, children }) {
-  const [render, setRender] = useState(open)
-  const [expanded, setExpanded] = useState(false)
-
-  useEffect(() => {
-    if (open) {
-      setRender(true)
-      // Two rAFs so the browser paints the 0fr state before we flip to 1fr, otherwise
-      // it mounts already-open and the transition never runs.
-      const id = requestAnimationFrame(() => requestAnimationFrame(() => setExpanded(true)))
-      return () => cancelAnimationFrame(id)
-    }
-    setExpanded(false)  // triggers the collapse; unmount happens on transitionend
-  }, [open])
-
-  if (!render) return null
-  return (
-    <tr>
-      <td colSpan={colSpan} className="p-0 bg-ink/30 border-l-2 border-brand">
-        <div
-          className="collapse-row"
-          style={{ gridTemplateRows: expanded ? '1fr' : '0fr', opacity: expanded ? 1 : 0 }}
-          onTransitionEnd={(e) => { if (!open && e.propertyName === 'grid-template-rows') setRender(false) }}
-        >
-          <div>{children}</div>
-        </div>
-      </td>
-    </tr>
   )
 }
 

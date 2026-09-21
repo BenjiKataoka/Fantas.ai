@@ -18,7 +18,7 @@ from models.news import PlayerNews, NewsAnalysis
 from models.player import Player
 from models.roster import MyRoster
 from models.tracker import TrackedPlayer, PlayerStockProfile, PlayerSentimentHistory
-from services import adp_service, historical_stats_service, nflreadpy_service, sentiment_service
+from services import adp_service, historical_stats_service, nflreadpy_service, sentiment_service, sleeper_service
 from services.projection_service import get_nfl_state
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,16 @@ async def star_player(
 
         player = await db.get(Player, player_id)
         if not player:
-            return {"status": "error", "detail": "Player not found"}
+            # Free agents from the waiver wire usually aren't in our pool yet.
+            sp = (await sleeper_service.get_all_players()).get(player_id)
+            if not sp or not sp.get("full_name"):
+                return {"status": "error", "detail": "Player not found"}
+            espn_id = str(sp["espn_id"]) if sp.get("espn_id") is not None else None
+            player = Player(player_id=player_id, name=sp["full_name"], position=sp.get("position"),
+                            nfl_team=sp.get("team"), sleeper_id=player_id, espn_id=espn_id,
+                            espn_athlete_id=espn_id, injury_status=sp.get("injury_status") or "Active")
+            db.add(player)
+            await db.flush()
 
         if existing:
             existing.is_active = True

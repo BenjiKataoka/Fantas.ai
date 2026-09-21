@@ -84,29 +84,28 @@ async def get_eligible_leagues(user_id: str, season: int = CURRENT_SEASON) -> li
     return eligible
 
 
-async def get_roster(league_id: str, user_id: str) -> Optional[dict]:
-    """Returns the roster belonging to user_id in the given league."""
-    cache_key = f"sleeper_roster_{league_id}_{user_id}"
+async def get_league_rosters(league_id: str) -> list:
+    """Every roster in a league. Cached 15 min since waiver claims change ownership."""
+    cache_key = f"sleeper_rosters_{league_id}"
     cached = _get_cache(cache_key)
     if cached:
         return cached
-
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{SLEEPER_BASE}/league/{league_id}/rosters", timeout=10
-            )
+            resp = await client.get(f"{SLEEPER_BASE}/league/{league_id}/rosters", timeout=10)
             resp.raise_for_status()
-            rosters = resp.json()
-            my_roster = next(
-                (r for r in rosters if r.get("owner_id") == user_id), None
-            )
-            if my_roster:
-                _set_cache(cache_key, my_roster, ttl_hours=6)
-            return my_roster
+            data = resp.json() or []
+            _set_cache(cache_key, data, ttl_hours=0.25)
+            return data
     except Exception as e:
-        logger.error(f"[Sleeper] get_roster failed for league {league_id}: {e}")
-        return None
+        logger.error(f"[Sleeper] get_league_rosters failed for league {league_id}: {e}")
+        return []
+
+
+async def get_roster(league_id: str, user_id: str) -> Optional[dict]:
+    """Returns the roster belonging to user_id in the given league."""
+    rosters = await get_league_rosters(league_id)
+    return next((r for r in rosters if r.get("owner_id") == user_id), None)
 
 
 async def get_league(league_id: str) -> Optional[dict]:
@@ -210,7 +209,7 @@ async def get_projections(season: int, week: int) -> dict:
 
 async def get_trending_players(trend_type: str = "add", limit: int = 25) -> list:
     """trend_type: 'add' or 'drop'"""
-    cache_key = f"sleeper_trending_{trend_type}"
+    cache_key = f"sleeper_trending_{trend_type}_{limit}"
     cached = _get_cache(cache_key)
     if cached:
         return cached

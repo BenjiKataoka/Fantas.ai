@@ -10,7 +10,7 @@ import StockSection from '../components/StockSection'
 import TrendChart, { METRICS } from '../components/TrendChart'
 import PlayerSearchModal from '../components/PlayerSearchModal'
 
-const POS_COLORS = { QB: 'text-violet-300', RB: 'text-teal-300', WR: 'text-sky-300', TE: 'text-amber-300', K: 'text-subtle' }
+const POS_COLORS = { QB: 'text-pos-qb', RB: 'text-pos-rb', WR: 'text-pos-wr', TE: 'text-pos-te', K: 'text-subtle' }
 const RANGES = [{ k: '1w', label: '1W' }, { k: '1m', label: '1M' }, { k: 'season', label: 'Season' }]
 const METRIC_KEYS = ['rank', 'rostered', 'sentiment', 'concern', 'adp']
 
@@ -252,7 +252,7 @@ export default function PlayerTracker() {
                   className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
                     metric === k ? 'text-content' : 'text-subtle hover:text-content'
                   }`}
-                  style={metric === k ? { background: `${METRICS[k].color}22`, boxShadow: `inset 0 0 0 1px ${METRICS[k].color}55` } : undefined}
+                  style={metric === k ? { background: `color-mix(in srgb, ${METRICS[k].color} 13%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${METRICS[k].color} 35%, transparent)` } : undefined}
                 >{METRICS[k].label}</button>
               ))}
             </div>

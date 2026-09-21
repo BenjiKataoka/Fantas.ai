@@ -3,6 +3,9 @@ import { useState } from 'react'
 // Single-metric chart. Every metric is drawn so UP = BETTER, on a real axis labeled
 // with actual values and auto-scaled to THIS player's range (so a WR3 and a WR9 each
 // get a fitted axis). `betterHigh` flips the orientation; `domain:'auto'` fits the data.
+// Metric line colors are fixed on purpose (each metric keeps its identity in both themes);
+// the grid and labels follow the theme through CSS variables, applied via style props
+// because SVG attributes don't resolve var().
 export const METRICS = {
   rank: {
     label: 'Position Rank', color: '#7C5CFF', betterHigh: false, domain: 'auto',
@@ -77,9 +80,9 @@ export default function TrendChart({ points = [], metric = 'rank', position = ''
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full select-none" preserveAspectRatio="xMidYMid meet" onMouseLeave={() => setHover(null)}>
         <defs>
           <linearGradient id="goodbad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#34D399" stopOpacity="0.10" />
-            <stop offset="50%" stopColor="#34D399" stopOpacity="0" />
-            <stop offset="100%" stopColor="#F76B6B" stopOpacity="0.10" />
+            <stop offset="0%" style={{ stopColor: 'var(--bull)', stopOpacity: 0.10 }} />
+            <stop offset="50%" style={{ stopColor: 'var(--bull)', stopOpacity: 0 }} />
+            <stop offset="100%" style={{ stopColor: 'var(--bear)', stopOpacity: 0.10 }} />
           </linearGradient>
         </defs>
 
@@ -89,23 +92,23 @@ export default function TrendChart({ points = [], metric = 'rank', position = ''
         {/* axis ticks + gridlines */}
         {ticks.map((tk, i) => (
           <g key={i}>
-            <line x1={padL} x2={W - padR} y1={tk.y} y2={tk.y} stroke="rgba(255,255,255,0.06)" />
-            <text x={padL - 8} y={tk.y + 3} fontSize="10" fill="rgba(255,255,255,0.45)" textAnchor="end" fontFamily="monospace">
+            <line x1={padL} x2={W - padR} y1={tk.y} y2={tk.y} style={{ stroke: 'var(--chart-grid)' }} />
+            <text x={padL - 8} y={tk.y + 3} fontSize="10" style={{ fill: 'var(--chart-label)' }} textAnchor="end" fontFamily="monospace">
               {m.value(tk.v, position)}
             </text>
           </g>
         ))}
 
         {/* hover guide */}
-        {hover != null && <line x1={hoverX} x2={hoverX} y1={padT} y2={H - padB} stroke="rgba(255,255,255,0.16)" />}
+        {hover != null && <line x1={hoverX} x2={hoverX} y1={padT} y2={H - padB} style={{ stroke: 'var(--chart-label)', strokeOpacity: 0.4 }} />}
 
         {/* the metric line */}
-        <path d={line} fill="none" stroke={m.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-        {vals.map(d => <circle key={d.i} cx={xFor(d.i)} cy={yFor(d.v)} r={hover === d.i ? 4 : 2.4} fill={m.color} />)}
+        <path d={line} fill="none" style={{ stroke: m.color }} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        {vals.map(d => <circle key={d.i} cx={xFor(d.i)} cy={yFor(d.v)} r={hover === d.i ? 4 : 2.4} style={{ fill: m.color }} />)}
 
         {/* x-axis date labels */}
         {labelIdx.map(i => (
-          <text key={i} x={xFor(i)} y={H - 6} fontSize="10" fill="rgba(255,255,255,0.4)"
+          <text key={i} x={xFor(i)} y={H - 6} fontSize="10" style={{ fill: 'var(--chart-label)' }}
                 textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'} fontFamily="monospace">
             {fmtDate(points[i].t)}
           </text>

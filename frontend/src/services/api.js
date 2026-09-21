@@ -72,6 +72,12 @@ export const getStartSit = (week) => api.get(`/startsit/${week}`)
 export const getRecap = (week, sleeperUsername, leagueId) =>
   api.get(`/recap/${week}`, { params: { sleeper_username: sleeperUsername, league_id: leagueId } })
 
+export const getWaivers = (sleeperUsername, leagueId) =>
+  api.get('/waivers', { params: { sleeper_username: sleeperUsername, league_id: leagueId } })
+
+export const analyzeFreeAgent = (playerId, sleeperUsername, leagueId) =>
+  api.post(`/waivers/analyze/${playerId}`, null, { params: { sleeper_username: sleeperUsername, league_id: leagueId } })
+
 // --- Auth / Admin ---
 export const getMe = () => api.get('/me')
 export const getAdminUsers = () => api.get('/admin/users')

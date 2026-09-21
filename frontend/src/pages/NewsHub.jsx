@@ -33,9 +33,9 @@ function formatSource(source) {
 // news_type → chip styling. Presentational only, no LLM, the type is scraped.
 const TYPE_STYLES = {
   INJURY:      { label: 'Injury',      cls: 'text-bear border-bear/30 bg-bear/10' },
-  TRANSACTION: { label: 'Transaction', cls: 'text-teal-300 border-teal-400/30 bg-teal-400/10' },
+  TRANSACTION: { label: 'Transaction', cls: 'text-info border-info/30 bg-info/10' },
   CONTRACT:    { label: 'Contract',    cls: 'text-brand border-brand/30 bg-brand/10' },
-  DEPTH_CHART: { label: 'Depth Chart', cls: 'text-amber-300 border-amber-400/30 bg-amber-400/10' },
+  DEPTH_CHART: { label: 'Depth Chart', cls: 'text-warn border-warn/30 bg-warn/10' },
   PERFORMANCE: { label: 'Performance', cls: 'text-bull border-bull/30 bg-bull/10' },
   GENERAL:     { label: 'News',        cls: 'text-subtle border-line bg-raised' },
 }

@@ -7,10 +7,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Saira+Condensed:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <title>Fantas.ai — The Fantasy Exchange</title>
+    <title>Fantas.ai</title>
+    <!-- Set the theme before first paint so there's no flash of the wrong mode. -->
+    <script>
+      try {
+        var t = localStorage.getItem('theme')
+        if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        document.documentElement.classList.toggle('dark', t === 'dark')
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

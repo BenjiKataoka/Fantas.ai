@@ -3,8 +3,8 @@ import { useState, useEffect, useRef } from 'react'
 import { searchPlayers, starPlayer } from '../services/api'
 
 const POS_COLORS = {
-  QB: 'text-violet-300', RB: 'text-teal-300',
-  WR: 'text-sky-300', TE: 'text-amber-300', K: 'text-subtle',
+  QB: 'text-pos-qb', RB: 'text-pos-rb',
+  WR: 'text-pos-wr', TE: 'text-pos-te', K: 'text-subtle',
 }
 
 /**

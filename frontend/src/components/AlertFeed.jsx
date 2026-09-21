@@ -19,8 +19,8 @@ const SIGNAL     = new Set(['BULLISH', 'BEARISH'])
 
 const TYPE_LABEL = {
   INJURY:      { text: 'Injury',      cls: 'text-bear' },
-  TRANSACTION: { text: 'Transaction', cls: 'text-teal-300' },
-  DEPTH_CHART: { text: 'Depth',       cls: 'text-amber-300' },
+  TRANSACTION: { text: 'Transaction', cls: 'text-info' },
+  DEPTH_CHART: { text: 'Depth',       cls: 'text-warn' },
   CONTRACT:    { text: 'Contract',    cls: 'text-brand' },
 }
 
