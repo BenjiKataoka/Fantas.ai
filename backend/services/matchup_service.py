@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 OUT = {"Out", "IR", "PUP", "Sus", "NFI"}     # won't play: projects zero
 WARN = {"Questionable", "Doubtful"}          # might not play: flag, keep the projection
 EASTERN = ZoneInfo("America/New_York")
+SLEEPER_AVATAR = "https://sleepercdn.com/avatars/thumbs/{avatar}"
 # ponytail: fixed spread for weekly fantasy scores; fit it from real results once we
 # store final scores, if the percentages feel off.
 SCORE_SD = 25.0
@@ -189,10 +190,14 @@ async def sleeper_matchup(league: dict, sleeper_user_id: str, week: int, all_pla
              if pid not in starter_ids and pid not in (mine.get("reserve") or [])]
     opp_roster = next((r for r in rosters if opp and r.get("roster_id") == opp.get("roster_id")), {})
     owner = next((u for u in users if u.get("user_id") == opp_roster.get("owner_id")), {})
+    me_user = next((u for u in users if u.get("user_id") == sleeper_user_id), {})
     s = mine.get("settings") or {}
     return {
         "you": you, "bench": bench, "opp": lineup(opp) if opp else [],
         "opp_name": (owner.get("metadata") or {}).get("team_name") or owner.get("display_name") or "Opponent",
+        "opp_logo": SLEEPER_AVATAR.format(avatar=owner["avatar"]) if owner.get("avatar") else None,
+        "my_name": (me_user.get("metadata") or {}).get("team_name") or me_user.get("display_name"),
+        "my_logo": SLEEPER_AVATAR.format(avatar=me_user["avatar"]) if me_user.get("avatar") else None,
         "record": f"{s.get('wins', 0)}-{s.get('losses', 0)}" + (f"-{s['ties']}" if s.get("ties") else ""),
         "url": f"https://sleeper.com/leagues/{league['league_id']}/team",
     }
@@ -226,6 +231,8 @@ async def espn_matchup(league: dict, user, season: int, week: int, all_players: 
     return {
         "you": you, "bench": bench, "opp": split(theirs, opp_team)[0] if theirs else [],
         "opp_name": (opp_team or {}).get("name") or "Opponent",
+        "opp_logo": (opp_team or {}).get("logo"),
+        "my_name": me.get("name"), "my_logo": me.get("logo"),
         "record": f"{rec.get('wins', 0)}-{rec.get('losses', 0)}" + (f"-{rec['ties']}" if rec.get("ties") else ""),
         "url": f"https://fantasy.espn.com/football/team?leagueId={league['league_id']}&teamId={me['id']}&seasonId={season}",
     }
@@ -254,7 +261,9 @@ async def sleeper_week(league: dict, sleeper_user_id: str, week: int, all_player
     owner = next((u for u in users if u.get("user_id") == opp_roster.get("owner_id")), {})
     graded = week_result(players, (info or {}).get("roster_positions") or [], me.get("points") or 0.0,
                          opp.get("points") if opp else None)
-    return {**graded, "opp_name": (owner.get("metadata") or {}).get("team_name") or owner.get("display_name") or "Opponent"}
+    return {**graded,
+            "opp_name": (owner.get("metadata") or {}).get("team_name") or owner.get("display_name") or "Opponent",
+            "opp_logo": SLEEPER_AVATAR.format(avatar=owner["avatar"]) if owner.get("avatar") else None}
 
 
 async def espn_week(league: dict, user, season: int, week: int, all_players: dict) -> dict | None:
@@ -279,4 +288,4 @@ async def espn_week(league: dict, user, season: int, week: int, all_players: dic
     opp_team = next((t for t in data.get("teams") or [] if theirs and t.get("id") == theirs.get("teamId")), {})
     graded = week_result(players, espn_service.espn_roster_positions(data), mine.get("totalPoints") or 0.0,
                          theirs.get("totalPoints") if theirs else None)
-    return {**graded, "opp_name": opp_team.get("name") or "Opponent"}
+    return {**graded, "opp_name": opp_team.get("name") or "Opponent", "opp_logo": opp_team.get("logo")}

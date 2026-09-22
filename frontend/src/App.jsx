@@ -31,8 +31,10 @@ const NAV_LINKS = [
 
 function BrandMark({ className = '' }) {
   return (
-    <span className={`font-display font-bold uppercase tracking-wide text-content select-none ${className}`}>
-      Fantas.ai
+    <span className={`inline-flex flex-col items-stretch select-none ${className}`}>
+      <span className="font-display font-bold uppercase tracking-wide text-content leading-none">Fantas.ai</span>
+      {/* The line to beat, the same device the scoreboard and waiver wire use. */}
+      <span className="mt-1 h-[3px] rounded-full bg-mark" aria-hidden />
     </span>
   )
 }

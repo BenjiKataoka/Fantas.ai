@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { getWaivers, analyzeFreeAgent, starPlayer } from '../services/api'
 import PlayerAvatar from '../components/PlayerAvatar'
+import TeamAccent from '../components/TeamAccent'
 import InjuryBadge from '../components/InjuryBadge'
 import { WaiverSkeleton } from '../components/Skeletons'
 import Notice from '../components/Notice'
@@ -100,6 +101,7 @@ function Row({ p, i, analysis, open, onAnalyze, lineAbove }) {
           </span>
         )}
         <div className="flex items-center gap-2.5 min-w-0">
+          <TeamAccent team={p.nfl_team} />
           <PlayerAvatar playerId={p.player_id} name={p.name} size="md" />
           <div className="min-w-0">
             <div className="flex items-center gap-2">

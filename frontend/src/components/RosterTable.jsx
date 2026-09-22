@@ -7,6 +7,7 @@ import ConfidenceBadge from './ConfidenceBadge'
 import PlayerAvatar from './PlayerAvatar'
 import StockSection from './StockSection'
 import CollapseRow from './CollapseRow'
+import TeamAccent from './TeamAccent'
 import { slotLabel } from '@/lib/utils'
 
 // Concern is 1-10 from the AI analysis. 8+ is rare (2 of 15 on a typical roster), so the
@@ -87,6 +88,7 @@ function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
       <td className={COL_CELL}>
         <div className="flex items-center gap-2.5">
           <ChevronRight className={`size-3.5 shrink-0 text-subtle/50 transition-transform ${isOpen ? 'rotate-90 text-brand' : ''}`} />
+          <TeamAccent team={nfl_team} />
           <PlayerAvatar playerId={player_id} name={name} size="md" />
           <div className="min-w-0">
             <div className="flex items-center gap-2">

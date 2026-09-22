@@ -7,6 +7,26 @@ import { Hint } from '@/components/ui/tooltip'
 import { LoadingDots } from './Spinner'
 
 const PLATFORM = { SLEEPER: 'Sleeper', ESPN: 'ESPN' }
+const PLATFORM_LOGO = { SLEEPER: '/platform/sleeper.png', ESPN: '/platform/espn.png' }
+
+// A league or team image that simply disappears if the platform won't serve it.
+function Logo({ src, alt, className }) {
+  const [ok, setOk] = useState(true)
+  if (!src || !ok) return null
+  return <img src={src} alt={alt} onError={() => setOk(false)} className={className} loading="lazy" />
+}
+
+// The platform's mark filling the whole tile, faint enough to read as texture.
+function Watermark({ platform }) {
+  return (
+    <img
+      src={PLATFORM_LOGO[platform]}
+      alt=""
+      aria-hidden
+      className="pointer-events-none select-none absolute inset-0 m-auto h-full w-auto max-w-none opacity-[0.07] dark:opacity-[0.09]"
+    />
+  )
+}
 const CARD = 'bg-surface border border-line rounded-xl'
 const H2 = 'font-display font-semibold text-2xl text-content'
 
@@ -96,9 +116,10 @@ export function Tile({ l, onOpen }) {
     <button
       type="button"
       onClick={() => onOpen(l)}
-      className={`${CARD} shrink-0 w-80 text-left p-5 flex flex-col gap-3 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:border-content/25`}
+      className={`${CARD} relative overflow-hidden shrink-0 w-80 text-left p-5 flex flex-col gap-3 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:border-content/25`}
     >
-      <div className="flex items-center justify-between gap-2">
+      <Watermark platform={l.platform} />
+      <div className="relative flex items-center justify-between gap-2">
         <span className="font-semibold text-sm text-content truncate">{l.name}</span>
         {l.live
           ? <Hint text="Scores are live: players whose games have started count their real points, the rest still show projections.">
@@ -106,20 +127,26 @@ export function Tile({ l, onOpen }) {
                 <span className="size-1.5 rounded-full bg-bull motion-safe:animate-pulse" />Live
               </span>
             </Hint>
-          : <span className="font-mono text-xs text-subtle shrink-0">{PLATFORM[l.platform]}</span>}
+          : <Logo src={PLATFORM_LOGO[l.platform]} alt={PLATFORM[l.platform]} className="size-4 shrink-0 rounded-sm" />}
       </div>
-      <div>
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-subtle">You</span>
+      <div className="relative">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="flex items-center gap-2 text-sm text-subtle truncate">
+            <Logo src={l.my_logo} alt="" className="size-5 rounded-full bg-raised object-cover" />
+            {l.my_name || 'You'}
+          </span>
           <span className={`font-display font-semibold text-3xl tabular-nums ${favored ? 'text-content' : 'text-subtle'}`}>{l.you.toFixed(1)}</span>
         </div>
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-sm text-subtle truncate">{l.opp_name}</span>
+          <span className="flex items-center gap-2 text-sm text-subtle truncate">
+            <Logo src={l.opp_logo} alt="" className="size-5 rounded-full bg-raised object-cover" />
+            {l.opp_name}
+          </span>
           <span className={`font-display font-semibold text-3xl tabular-nums ${favored ? 'text-subtle' : 'text-content'}`}>{l.opp != null ? l.opp.toFixed(1) : '-'}</span>
         </div>
       </div>
       {pct != null && (
-        <div className="flex flex-col gap-1.5">
+        <div className="relative flex flex-col gap-1.5">
           {/* The yellow tick is the 50% line: the same "line to beat" as Waivers. */}
           <div className="relative h-1.5 rounded-full bg-line">
             <div className={`absolute inset-y-0 left-0 rounded-full ${favored ? 'bg-bull' : 'bg-bear'}`} style={{ width: `${pct}%` }} />
@@ -158,19 +185,23 @@ export function ResultTile({ r, onOpen }) {
     <button
       type="button"
       onClick={() => onOpen(r)}
-      className={`${CARD} shrink-0 w-80 text-left p-5 flex flex-col gap-3 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:border-content/25`}
+      className={`${CARD} relative overflow-hidden shrink-0 w-80 text-left p-5 flex flex-col gap-3 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:border-content/25`}
     >
-      <div className="flex items-center justify-between gap-2">
+      <Watermark platform={r.platform} />
+      <div className="relative flex items-center justify-between gap-2">
         <span className="font-semibold text-sm text-content truncate">{r.name}</span>
         {r.result && <span className={`font-display font-bold text-sm px-2 py-0.5 rounded text-ink ${chip}`}>{r.result}</span>}
       </div>
-      <div className="flex items-baseline gap-2.5">
+      <div className="relative flex items-baseline gap-2.5">
         <span className="font-display font-bold text-4xl tabular-nums text-content">{r.you.toFixed(1)}</span>
         <span className="text-sm text-subtle">to</span>
         <span className="font-display font-semibold text-2xl tabular-nums text-subtle">{r.opp != null ? r.opp.toFixed(1) : '-'}</span>
       </div>
-      <p className="text-sm text-subtle truncate -mt-2">vs {r.opp_name}</p>
-      <div className="flex justify-between pt-2.5 border-t border-line text-sm">
+      <p className="relative flex items-center gap-2 text-sm text-subtle truncate -mt-2">
+        <Logo src={r.opp_logo} alt="" className="size-5 rounded-full bg-raised object-cover" />
+        vs {r.opp_name}
+      </p>
+      <div className="relative flex justify-between pt-2.5 border-t border-line text-sm">
         <Hint text="Points your best possible lineup would have added. It compares what your bench actually scored with who you started.">
           <span className="text-subtle">Left on bench</span>
         </Hint>

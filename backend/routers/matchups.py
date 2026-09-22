@@ -78,7 +78,8 @@ async def get_matchups(
         full = sum((p.get("proj") or 0) for p in m["you"] + (m["opp"] or []))
         progress = matchup_service.lineup_progress(m["you"], schedule)
         out_leagues.append({
-            **meta, "record": m["record"], "opp_name": m["opp_name"], "you": you, "opp": opp,
+            **meta, "record": m["record"], "opp_name": m["opp_name"], "opp_logo": m.get("opp_logo"),
+            "my_name": m.get("my_name"), "my_logo": m.get("my_logo"), "you": you, "opp": opp,
             "progress": progress, "live": progress["in_play"] > 0 or (0 < progress["played"] < progress["total"]),
             "win_prob": matchup_service.win_probability(you, opp, left, full) if opp is not None else None,
             "issues": sum(1 for i in issues if i["severity"] == "out"),

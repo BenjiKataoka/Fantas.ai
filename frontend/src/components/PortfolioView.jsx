@@ -12,6 +12,7 @@ import ProjectionBar from './ProjectionBar'
 import AlertFeed from './AlertFeed'
 import CollapseRow from './CollapseRow'
 import { ConcernFlag } from './RosterTable'
+import TeamAccent from './TeamAccent'
 import { TableSkeleton } from './Skeletons'
 
 const POS_COLORS = { QB: 'text-pos-qb', RB: 'text-pos-rb', WR: 'text-pos-wr', TE: 'text-pos-te', K: 'text-subtle' }
@@ -63,6 +64,7 @@ function Row({ p, total, open, onToggle }) {
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-2.5">
             <ChevronRight className={`size-3.5 shrink-0 text-subtle/50 transition-transform ${open ? 'rotate-90 text-brand' : ''}`} />
+            <TeamAccent team={p.nfl_team} />
             <PlayerAvatar playerId={p.player_id} name={p.name} size="md" />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
