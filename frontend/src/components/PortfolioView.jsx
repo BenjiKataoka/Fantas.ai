@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { getMatchups, getPortfolio, getResults, getWaivers } from '../services/api'
+import Notice from './Notice'
 import { BenchMisses, LeagueStrip, LeagueStripSkeleton, ModeToggle, MostOnTheLine, NeedsYou, Pickups, ResultTile, ResultsHero, Tile, WeekHero, YourSunday } from './WeekBoard'
 import { REVEAL, slotLabel, tiltHandlers } from '@/lib/utils'
 import { Hint } from '@/components/ui/tooltip'
@@ -142,6 +143,26 @@ export default function PortfolioView({ onOpenLeague }) {
     return () => { cancelled = true }
   }, [mode, credentials, results, leagues])
 
+  // The portfolio paints from what's stored and syncs stale leagues behind it; poll until done.
+  useEffect(() => {
+    if (!data?.syncing || !credentials) return
+    const id = setTimeout(() => {
+      getPortfolio(credentials.username).then(res => setData(res.data)).catch(() => {})
+    }, 6000)
+    return () => clearTimeout(id)
+  }, [data, credentials])
+
+  // Game day: refresh the scoreboard every minute while any of your players is playing.
+  const gamesOn = !!week?.leagues?.some(l => l.live) || !!week?.kickoffs?.some(k => k.state === 'in')
+  useEffect(() => {
+    if (!gamesOn || !credentials) return
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      getMatchups(credentials.username).then(res => setWeek(res.data)).catch(() => {})
+    }, 60000)
+    return () => clearInterval(id)
+  }, [gamesOn, credentials])
+
   const playerMap = useMemo(() => Object.fromEntries((data?.players || []).map(p => [p.player_id, { name: p.name, position: p.position }])), [data])
   const lineups = useMemo(() => Object.fromEntries((data?.players || []).map(p => [p.player_id, p.starting])), [data])
 
@@ -181,13 +202,14 @@ export default function PortfolioView({ onOpenLeague }) {
       ) : !week ? <LeagueStripSkeleton /> : null}
       {warnings.map(w => <p key={w} className="text-sm text-warn -mt-4">{w}</p>)}
 
-      {error && !data && <p className="text-bear text-sm">{error}</p>}
+      {error && !data && <Notice tone="error" title={error} message="Your leagues may be slow to respond right now." actionLabel="Try again" onAction={() => window.location.reload()} />}
       {!data && !error && <TableSkeleton rows={8} />}
       {data && (
       <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <h2 className="font-display font-semibold text-2xl text-content">Your players</h2>
-        {data.summary.biggest_exposure && (
+        {data.syncing && <span className="text-sm text-subtle">Refreshing {data.syncing_leagues} leagues</span>}
+        {!data.syncing && data.summary.biggest_exposure && (
           <span className="text-sm text-subtle">Biggest exposure: {data.summary.biggest_exposure.name}, on {data.summary.biggest_exposure.held} of your {total} teams</span>
         )}
       </div>

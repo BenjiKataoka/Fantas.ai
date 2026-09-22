@@ -23,14 +23,15 @@ export function AppProvider({ children }) {
 
   // ── Credentials ────────────────────────────────────────────────────────────
   const [credentials, setCredentials] = useState(() => {
-    const username = localStorage.getItem(LS_USERNAME)
+    const username = localStorage.getItem(LS_USERNAME) || ''
     const leagueId = localStorage.getItem(LS_LEAGUE)
     const platform = localStorage.getItem(LS_PLATFORM) || 'SLEEPER'
-    return username && leagueId ? { username, leagueId, platform } : null
+    // An ESPN-only user has a league but no Sleeper username.
+    return leagueId && (username || platform === 'ESPN') ? { username, leagueId, platform } : null
   })
 
   const saveCredentials = useCallback((username, leagueId, platform = 'SLEEPER') => {
-    localStorage.setItem(LS_USERNAME, username)
+    localStorage.setItem(LS_USERNAME, username || '')
     localStorage.setItem(LS_LEAGUE, leagueId)
     localStorage.setItem(LS_PLATFORM, platform)
     setCredentials({ username, leagueId, platform })
@@ -79,8 +80,7 @@ export function AppProvider({ children }) {
   const [leagues, setLeagues] = useState([])
 
   const reloadLeagues = useCallback(() => {
-    if (!credentials?.username) return
-    getLeagues(credentials.username).then(res => setLeagues(res.data.leagues || [])).catch(() => {})
+    getLeagues(credentials?.username).then(res => setLeagues(res.data.leagues || [])).catch(() => {})
   }, [credentials?.username])
 
   useEffect(() => { if (authed) reloadLeagues() }, [authed, reloadLeagues])

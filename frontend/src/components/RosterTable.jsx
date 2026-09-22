@@ -45,13 +45,13 @@ const POS_COLORS = {
   K:  'text-subtle',
 }
 
-const COL_HEADER = 'px-3 py-2.5 text-left text-[11px] font-semibold text-subtle uppercase tracking-wider'
+const COL_HEADER = 'px-3 py-2.5 text-left text-xs font-medium text-subtle'
 const COL_CELL   = 'px-3 py-2.5 text-sm'
 
 function SectionHeader({ label, count }) {
   return (
     <tr>
-      <td colSpan={9} className="px-3 py-2 bg-raised text-[11px] font-display font-semibold text-subtle uppercase tracking-widest border-y border-line">
+      <td colSpan={9} className="px-3 py-2 bg-raised text-xs font-display font-semibold text-subtle border-y border-line">
         {label} <span className="font-mono font-normal text-subtle/60 ml-1">({count})</span>
       </td>
     </tr>

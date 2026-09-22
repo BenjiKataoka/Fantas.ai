@@ -19,6 +19,7 @@ from services.projection_service import _extract_sleeper_pts, get_nfl_state
 from services.rule_filter_service import classify_news_type
 from services.utils import normalize_name
 from services.recap_service import best_lineup
+from services.league_service import resolve_sleeper_user_id
 from services.waiver_service import POSITIONS, rank_free_agents
 
 router = APIRouter()
@@ -112,8 +113,8 @@ async def _board(sleeper_username: str, league_id: str, user: User, db: AsyncSes
     season, week = state["season"], state["week"]
     weeks = list(range(week, min(week + HORIZON, LAST_REG_WEEK + 1)))
 
-    sleeper_user_id = await sleeper_service.get_user_id(sleeper_username)
-    if not sleeper_user_id:
+    sleeper_user_id = await resolve_sleeper_user_id(user, sleeper_username)
+    if platform == "SLEEPER" and not sleeper_user_id:
         raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
 
     league, rosters, all_players, (espn_by_id, espn_by_name), market, adds, drops, *sleeper_weeks = await asyncio.gather(
@@ -196,7 +197,7 @@ async def _board(sleeper_username: str, league_id: str, user: User, db: AsyncSes
 
 @router.get("/waivers")
 async def get_waivers(
-    sleeper_username: str = Query(..., description="Sleeper username"),
+    sleeper_username: str | None = Query(None, description="Sleeper username; not needed for ESPN leagues"),
     league_id: str = Query(..., description="League ID on its platform"),
     platform: str = Query("SLEEPER", pattern="^(SLEEPER|ESPN)$"),
     user: User = Depends(get_current_user),
@@ -260,7 +261,7 @@ def _analyze_prompt(c: dict, my_rows: list[dict], news: list[dict], profile: dic
 @router.post("/waivers/analyze/{player_id}")
 async def analyze_free_agent(
     player_id: str,
-    sleeper_username: str = Query(..., description="Sleeper username"),
+    sleeper_username: str | None = Query(None, description="Sleeper username; not needed for ESPN leagues"),
     league_id: str = Query(..., description="League ID on its platform"),
     platform: str = Query("SLEEPER", pattern="^(SLEEPER|ESPN)$"),
     user: User = Depends(get_current_user),

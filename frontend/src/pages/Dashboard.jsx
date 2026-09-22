@@ -1,5 +1,6 @@
 import { REVEAL } from '@/lib/utils'
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { getLeagues } from '../services/api'
 import { useApp } from '../context/AppContext'
 import RosterTable from '../components/RosterTable'
@@ -35,6 +36,26 @@ function SetupForm({ onComplete }) {
   const [leagueId, setLeagueId] = useState('')
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState(null)
+
+  // ESPN-only: the server lists the leagues this account's saved cookies unlock.
+  const findEspn = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await getLeagues()
+      const list = (res.data.leagues || []).filter(l => l.platform === 'ESPN')
+      if (!list.length) {
+        setError('No ESPN leagues yet. Connect your ESPN account in Settings, then come back.')
+      } else {
+        setLeagues(list)
+        setLeagueId(`${list[0].platform}:${list[0].league_id}`)
+      }
+    } catch {
+      setError('Could not reach ESPN. Connect your ESPN account in Settings first.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const findLeagues = async () => {
     if (!username.trim()) return
@@ -75,7 +96,21 @@ function SetupForm({ onComplete }) {
         </button>
       </div>
 
-      {error && <p className="text-bear text-sm mb-4">{error}</p>}
+      {error && (
+        <p className="text-bear text-sm mb-4">
+          {error}{' '}
+          <Link to="/settings" className="underline underline-offset-2">Open Settings</Link>
+        </p>
+      )}
+
+      {!leagues.length && !loading && (
+        <div className="mt-6 pt-5 border-t border-line">
+          <p className="text-sm text-subtle mb-3">Only play on ESPN? You don't need a Sleeper account.</p>
+          <button onClick={findEspn} className="px-4 py-2 text-sm text-content border border-line rounded-lg hover:bg-raised">
+            Use my ESPN leagues
+          </button>
+        </div>
+      )}
 
       {leagues.length > 0 && (
         <>
@@ -83,7 +118,7 @@ function SetupForm({ onComplete }) {
             {leagues.map(l => <option key={`${l.platform}:${l.league_id}`} value={`${l.platform}:${l.league_id}`}>{l.name}{l.platform === 'ESPN' ? ' (ESPN)' : ''}</option>)}
           </select>
           <button onClick={() => { const [platform, id] = leagueId.split(':'); onComplete(username.trim(), id, platform) }} className={`w-full py-2 text-sm ${btnPrimary}`}>
-            Load Roster
+            Load roster
           </button>
         </>
       )}
@@ -110,7 +145,7 @@ function TopBar({ rosterData }) {
             {totalPts > 0 && (
               <span className="text-bull ml-3 font-mono text-base font-bold tabular-nums">{totalPts.toFixed(1)}</span>
             )}
-            {totalPts > 0 && <span className="text-subtle/60 ml-1 text-xs uppercase tracking-wide">proj pts</span>}
+            {totalPts > 0 && <span className="text-subtle/60 ml-1 text-xs">projected</span>}
           </span>
         )}
       </div>

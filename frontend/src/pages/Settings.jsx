@@ -99,7 +99,7 @@ function LeagueSection() {
     <Section title="League Setup" description="Your Sleeper username and the league to track on the Dashboard.">
       <div className="flex flex-col gap-3 max-w-sm">
         <div>
-          <label className="block text-xs text-subtle uppercase tracking-wide mb-1">Sleeper Username</label>
+          <label className="block text-sm text-subtle mb-1">Sleeper Username</label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -123,7 +123,7 @@ function LeagueSection() {
 
         {leagues.length > 0 && (
           <div>
-            <label className="block text-xs text-subtle uppercase tracking-wide mb-1">Active League</label>
+            <label className="block text-sm text-subtle mb-1">Active League</label>
             <select value={leagueKey} onChange={e => { setLeagueKey(e.target.value); setSaved(false) }} className={`w-full ${field}`}>
               {leagues.map(l => <option key={`${l.platform}:${l.league_id}`} value={`${l.platform}:${l.league_id}`}>{l.name}{l.platform === 'ESPN' ? ' (ESPN)' : ''}</option>)}
             </select>

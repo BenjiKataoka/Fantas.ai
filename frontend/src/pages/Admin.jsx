@@ -60,7 +60,7 @@ export default function Admin() {
           <thead className="bg-raised border-b border-line">
             <tr>
               {['User', 'Status', 'Joined', ''].map((h, i) => (
-                <th key={i} className="px-4 py-2.5 text-[11px] font-semibold text-subtle uppercase tracking-wider">{h}</th>
+                <th key={i} className="px-4 py-2.5 text-xs font-medium text-subtle">{h}</th>
               ))}
             </tr>
           </thead>

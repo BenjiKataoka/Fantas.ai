@@ -11,7 +11,7 @@ from auth import get_current_user
 from database import get_db
 from models.user import User, UserLeague
 from services import espn_service, matchup_service, nfl_service, sleeper_service
-from services.league_service import espn_leagues, league_season
+from services.league_service import all_leagues, league_season, resolve_sleeper_user_id
 from services.projection_engine import this_week_projection, weights_from_user
 from services.projection_service import get_nfl_state
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/matchups")
 async def get_matchups(
-    sleeper_username: str = Query(..., description="Sleeper username"),
+    sleeper_username: str | None = Query(None, description="Sleeper username; not needed for ESPN-only users"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -29,13 +29,8 @@ async def get_matchups(
     if state.get("season_type") not in ("regular", "post"):
         return {"week": state.get("week"), "leagues": [], "needs": [], "kickoffs": [], "next_kickoff": None, "warnings": []}
     season, week = state["season"], state["week"]
-    sleeper_user_id = await sleeper_service.get_user_id(sleeper_username)
-    if not sleeper_user_id:
-        raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
-
-    leagues = [{**l, "platform": "SLEEPER"} for l in
-               await sleeper_service.get_eligible_leagues(sleeper_user_id, season=league_season(state))]
-    leagues += await espn_leagues(user, league_season(state), db)
+    sleeper_user_id = await resolve_sleeper_user_id(user, sleeper_username)
+    leagues = await all_leagues(user, sleeper_user_id, league_season(state), db)
     # Public ESPN leagues find your team by the one you picked, not by SWID.
     picked = dict((await db.execute(select(UserLeague.league_id, UserLeague.team_id).where(
         UserLeague.user_id == user.id, UserLeague.platform == "ESPN", UserLeague.team_id.isnot(None),

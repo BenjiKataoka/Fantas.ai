@@ -1,8 +1,9 @@
-import { REVEAL, slotLabel } from '@/lib/utils'
+import { REVEAL, slotLabel, tiltHandlers } from '@/lib/utils'
 import { useApp } from '../context/AppContext'
 import InjuryBadge from '../components/InjuryBadge'
 import PlayerAvatar from '../components/PlayerAvatar'
 import { TableSkeleton } from '../components/Skeletons'
+import Notice from '../components/Notice'
 
 const SLOT_ORDER = { QB: 0, RB: 1, WR: 2, TE: 3, FLEX: 4, WRRB_FLEX: 4, REC_FLEX: 4, SUPER_FLEX: 5, K: 6, DEF: 7 }
 
@@ -23,7 +24,7 @@ function projColor(v) {
   return 'text-bear'
 }
 
-const H2 = 'text-sm font-display font-semibold text-subtle uppercase tracking-wider'
+const H2 = 'font-display font-semibold text-xl text-content'
 
 function LineupRow({ p }) {
   return (
@@ -56,7 +57,7 @@ function LineupRow({ p }) {
 
 function CloseDecision({ d }) {
   return (
-    <div className="bg-warn/8 border border-warn/25 rounded-lg p-3">
+    <div {...tiltHandlers} className="bg-warn/8 border border-warn/25 rounded-lg p-3 tilt">
       <div className="flex items-center gap-2 mb-2">
         <span className={`font-mono text-xs font-semibold uppercase ${SLOT_COLORS[d.slot] || 'text-subtle'}`}>{slotLabel(d.slot)}</span>
         <span className="text-xs text-warn/80 font-mono">margin {d.margin.toFixed(1)}</span>
@@ -117,18 +118,18 @@ export default function StartSit() {
         <div className="flex gap-6 items-start">
           <div className={`flex-1 min-w-0 ${REVEAL}`} style={{ animationDelay: '90ms' }}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className={H2}>Recommended Lineup</h2>
+              <h2 className={H2}>Recommended lineup</h2>
               {totalProj > 0 && (
                 <span className="font-mono tabular-nums text-bull text-base font-bold">{totalProj.toFixed(1)} <span className="text-subtle/60 text-xs uppercase">pts</span></span>
               )}
             </div>
-            <div className="overflow-x-auto rounded-xl border border-line bg-surface">
+            <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
               <table className="w-full text-left">
                 <thead className="bg-raised border-b border-line">
                   <tr>
-                    <th className="px-3 py-2.5 text-[11px] font-semibold text-subtle uppercase tracking-wider">Slot</th>
-                    <th className="px-3 py-2.5 text-[11px] font-semibold text-subtle uppercase tracking-wider">Player</th>
-                    <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-content uppercase tracking-wider">Proj</th>
+                    <th className="px-3 py-2.5 text-xs font-medium text-subtle">Slot</th>
+                    <th className="px-3 py-2.5 text-xs font-medium text-subtle">Player</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-medium text-content tracking-wider">Proj</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line/40">
@@ -143,7 +144,7 @@ export default function StartSit() {
             {bench.length > 0 && (
               <div className="mt-6">
                 <h2 className={`${H2} mb-3`}>Bench</h2>
-                <div className="overflow-x-auto rounded-xl border border-line bg-surface">
+                <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
                   <table className="w-full text-left">
                     <tbody className="divide-y divide-line/40">
                       {bench.map(p => (
@@ -175,7 +176,7 @@ export default function StartSit() {
           </div>
 
           <div className={`w-72 shrink-0 ${REVEAL}`} style={{ animationDelay: '180ms' }}>
-            <h2 className={`${H2} mb-3`}>Close Calls</h2>
+            <h2 className={`${H2} mb-3`}>Close calls</h2>
             {close_decisions.length > 0 ? (
               <div className="flex flex-col gap-3">
                 {close_decisions.map((d, i) => <CloseDecision key={`${d.slot}-${i}`} d={d} />)}

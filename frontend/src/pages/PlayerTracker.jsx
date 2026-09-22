@@ -225,7 +225,7 @@ export default function PlayerTracker() {
                   <div className="text-2xl font-mono font-bold text-content tabular-nums leading-none" style={{ color: stats.m.color }}>
                     {stats.m.value(stats.last, selected.position)}
                   </div>
-                  <div className="text-[11px] uppercase tracking-wide text-subtle/70">{stats.m.label}</div>
+                  <div className="text-xs text-subtle/70">{stats.m.label}</div>
                 </>
               ) : <span className="text-xs text-subtle">No data</span>}
             </div>

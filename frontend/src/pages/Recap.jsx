@@ -3,7 +3,8 @@ import { useApp } from '../context/AppContext'
 import { getRecap } from '../services/api'
 import PlayerAvatar from '../components/PlayerAvatar'
 import { RecapSkeleton } from '../components/Skeletons'
-import { REVEAL } from '@/lib/utils'
+import Notice from '../components/Notice'
+import { REVEAL, tiltHandlers } from '@/lib/utils'
 
 const SOURCE_NAMES = { sleeper: 'Sleeper', espn: 'ESPN', fp: 'FantasyPros', weighted: 'Your blend' }
 const POS_COLORS = { QB: 'text-pos-qb', RB: 'text-pos-rb', WR: 'text-pos-wr', TE: 'text-pos-te' }
@@ -62,8 +63,8 @@ function Accuracy({ d }) {
   if (!rows.length) return null
   const worst = Math.max(...rows.map(([, a]) => a.mae))
   return (
-    <div className="bg-surface border border-line rounded-xl p-5">
-      <h2 className="font-display font-semibold text-content">How close were the projections?</h2>
+    <div {...tiltHandlers} className="bg-surface border border-line rounded-xl tilt p-5">
+      <h2 className="font-display font-semibold text-content text-xl">How close were the projections?</h2>
       <p className="text-sm text-subtle mt-1 mb-4">Average miss per player this week. Shorter is better.</p>
       <div className="flex flex-col gap-3">
         {rows.sort((a, b) => a[1].mae - b[1].mae).map(([src, a]) => (
@@ -109,8 +110,8 @@ export default function Recap() {
     return () => { cancelled = true }
   }, [week, credentials])
 
-  if (!credentials) return <p className="text-subtle text-sm py-16 text-center">Pick your league on the Dashboard first.</p>
-  if (rosterData?.season_type === 'off') return <p className="text-subtle text-sm py-16 text-center">Recaps start once the season does.</p>
+  if (!credentials) return <Notice title="No league yet" message="Pick a league on the Dashboard to see how its weeks went." actionLabel="Go to the Dashboard" to="/" />
+  if (rosterData?.season_type === 'off') return <Notice title="Recaps start once the season does." message="They compare what your players scored with what each source projected." />
 
   const best = new Set(data?.lineup.best_lineup_ids || [])
   const starters = data?.players.filter(p => p.started) || []
@@ -139,7 +140,7 @@ export default function Recap() {
       </div>
 
       {!data && !error && <RecapSkeleton />}
-      {error && <p className="text-bear text-sm">{error}</p>}
+      {error && <Notice tone="error" title={error} actionLabel="Try again" onAction={() => window.location.reload()} />}
 
       {data && (
         <div key={data.week} className={`flex flex-col gap-6 transition-opacity ${loading ? 'opacity-50' : ''}`}>
@@ -152,7 +153,7 @@ export default function Recap() {
           </div>
 
           <div className="grid lg:grid-cols-[1fr_320px] gap-6 items-start">
-            <div className={`bg-surface border border-line rounded-xl overflow-hidden ${REVEAL}`} style={{ animationDelay: '90ms' }}>
+            <div className={`bg-surface border border-line rounded-xl overflow-hidden shadow-sm ${REVEAL}`} style={{ animationDelay: '90ms' }}>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-subtle text-xs">

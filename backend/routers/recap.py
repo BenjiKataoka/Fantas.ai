@@ -13,6 +13,7 @@ from models.projection import Projection
 from models.user import User
 from services import sleeper_service
 from services.projection_service import get_nfl_state
+from services.league_service import resolve_sleeper_user_id
 from services.recap_service import build_recap, find_matchup
 
 router = APIRouter()
@@ -59,7 +60,7 @@ async def _espn_week(league_id: str, user: User, season: int, week: int, final: 
 @router.get("/recap/{week}")
 async def get_recap(
     week: int,
-    sleeper_username: str = Query(..., description="Sleeper username"),
+    sleeper_username: str | None = Query(None, description="Sleeper username; not needed for ESPN leagues"),
     league_id: str = Query(..., description="League ID on its platform"),
     platform: str = Query("SLEEPER", pattern="^(SLEEPER|ESPN)$"),
     user: User = Depends(get_current_user),
@@ -76,7 +77,7 @@ async def get_recap(
     if platform == "ESPN":
         matchup, slots, league_name = await _espn_week(league_id, user, season, week, final, db)
     else:
-        sleeper_user_id = await sleeper_service.get_user_id(sleeper_username)
+        sleeper_user_id = await resolve_sleeper_user_id(user, sleeper_username)
         if not sleeper_user_id:
             raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
 

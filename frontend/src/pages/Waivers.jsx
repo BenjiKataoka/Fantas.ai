@@ -4,7 +4,8 @@ import { getWaivers, analyzeFreeAgent, starPlayer } from '../services/api'
 import PlayerAvatar from '../components/PlayerAvatar'
 import InjuryBadge from '../components/InjuryBadge'
 import { WaiverSkeleton } from '../components/Skeletons'
-import { REVEAL, slotLabel } from '@/lib/utils'
+import Notice from '../components/Notice'
+import { REVEAL, slotLabel, tiltHandlers } from '@/lib/utils'
 import { TrendingDown, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import CollapseRow from '../components/CollapseRow'
@@ -137,13 +138,13 @@ function Row({ p, i, analysis, open, onAnalyze, lineAbove }) {
 }
 
 const SLOT_ORDER = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'WRRB_FLEX', 'REC_FLEX', 'SUPER_FLEX', 'K', 'DEF']
-const CARD = 'bg-surface border border-line rounded-xl p-4'
+const CARD = 'bg-surface border border-line rounded-xl tilt p-4'
 
 function LineToBeat({ lineup, weeks }) {
   const rows = [...lineup].sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot))
   return (
-    <div className={CARD}>
-      <h2 className="font-display font-semibold text-content text-sm">Your starters</h2>
+    <div {...tiltHandlers} className={CARD}>
+      <h2 className="font-display font-semibold text-content">Your starters</h2>
       <p className="text-xs text-subtle mt-0.5 mb-3">Points per week, next {weeks}. A pickup has to beat these.</p>
       <ul className="space-y-1.5 text-sm">
         {rows.map(r => (
@@ -207,8 +208,8 @@ export default function Waivers() {
     return () => { cancelled = true }
   }, [credentials, leagueId])
 
-  if (!credentials) return <p className="text-subtle text-sm py-16 text-center">Pick your league on the Dashboard first.</p>
-  if (rosterData?.season_type === 'off') return <p className="text-subtle text-sm py-16 text-center">The waiver wire opens once the season does.</p>
+  if (!credentials) return <Notice title="No league yet" message="Pick a league on the Dashboard and the waiver wire fills in." actionLabel="Go to the Dashboard" to="/" />
+  if (rosterData?.season_type === 'off') return <Notice title="The waiver wire opens once the season does." message="Free agents are ranked against your lineup, so it needs weekly projections." />
 
   const all = data?.candidates || []
   const rows = filter === 'All' ? all.slice(0, ALL_LIMIT) : all.filter(p => p.position === filter)
@@ -237,7 +238,7 @@ export default function Waivers() {
         </div>
       </div>
 
-      {error && <p className="text-bear text-sm">{error}</p>}
+      {error && <Notice tone="error" title={error} actionLabel="Try again" onAction={() => window.location.reload()} />}
       {!data && !error && <WaiverSkeleton />}
 
       {data && (
@@ -252,7 +253,7 @@ export default function Waivers() {
           </div>
 
           <div className="flex flex-col xl:flex-row gap-6 items-start">
-            <div key={filter} className={`w-fit max-w-full overflow-x-auto bg-surface border border-line rounded-xl ${REVEAL}`} style={{ animationDelay: '90ms' }}>
+            <div key={filter} className={`w-fit max-w-full overflow-x-auto bg-surface border border-line rounded-xl shadow-sm ${REVEAL}`} style={{ animationDelay: '90ms' }}>
               {/* Every column is fixed and the table is exactly their sum (51.5rem), so a long
                   headline wraps inside Player instead of stretching the row. */}
               <table className="w-[51.5rem] table-fixed text-sm">

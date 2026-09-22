@@ -17,7 +17,7 @@ function FactorList({ label, items, tone }) {
   const dot = tone === 'bull' ? 'bg-bull' : 'bg-bear'
   return (
     <div className="flex-1 min-w-0">
-      <div className="text-[11px] uppercase tracking-wide text-subtle mb-1.5">{label}</div>
+      <div className="text-xs text-subtle mb-1.5">{label}</div>
       <ul className="flex flex-col gap-1">
         {items.map((f, i) => (
           <li key={i} className="flex items-start gap-1.5 text-xs text-content/80 leading-snug">
@@ -62,10 +62,10 @@ export default function StockSection({ stock }) {
       {/* Header: overall stock + freshness */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] uppercase tracking-widest text-subtle font-display">Stock &amp; Sentiment</span>
+          <span className="text-xs text-subtle font-display">Stock &amp; Sentiment</span>
           {overall_direction && <StockBadge direction={overall_direction} magnitude={overall_magnitude} size="sm" />}
           {contrarian_flag && (
-            <span className="px-1.5 py-0.5 rounded border border-warn/30 bg-warn/10 text-warn text-[10px] font-semibold uppercase tracking-wide">
+            <span className="px-1.5 py-0.5 rounded border border-warn/30 bg-warn/10 text-warn text-xs font-medium">
               Contrarian
             </span>
           )}
@@ -105,13 +105,13 @@ export default function StockSection({ stock }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs">
           {short_term_outlook && (
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-subtle mb-0.5">Short term</div>
+              <div className="text-xs text-subtle mb-0.5">Short term</div>
               <p className="text-content/80 leading-snug">{short_term_outlook}</p>
             </div>
           )}
           {long_term_outlook && (
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-subtle mb-0.5">Long term</div>
+              <div className="text-xs text-subtle mb-0.5">Long term</div>
               <p className="text-content/80 leading-snug">{long_term_outlook}</p>
             </div>
           )}

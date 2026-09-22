@@ -6,6 +6,7 @@ import StockBadge from '../components/StockBadge'
 import ContradictionAlert from '../components/ContradictionAlert'
 import PlayerAvatar from '../components/PlayerAvatar'
 import { CardListSkeleton } from '../components/Skeletons'
+import Notice from '../components/Notice'
 import { LoadingDots } from '../components/Spinner'
 
 function relativeTime(isoStr) {
@@ -45,7 +46,7 @@ const TYPE_STYLES = {
 function TypeChip({ type }) {
   const s = TYPE_STYLES[type] || TYPE_STYLES.GENERAL
   return (
-    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide border ${s.cls}`}>
+    <span className={`px-1.5 py-0.5 rounded text-xs font-medium border ${s.cls}`}>
       {s.label}
     </span>
   )
@@ -156,13 +157,13 @@ function NewsCard({ item, playerLabel, playerName }) {
         <div className="grid grid-cols-2 gap-3 pt-1">
           {item.short_term_impact && (
             <div className="bg-raised rounded-lg p-3">
-              <p className="text-xs font-semibold text-subtle uppercase tracking-wide mb-1">Short Term</p>
+              <p className="text-xs font-medium text-subtle mb-1">Short term</p>
               <p className="text-xs text-content/80 leading-snug">{item.short_term_impact}</p>
             </div>
           )}
           {item.long_term_impact && (
             <div className="bg-raised rounded-lg p-3">
-              <p className="text-xs font-semibold text-subtle uppercase tracking-wide mb-1">Long Term</p>
+              <p className="text-xs font-medium text-subtle mb-1">Long term</p>
               <p className="text-xs text-content/80 leading-snug">{item.long_term_impact}</p>
             </div>
           )}
@@ -281,16 +282,11 @@ export default function NewsHub() {
       )}
 
       {!newsLoading && !query && !items.length && (
-        <div className="text-center py-16 text-subtle/70">
-          <p className="text-sm">No news found for your roster.</p>
-          <p className="text-xs mt-1">Make sure your league is set up in Settings.</p>
-        </div>
+        <Notice title="No news for your players yet" message="News is gathered for players you roster or star. Load a league first, then check back." actionLabel="Go to the Dashboard" to="/" />
       )}
 
       {!newsLoading && items.length > 0 && filtered.length === 0 && (
-        <div className="text-center py-12 text-subtle/70">
-          <p className="text-sm">No items match this filter.</p>
-        </div>
+        <Notice title="No items match this filter." actionLabel="Show everything" onAction={() => setActiveFilter('all')} />
       )}
 
       {filtered.length > 0 && (

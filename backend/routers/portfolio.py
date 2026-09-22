@@ -1,4 +1,5 @@
 """GET /api/portfolio: every player the user owns across all their leagues, listed once."""
+import asyncio
 import logging
 from datetime import datetime, timedelta
 
@@ -13,7 +14,7 @@ from models.projection import Projection
 from models.roster import MyRoster
 from models.user import User, UserLeague
 from services import espn_service, sleeper_service, tracker_service
-from services.league_service import espn_leagues, get_or_create_user_league, league_season, sync_league
+from services.league_service import all_leagues, get_or_create_user_league, league_season, resolve_sleeper_user_id, sync_league
 from services.portfolio_service import build_portfolio
 from services.projection_service import get_nfl_state
 
@@ -21,33 +22,55 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 STALE_AFTER = timedelta(hours=6)  # same cadence as the scheduler's roster sync
+_syncing: set[int] = set()        # user ids with a background sync in flight (per process)
+
+
+async def _sync_in_background(user_id: int, league_ids: list[int], nfl_state: dict) -> None:
+    """Refresh stale leagues after the response has gone out, one session per league so a
+    failure can't take the others down. The page polls until this finishes."""
+    from database import AsyncSessionLocal
+
+    try:
+        for ul_id in league_ids:
+            async with AsyncSessionLocal() as db:
+                try:
+                    ul, user = await db.get(UserLeague, ul_id), await db.get(User, user_id)
+                    await sync_league(db, user, ul, nfl_state)
+                    await db.commit()
+                except Exception as e:
+                    await db.rollback()
+                    logger.error(f"[Portfolio] background sync failed for user_league={ul_id}: {e}")
+    finally:
+        _syncing.discard(user_id)
 
 
 @router.get("/portfolio")
 async def get_portfolio(
-    sleeper_username: str = Query(..., description="Sleeper username"),
+    sleeper_username: str | None = Query(None, description="Sleeper username; not needed for ESPN-only users"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     nfl_state = await get_nfl_state()
     season = league_season(nfl_state)
-    sleeper_user_id = await sleeper_service.get_user_id(sleeper_username)
-    if not sleeper_user_id:
-        raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
+    sleeper_user_id = await resolve_sleeper_user_id(user, sleeper_username)
     user.sleeper_user_id = user.sleeper_user_id or sleeper_user_id
-
-    eligible = [{**l, "platform": "SLEEPER"} for l in await sleeper_service.get_eligible_leagues(sleeper_user_id, season=season)]
-    eligible += await espn_leagues(user, season, db)
+    eligible = await all_leagues(user, sleeper_user_id, season, db)
 
     # Make sure every league has a user_leagues row and a roster no older than the
     # scheduler would keep it. Each league commits on its own so one failure keeps the rest.
+    # A league with no roster yet has to sync before we can show anything; a merely stale one
+    # refreshes in the background so the page paints straight away.
     warnings: list[str] = []
     league_ids: list[int] = []
+    stale: list[int] = []
     for l in eligible:
         ul = await get_or_create_user_league(db, user.id, l["platform"], l["league_id"], league_name=l["name"],
                                              total_rosters=l.get("total_rosters"), season=season)
         league_ids.append(ul.id)
         if ul.synced_at and datetime.utcnow() - ul.synced_at < STALE_AFTER:
+            continue
+        if ul.synced_at:
+            stale.append(ul.id)
             continue
         try:
             await sync_league(db, user, ul, nfl_state)
@@ -61,6 +84,11 @@ async def get_portfolio(
             await db.rollback()
             logger.error(f"[Portfolio] sync failed for {l['platform']} {l['league_id']}: {e}")
             warnings.append(f"{l['name']} couldn't refresh, showing its last synced roster.")
+
+    syncing = bool(stale) and user.id not in _syncing
+    if syncing:
+        _syncing.add(user.id)
+        asyncio.create_task(_sync_in_background(user.id, stale, nfl_state))
 
     rows = (await db.execute(
         select(MyRoster, Player, UserLeague)
@@ -83,5 +111,8 @@ async def get_portfolio(
 
     out = build_portfolio(flat, projections, stock, league_count=len(league_ids))
     out.update({"week": nfl_state["week"], "season": nfl_state["season"], "season_type": nfl_state["season_type"],
-                "warnings": warnings})
+                "warnings": warnings,
+                # The page polls while this is true, then shows the refreshed rosters.
+                "syncing": syncing or user.id in _syncing,
+                "syncing_leagues": len(stale)})
     return out

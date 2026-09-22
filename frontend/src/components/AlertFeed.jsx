@@ -85,7 +85,7 @@ export default function AlertFeed({ items = [], playerMap = {}, maxItems = 6, li
               </div>
               <p className="text-xs text-subtle leading-snug line-clamp-2">{item.headline}</p>
               {(type || lineups[item.player_id] > 1) && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide">
+                <span className="text-xs font-medium">
                   {type && <span className={type.cls}>{type.text}</span>}
                   {lineups[item.player_id] > 1 && <span className="text-content/80">{type ? ' · ' : ''}Affects {lineups[item.player_id]} lineups</span>}
                 </span>

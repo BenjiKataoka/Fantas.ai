@@ -10,7 +10,7 @@ export default function ConcernMeter({ score }) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex justify-between items-center">
-        <span className="text-xs text-subtle uppercase tracking-wide">Concern</span>
+        <span className="text-xs text-subtle">Concern</span>
         <span className={`text-xs font-semibold font-mono tabular-nums ${text}`}>{score}/10</span>
       </div>
       <div className="h-1.5 bg-raised rounded-full overflow-hidden">

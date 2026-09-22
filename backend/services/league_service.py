@@ -211,3 +211,24 @@ async def sync_league(db: AsyncSession, user, ul: UserLeague, nfl_state: dict) -
     if not user.sleeper_user_id:
         return None
     return await sync_sleeper_league(db, user, user.sleeper_user_id, ul, nfl_state)
+
+
+async def resolve_sleeper_user_id(user, sleeper_username: Optional[str]) -> Optional[str]:
+    """The Sleeper account for this request, or None for an ESPN-only user. Falls back to
+    the id saved on the user so pages work without passing a username every time."""
+    from services import sleeper_service
+
+    if sleeper_username:
+        return await sleeper_service.get_user_id(sleeper_username)
+    return user.sleeper_user_id
+
+
+async def all_leagues(user, sleeper_user_id: Optional[str], season: int, db: AsyncSession) -> list[dict]:
+    """Every eligible league across platforms: Sleeper (when the user has an account) plus ESPN."""
+    from services import sleeper_service
+
+    leagues = []
+    if sleeper_user_id:
+        leagues += [{**l, "platform": "SLEEPER"}
+                    for l in await sleeper_service.get_eligible_leagues(sleeper_user_id, season=season)]
+    return leagues + await espn_leagues(user, season, db)

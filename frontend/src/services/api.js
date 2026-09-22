@@ -35,7 +35,7 @@ api.interceptors.response.use(
 
 // --- Roster ---
 export const getLeagues = (sleeperUsername) =>
-  api.get('/leagues', { params: { sleeper_username: sleeperUsername } })
+  api.get('/leagues', { params: sleeperUsername ? { sleeper_username: sleeperUsername } : {} })
 
 export const getRoster = (sleeperUsername, leagueId, platform = 'SLEEPER', force = false) =>
   api.get('/roster', { params: { sleeper_username: sleeperUsername, league_id: leagueId, platform, force } })

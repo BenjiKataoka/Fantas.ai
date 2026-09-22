@@ -137,13 +137,13 @@ export default function TrackerCard({ player, onUnstar, onRefresh }) {
             <div className="grid grid-cols-2 gap-3">
               {short_term_outlook && (
                 <div className="bg-raised rounded-lg p-3">
-                  <p className="text-xs font-semibold text-subtle uppercase tracking-wide mb-1">Short Term</p>
+                  <p className="text-xs font-medium text-subtle mb-1">Short term</p>
                   <p className="text-xs text-content/80 leading-snug">{short_term_outlook}</p>
                 </div>
               )}
               {long_term_outlook && (
                 <div className="bg-raised rounded-lg p-3">
-                  <p className="text-xs font-semibold text-subtle uppercase tracking-wide mb-1">Long Term</p>
+                  <p className="text-xs font-medium text-subtle mb-1">Long term</p>
                   <p className="text-xs text-content/80 leading-snug">{long_term_outlook}</p>
                 </div>
               )}

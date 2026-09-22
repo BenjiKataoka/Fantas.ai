@@ -11,7 +11,7 @@ export default function SentimentGauge({ score, label }) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex justify-between items-center">
-        <span className="text-xs text-subtle uppercase tracking-wide">Sentiment</span>
+        <span className="text-xs text-subtle">Sentiment</span>
         <span className={`text-xs font-semibold ${text}`}>
           {label ?? (score > 0.2 ? 'OPTIMISTIC' : score < -0.2 ? 'PESSIMISTIC' : 'NEUTRAL')}
           <span className="font-mono tabular-nums ml-1 opacity-60">{score > 0 ? '+' : ''}{score.toFixed(2)}</span>

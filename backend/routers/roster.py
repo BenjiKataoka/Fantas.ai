@@ -10,7 +10,8 @@ from services.sleeper_service import get_user_id, get_eligible_leagues
 from auth import get_current_user
 from services import tracker_service
 from services import espn_service
-from services.league_service import (RELEVANT_POSITIONS, espn_leagues as _espn_leagues, full_name,
+from services.league_service import (RELEVANT_POSITIONS, all_leagues, espn_leagues as _espn_leagues, full_name,
+                                     resolve_sleeper_user_id,
                                      get_or_create_user_league,
                                      league_season as _resolve_league_season, sync_espn_league,
                                      sync_sleeper_league)
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/leagues")
 async def list_eligible_leagues(
-    sleeper_username: str = Query(..., description="Sleeper username"),
+    sleeper_username: str | None = Query(None, description="Sleeper username; not needed for ESPN-only users"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -29,18 +30,18 @@ async def list_eligible_leagues(
     The user's redraft PPR leagues across platforms: Sleeper by username, plus ESPN when
     the user has saved ESPN cookies. Each entry carries its `platform`.
     """
-    user_id = await get_user_id(sleeper_username)
-    if not user_id:
+    user_id = await resolve_sleeper_user_id(user, sleeper_username)
+    if sleeper_username and not user_id:
         raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
 
     nfl_state = await get_nfl_state()
     league_season = _resolve_league_season(nfl_state)
-    leagues = [{**l, "platform": "SLEEPER"} for l in await get_eligible_leagues(user_id, season=league_season)]
-    leagues += await _espn_leagues(user, league_season, db)
+    leagues = await all_leagues(user, user_id, league_season, db)
     if not leagues:
         return {
             "leagues": [],
-            "message": "No redraft PPR leagues found for this Sleeper account.",
+            "message": ("No redraft PPR leagues found for this Sleeper account." if user_id
+                        else "Connect Sleeper or ESPN to see your leagues."),
         }
 
     return {"leagues": leagues, "sleeper_user_id": user_id}
@@ -108,7 +109,7 @@ async def remove_espn_league(league_id: str, user: User = Depends(get_current_us
 
 @router.get("/roster")
 async def get_my_roster(
-    sleeper_username: str = Query(..., description="Sleeper username"),
+    sleeper_username: str | None = Query(None, description="Sleeper username; not needed for ESPN leagues"),
     league_id: str = Query(..., description="League ID on its platform"),
     platform: str = Query("SLEEPER", pattern="^(SLEEPER|ESPN)$"),
     force: bool = Query(False, description="Skip the 15-minute league cache (manual refresh)"),
@@ -122,9 +123,9 @@ async def get_my_roster(
     # Fetch NFL state first, used for season/week throughout this handler
     nfl_state = await get_nfl_state()
 
-    # Resolve username → user_id
-    sleeper_user_id = await get_user_id(sleeper_username)
-    if not sleeper_user_id:
+    # Resolve username → user_id (ESPN leagues don't need one)
+    sleeper_user_id = await resolve_sleeper_user_id(user, sleeper_username)
+    if platform == "SLEEPER" and not sleeper_user_id:
         raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
 
     # Validate this is a redraft PPR league owned by this user.
@@ -146,8 +147,9 @@ async def get_my_roster(
         )
 
     # --- Persist the Sleeper credentials on the authenticated user ---
-    user.sleeper_username = sleeper_username
-    user.sleeper_user_id = sleeper_user_id
+    if sleeper_username:
+        user.sleeper_username = sleeper_username
+    user.sleeper_user_id = user.sleeper_user_id or sleeper_user_id
 
     # --- Upsert this league into user_leagues and make it the primary (last loaded) ---
     meta = next(l for l in eligible if l["league_id"] == league_id)
