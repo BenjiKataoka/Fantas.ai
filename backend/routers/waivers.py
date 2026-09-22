@@ -14,7 +14,7 @@ from database import get_db
 from models.news import PlayerNews
 from models.user import User
 from services import espn_service, nfl_service, rotowire_service, sentiment_service, sleeper_service, tracker_service
-from services.projection_engine import compute_weighted_projection, weights_from_user
+from services.projection_engine import this_week_projection, weights_from_user
 from services.projection_service import _extract_sleeper_pts, get_nfl_state
 from services.rule_filter_service import classify_news_type
 from services.utils import normalize_name
@@ -109,11 +109,7 @@ async def _board(sleeper_username: str, league_id: str, user: User, db: AsyncSes
             return None
         name = sp.get("full_name") or f"{sp.get('first_name', '')} {sp.get('last_name', '')}".strip()
         status = sp.get("injury_status")
-        slp = _extract_sleeper_pts(sleeper_weeks[0].get(pid))
-        espn = espn_by_id.get(str(sp.get("espn_id"))) or espn_by_name.get(normalize_name(name))
-        # FantasyPros is left out on purpose: it only covers the top 10 per position, so it
-        # would score your starters on 3 sources and free agents on 2.
-        w = compute_weighted_projection(slp, espn, None, weights)
+        w = this_week_projection(sp, sleeper_weeks[0].get(pid), espn_by_id, espn_by_name, weights)
         # Sleeper keeps projecting injured players, so availability overrides the numbers.
         # ESPN only projects the current week; later weeks are Sleeper's.
         per_week = [w["weighted_proj"] or 0.0] + [_extract_sleeper_pts(p.get(pid)) or 0.0 for p in sleeper_weeks[1:]]

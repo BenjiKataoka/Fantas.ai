@@ -11,6 +11,9 @@ ESPN_TRANSACTIONS_URL = "https://site.api.espn.com/apis/site/v2/sports/football/
 ESPN_ATHLETE_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/athletes/{athlete_id}"
 ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
 
+# ESPN's scoreboard abbreviations that differ from Sleeper's (the app's canonical ones).
+ESPN_TO_SLEEPER_TEAM = {"WSH": "WAS"}
+
 # In-memory cache keyed by endpoint
 _cache: dict = {}
 
@@ -268,3 +271,35 @@ async def get_teams_playing_today(force_refresh: bool = False) -> set[str]:
     _set_cache(cache_key, teams, ttl_hours=1.0)
     logger.info(f"[ESPN Scoreboard] {len(teams)} teams playing today: {sorted(teams)}")
     return teams
+
+
+async def get_week_schedule(season: int, week: int) -> dict[str, dict]:
+    """{team: {"kickoff": aware UTC datetime, "state": "pre"|"in"|"post"}} for one regular
+    season week, in Sleeper's team abbreviations. A team missing from the map is on bye.
+    Cached 1 hour (game states change on Sundays)."""
+    cache_key = f"schedule_{season}_{week}"
+    cached = _get_cache(cache_key)
+    if cached is not None:
+        return cached
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(ESPN_SCOREBOARD_URL, params={"week": week, "seasontype": 2, "dates": season})
+            resp.raise_for_status()
+            events = resp.json().get("events", [])
+    except Exception as e:
+        logger.error(f"[NFL] week schedule failed season={season} week={week}: {e}")
+        return {}
+    out: dict[str, dict] = {}
+    for ev in events:
+        comp = (ev.get("competitions") or [{}])[0]
+        try:
+            kickoff = datetime.fromisoformat(ev["date"].replace("Z", "+00:00"))
+        except (KeyError, ValueError):
+            continue
+        state = ((comp.get("status") or {}).get("type") or {}).get("state", "pre")
+        for c in comp.get("competitors", []):
+            abbr = (c.get("team") or {}).get("abbreviation")
+            if abbr:
+                out[ESPN_TO_SLEEPER_TEAM.get(abbr, abbr)] = {"kickoff": kickoff, "state": state}
+    _set_cache(cache_key, out, ttl_hours=1.0)
+    return out

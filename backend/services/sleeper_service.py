@@ -229,3 +229,21 @@ async def get_trending_players(trend_type: str = "add", limit: int = 25) -> list
     except Exception as e:
         logger.error(f"[Sleeper] get_trending failed ({trend_type}): {e}")
         return []
+
+
+async def get_league_users(league_id: str) -> list:
+    """League members (display_name, metadata.team_name). Cached 6h."""
+    cache_key = f"sleeper_users_{league_id}"
+    cached = _get_cache(cache_key)
+    if cached:
+        return cached
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{SLEEPER_BASE}/league/{league_id}/users", timeout=10)
+            resp.raise_for_status()
+            data = resp.json() or []
+            _set_cache(cache_key, data)
+            return data
+    except Exception as e:
+        logger.error(f"[Sleeper] get_league_users failed for {league_id}: {e}")
+        return []

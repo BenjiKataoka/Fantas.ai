@@ -13,7 +13,7 @@ import { slotLabel } from '@/lib/utils'
 // icon stays meaningful instead of decorating everyone.
 const HIGH_CONCERN = 8
 
-function ConcernFlag({ stock }) {
+export function ConcernFlag({ stock }) {
   if (!stock || (stock.concern_level ?? 0) < HIGH_CONCERN) return null
   const reasons = (stock.bearish_factors || []).slice(0, 2)
   return (

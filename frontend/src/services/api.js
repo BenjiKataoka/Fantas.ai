@@ -78,6 +78,12 @@ export const getWaivers = (sleeperUsername, leagueId) =>
 export const analyzeFreeAgent = (playerId, sleeperUsername, leagueId) =>
   api.post(`/waivers/analyze/${playerId}`, null, { params: { sleeper_username: sleeperUsername, league_id: leagueId } })
 
+export const getMatchups = (sleeperUsername) =>
+  api.get('/matchups', { params: { sleeper_username: sleeperUsername } })
+
+export const getPortfolio = (sleeperUsername) =>
+  api.get('/portfolio', { params: { sleeper_username: sleeperUsername } })
+
 // --- ESPN account (cookies are write-only: the API never returns them) ---
 export const getEspnStatus = () => api.get('/settings/espn')
 export const saveEspn = (espn_s2, swid) => api.put('/settings/espn', { espn_s2, swid })

@@ -86,7 +86,7 @@ async def get_news(
 
     news_result = await db.execute(
         select(PlayerNews)
-        .options(selectinload(PlayerNews.analysis))
+        .options(selectinload(PlayerNews.analysis), selectinload(PlayerNews.player))
         .where(
             PlayerNews.player_id.in_(all_user_player_ids),
             PlayerNews.created_at >= lookback,
@@ -124,6 +124,10 @@ def _build_card(item: PlayerNews, is_starred: bool) -> dict:
     base = {
         "news_id": item.id,
         "player_id": item.player_id,
+        # Carried on the card so pages don't depend on one league's roster to name players.
+        "player_name": item.player.name if item.player else None,
+        "position": item.player.position if item.player else None,
+        "nfl_team": item.player.nfl_team if item.player else None,
         "source": item.source,
         "headline": item.headline,
         "news_body": item.news_body,

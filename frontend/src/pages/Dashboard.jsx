@@ -6,6 +6,7 @@ import RosterTable from '../components/RosterTable'
 import WeightSlider from '../components/WeightSlider'
 import AlertFeed from '../components/AlertFeed'
 import { TableSkeleton } from '../components/Skeletons'
+import PortfolioView from '../components/PortfolioView'
 
 // ── Analyze-my-roster button ──────────────────────────────────────────────────
 // State lives in AppContext so progress survives page navigation; this is just the UI.
@@ -146,14 +147,47 @@ function WeightSidebar() {
   )
 }
 
+// ── Portfolio / This league toggle ────────────────────────────────────────────
+const VIEW_KEY = 'fantasai_dashboard_view'
+
+function readView() {
+  try { return localStorage.getItem(VIEW_KEY) || 'portfolio' } catch { return 'portfolio' }
+}
+
+function ViewToggle({ view, onChange, leagueName }) {
+  const opt = (value, label) => (
+    <button
+      onClick={() => onChange(value)}
+      aria-pressed={view === value}
+      className={`px-3 py-1 rounded-md text-sm font-medium ${view === value ? 'bg-brand text-brand-fg' : 'text-subtle hover:text-content'}`}
+    >
+      {label}
+    </button>
+  )
+  return (
+    <div className="inline-flex gap-1 p-1 mb-6 rounded-lg bg-raised border border-line">
+      {opt('portfolio', 'Portfolio')}
+      {opt('league', leagueName ? `This league: ${leagueName}` : 'This league')}
+    </div>
+  )
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const {
     credentials, saveCredentials, clearCredentials,
     rosterData, rosterLoading, rosterError,
     newsData, newsLoading,
-    startSitData,
+    startSitData, leagues, switchLeague,
   } = useApp()
+  const [view, setView] = useState(readView)
+  const chooseView = (v) => {
+    setView(v)
+    try { localStorage.setItem(VIEW_KEY, v) } catch { /* private mode: choice lasts this visit */ }
+  }
+  // The portfolio only means something with two or more leagues.
+  const multi = leagues.length > 1
+  const activeLeague = leagues.find(l => l.league_id === credentials?.leagueId && l.platform === credentials?.platform)
 
   // { player_id → most recent news card } for the roster's News column
   const newsMap = useMemo(() => {
@@ -184,8 +218,18 @@ export default function Dashboard() {
     return <SetupForm onComplete={(username, leagueId, platform) => saveCredentials(username, leagueId, platform)} />
   }
 
+  if (multi && view === 'portfolio') {
+    return (
+      <div>
+        <ViewToggle view={view} onChange={chooseView} leagueName={activeLeague?.name} />
+        <PortfolioView onOpenLeague={(l) => { switchLeague(l.league_id, l.platform); chooseView('league') }} />
+      </div>
+    )
+  }
+
   return (
     <div>
+      {multi && <ViewToggle view={view} onChange={chooseView} leagueName={activeLeague?.name} />}
       {/* Wrap so the click event isn't passed as `creds` (would break the fetch). */}
       <div className={REVEAL}>
         <TopBar rosterData={rosterData} />

@@ -366,7 +366,7 @@ async def get_espn_league(league_id: str, season: int, espn_s2: str | None = Non
             resp = await client.get(
                 f"{ESPN_BASE}/seasons/{season}/segments/0/leagues/{league_id}",
                 headers=_cookie_headers(espn_s2, swid),
-                params=[("view", "mSettings"), ("view", "mTeam"), ("view", "mRoster")],
+                params=[("view", "mSettings"), ("view", "mTeam"), ("view", "mRoster"), ("view", "mMatchup")],
             )
     except Exception as e:
         logger.error(f"[ESPN] get_espn_league failed for {league_id}: {e}")

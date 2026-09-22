@@ -56,6 +56,7 @@ class UserLeague(Base):
     # ESPN public leagues only: which team is yours, since without cookies there's no SWID
     # to match. Null means "find my team by SWID".
     team_id = Column(Integer, nullable=True)
+    synced_at = Column(TIMESTAMP, nullable=True)      # last roster sync; the portfolio re-syncs stale leagues
     connected_at = Column(TIMESTAMP, server_default=func.now())
 
     # Relationships

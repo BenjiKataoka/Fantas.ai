@@ -14,7 +14,7 @@ import Recap from './pages/Recap'
 import Waivers from './pages/Waivers'
 import Settings from './pages/Settings'
 import Admin from './pages/Admin'
-import Spinner from './components/Spinner'
+import Spinner, { LoadingDots } from './components/Spinner'
 import Ticker from './components/Ticker'
 import { getMe } from './services/api'
 import { useApp } from './context/AppContext'
@@ -78,7 +78,9 @@ function RefreshStatus() {
   if (!credentials) return null
   return (
     <div className="flex items-center gap-1.5 text-xs text-subtle">
-      {lastRefresh && <span className="font-mono">{rosterLoading ? 'Updating' : `Updated ${ago(lastRefresh, now)}`}</span>}
+      {rosterLoading
+        ? <span className="flex items-center gap-2">Updating <LoadingDots /></span>
+        : lastRefresh && <span className="font-mono">Updated {ago(lastRefresh, now)}</span>}
       <button
         onClick={() => refreshAll({ force: true })}
         disabled={rosterLoading}
@@ -287,7 +289,7 @@ export default function App() {
   return (
     <>
       <ClerkLoading>
-        <CenteredShell><Spinner label="Loading..." /></CenteredShell>
+        <CenteredShell><Spinner /></CenteredShell>
       </ClerkLoading>
       <ClerkLoaded>
         <Show when="signed-out"><Landing /></Show>

@@ -138,6 +138,11 @@
 .no-scrollbar {
   scrollbar-width: none;
 }
+/* Dashboard league strip: fade the right edge so more leagues read as "keep dragging". */
+.league-strip {
+  -webkit-mask-image: linear-gradient(to right, #000 92%, transparent);
+  mask-image: linear-gradient(to right, #000 92%, transparent);
+}
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -156,4 +161,65 @@
 
 @media (prefers-reduced-motion: reduce) {
   .collapse-row { transition: none; }
+}
+
+/* ── Loading: daisyUI-style shimmer and dots ───────────────────────────────────
+   A highlight sweeps across placeholders instead of the whole block pulsing. */
+.shimmer {
+  background-color: var(--raised);
+  background-image: linear-gradient(105deg, transparent 30%, color-mix(in srgb, var(--content) 7%, transparent) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+@keyframes shimmer {
+  from { background-position: 150% 0; }
+  to   { background-position: -50% 0; }
+}
+.loading-dots { display: inline-flex; gap: 0.3em; align-items: center; }
+.loading-dots > span {
+  width: 0.4em; height: 0.4em; border-radius: 9999px; background: currentColor;
+  animation: loading-dot 1s ease-in-out infinite;
+}
+.loading-dots > span:nth-child(2) { animation-delay: 0.15s; }
+.loading-dots > span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes loading-dot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40%           { transform: scale(1);   opacity: 1; }
+}
+
+/* ── Bento cards: a slight tilt toward the cursor and a lift on hover ──────────
+   useTilt() sets --rx/--ry on mousemove; no re-render per frame. */
+.tilt {
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(var(--lift, 0));
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 300ms ease, border-color 300ms ease;
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.04);
+}
+.tilt:hover {
+  --lift: -3px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.10);
+  border-color: color-mix(in srgb, var(--content) 18%, var(--line));
+}
+:root.dark .tilt { box-shadow: 0 4px 20px rgb(0 0 0 / 0.25); }
+:root.dark .tilt:hover { box-shadow: 0 10px 30px rgb(0 0 0 / 0.45); }
+
+/* ── Dot field: a grid of dots that lights up around the cursor (the hero) ─────
+   Two layers of the same dots: a faint one everywhere, a bright one masked to a
+   circle at --mx/--my, which the hero moves with the mouse. */
+.dot-field { position: relative; isolation: isolate; overflow: hidden; }
+.dot-field::before, .dot-field::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background-image: radial-gradient(circle, var(--content) 1px, transparent 1.6px);
+  background-size: 18px 18px;
+}
+.dot-field::before { opacity: 0.10; }
+.dot-field::after {
+  opacity: 0.55;
+  -webkit-mask-image: radial-gradient(circle 160px at var(--mx, -999px) var(--my, -999px), #000, transparent);
+  mask-image: radial-gradient(circle 160px at var(--mx, -999px) var(--my, -999px), #000, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer, .loading-dots > span { animation: none; }
+  .tilt, .tilt:hover { transform: none; }
+  .dot-field::after { display: none; }
 }

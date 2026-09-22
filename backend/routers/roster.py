@@ -10,24 +10,14 @@ from services.sleeper_service import get_user_id, get_eligible_leagues
 from auth import get_current_user
 from services import tracker_service
 from services import espn_service
-from services.league_service import RELEVANT_POSITIONS, full_name, sync_espn_league, sync_sleeper_league
+from services.league_service import (RELEVANT_POSITIONS, espn_leagues as _espn_leagues, full_name,
+                                     get_or_create_user_league,
+                                     league_season as _resolve_league_season, sync_espn_league,
+                                     sync_sleeper_league)
 from services.projection_service import get_nfl_state
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-def _resolve_league_season(nfl_state: dict) -> int:
-    """
-    The season whose Sleeper leagues we should look at.
-
-    Sleeper always reports the upcoming season in `nfl_state` (e.g. 2026), but during
-    the offseason those leagues don't exist yet, so fall back to the completed season.
-    Both /api/leagues and /api/roster MUST use this so the dropdown and the roster
-    validation agree on which season's leagues are eligible. Never hardcode the year.
-    """
-    season = nfl_state["season"]
-    return season - 1 if nfl_state["season_type"] == "off" else season
-
 
 @router.get("/leagues")
 async def list_eligible_leagues(
@@ -54,30 +44,6 @@ async def list_eligible_leagues(
         }
 
     return {"leagues": leagues, "sleeper_user_id": user_id}
-
-
-async def _espn_leagues(user: User, season: int, db: AsyncSession) -> list[dict]:
-    """ESPN leagues for this user: every league their cookies unlock (filtered to redraft
-    PPR like Sleeper's), plus public leagues they added by link without cookies."""
-    out: dict[str, dict] = {}
-    if user.espn_s2 and user.swid:
-        try:
-            for l in await espn_service.get_espn_fan_leagues(user.espn_s2, user.swid, season):
-                league = await espn_service.get_espn_league(l["league_id"], season, user.espn_s2, user.swid)
-                if league and espn_service.espn_is_redraft_ppr(league):
-                    out[l["league_id"]] = {"league_id": l["league_id"], "name": l["name"], "platform": "ESPN",
-                                           "total_rosters": (league.get("settings") or {}).get("size"), "season": season}
-        except espn_service.EspnAuthError:
-            logger.warning(f"[Leagues] ESPN cookies expired for user {user.id}")
-            user.espn_needs_reconnect = True
-    public = (await db.execute(select(UserLeague).where(
-        UserLeague.user_id == user.id, UserLeague.platform == "ESPN",
-        UserLeague.team_id.isnot(None), UserLeague.season == season,
-    ))).scalars().all()
-    for ul in public:
-        out.setdefault(ul.league_id, {"league_id": ul.league_id, "name": ul.league_name, "platform": "ESPN",
-                                      "total_rosters": ul.total_rosters, "season": season, "public": True})
-    return list(out.values())
 
 
 class EspnLookup(BaseModel):
@@ -126,12 +92,7 @@ async def connect_public_espn_league(
     if not espn_service.espn_my_team(league, team_id=body.team_id):
         raise HTTPException(status_code=400, detail="That team isn't in this league.")
     settings_ = league.get("settings") or {}
-    ul = (await db.execute(select(UserLeague).where(
-        UserLeague.user_id == user.id, UserLeague.platform == "ESPN", UserLeague.league_id == body.league_id,
-    ))).scalar_one_or_none()
-    if not ul:
-        ul = UserLeague(user_id=user.id, platform="ESPN", league_id=body.league_id)
-        db.add(ul)
+    ul = await get_or_create_user_league(db, user.id, "ESPN", body.league_id)
     ul.league_name, ul.total_rosters, ul.season, ul.team_id = settings_.get("name"), settings_.get("size"), season, body.team_id
     return {"league_id": body.league_id, "name": ul.league_name, "platform": "ESPN", "public": True}
 
@@ -189,24 +150,9 @@ async def get_my_roster(
     user.sleeper_user_id = sleeper_user_id
 
     # --- Upsert this league into user_leagues and make it the primary (last loaded) ---
-    ul = (await db.execute(
-        select(UserLeague).where(
-            UserLeague.user_id == user.id,
-            UserLeague.league_id == league_id,
-            UserLeague.platform == platform,
-        )
-    )).scalar_one_or_none()
-    if not ul:
-        ul = UserLeague(
-            user_id=user.id,
-            platform=platform,
-            league_id=league_id,
-            league_name=next((l["name"] for l in eligible if l["league_id"] == league_id), None),
-            total_rosters=next((l.get("total_rosters") for l in eligible if l["league_id"] == league_id), None),
-            season=league_season,
-        )
-        db.add(ul)
-        await db.flush()
+    meta = next(l for l in eligible if l["league_id"] == league_id)
+    ul = await get_or_create_user_league(db, user.id, platform, league_id, league_name=meta["name"],
+                                         total_rosters=meta.get("total_rosters"), season=league_season)
     await db.execute(
         update(UserLeague).where(UserLeague.user_id == user.id).values(is_primary=(UserLeague.id == ul.id))
     )

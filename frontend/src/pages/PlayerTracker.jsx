@@ -1,3 +1,4 @@
+import { LoadingDots } from '../components/Spinner'
 import { REVEAL } from '@/lib/utils'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { toast } from 'sonner'
@@ -272,7 +273,7 @@ export default function PlayerTracker() {
           {/* Chart */}
           <div className={`px-2 pb-2 pt-1 ${REVEAL}`} style={{ animationDelay: '210ms' }}>
             {histLoading && !history
-              ? <div className="h-[210px] flex items-center justify-center text-sm text-subtle">Loading...</div>
+              ? <div className="h-[210px] flex items-center justify-center text-subtle" role="status" aria-label="Loading chart"><LoadingDots className="text-xl" /></div>
               : <TrendChart points={history?.points || []} metric={metric} position={selected.position} />}
           </div>
 

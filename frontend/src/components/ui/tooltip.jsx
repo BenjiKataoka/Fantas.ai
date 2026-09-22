@@ -26,3 +26,15 @@ export function TooltipContent({ className, sideOffset = 6, children, ...props }
     </TooltipPrimitive.Portal>
   )
 }
+
+// Explain a badge or symbol on hover/focus: <Hint text="...">{badge}</Hint>.
+export function Hint({ text, side = 'top', children }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help">{children}</span>
+      </TooltipTrigger>
+      <TooltipContent side={side} className="max-w-64 leading-snug">{text}</TooltipContent>
+    </Tooltip>
+  )
+}

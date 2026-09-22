@@ -8,6 +8,8 @@ import { REVEAL, slotLabel } from '@/lib/utils'
 import { TrendingDown, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import CollapseRow from '../components/CollapseRow'
+import { LoadingDots } from '../components/Spinner'
+import { Hint } from '@/components/ui/tooltip'
 
 const FILTERS = ['All', 'QB', 'RB', 'WR', 'TE', 'K']
 const POS_COLORS = { QB: 'text-pos-qb', RB: 'text-pos-rb', WR: 'text-pos-wr', TE: 'text-pos-te' }
@@ -24,7 +26,11 @@ function Trend({ p }) {
   return (
     <div className="flex flex-col items-end leading-tight">
       <Num className="text-subtle text-xs"><span className="text-bull">+{compact(p.adds)}</span> / <span className="text-bear">-{compact(p.drops)}</span></Num>
-      {p.being_dropped && <span className="flex items-center gap-1 text-xs text-bear mt-0.5"><TrendingDown className="size-3" />Being dropped</span>}
+      {p.being_dropped && (
+        <Hint text="More managers dropped him than added him in the last 24 hours, usually a sign of bad news.">
+          <span className="flex items-center gap-1 text-xs text-bear mt-0.5"><TrendingDown className="size-3" />Being dropped</span>
+        </Hint>
+      )}
     </div>
   )
 }
@@ -119,7 +125,7 @@ function Row({ p, i, analysis, open, onAnalyze, lineAbove }) {
           className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors disabled:opacity-60 ${
             open ? 'border-brand text-brand' : 'border-line text-subtle hover:text-content hover:bg-raised'}`}
         >
-          {analysis?.loading ? 'Analyzing' : open ? 'Hide' : 'Analyze'}
+          {analysis?.loading ? <span className="inline-flex items-center gap-1.5">Analyzing <LoadingDots /></span> : open ? 'Hide' : 'Analyze'}
         </button>
       </td>
     </tr>

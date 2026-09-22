@@ -37,7 +37,7 @@ function WeightsSection() {
       title="Projection Weights"
       description="How Sleeper, ESPN, and FantasyPros projections are blended into the weighted score. Must total 100%."
     >
-      {!weightsLoaded ? <Spinner label="Loading weights..." /> : (
+      {!weightsLoaded ? <Spinner label="Loading weights" /> : (
         <div className="flex flex-col gap-5 max-w-sm">
           <WeightSlider label="Sleeper"     value={weights.weight_sleeper} onChange={v => handleChange('weight_sleeper', v)} />
           <WeightSlider label="ESPN"        value={weights.weight_espn}    onChange={v => handleChange('weight_espn', v)} />
@@ -268,7 +268,7 @@ function ESPNSection() {
       <div className="border-t border-line my-6" />
       <h3 className="text-sm font-medium text-content mb-1">Private leagues: connect your ESPN account</h3>
       <p className="text-sm text-subtle mb-3">Finds every ESPN league you're in, public or private.</p>
-      {connected === null ? <Spinner label="Checking..." /> : connected ? (
+      {connected === null ? <Spinner label="Checking your ESPN connection" /> : connected ? (
         <div className="flex flex-col gap-3 max-w-sm">
           <p className="text-sm text-content">
             Connected.{' '}

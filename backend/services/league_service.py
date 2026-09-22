@@ -1,10 +1,31 @@
-"""Which of a user's connected leagues a request is about."""
+"""Connected leagues: which one a request means, which ones a user has, and syncing their rosters."""
+import logging
+from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.user import UserLeague
+
+logger = logging.getLogger(__name__)
+
+
+async def get_or_create_user_league(db: AsyncSession, user_id: int, platform: str, league_id: str,
+                                    **fields) -> UserLeague:
+    """The user's row for this league, creating it if needed. Race-safe: two requests
+    loading a new league at once (a double effect, portfolio + roster) both get the same
+    row instead of one failing on the unique constraint. `fields` fill a new row only."""
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    await db.execute(
+        pg_insert(UserLeague)
+        .values(user_id=user_id, platform=platform, league_id=league_id, **fields)
+        .on_conflict_do_nothing(constraint="uq_user_league")
+    )
+    return (await db.execute(select(UserLeague).where(
+        UserLeague.user_id == user_id, UserLeague.platform == platform, UserLeague.league_id == league_id,
+    ))).scalar_one()
 
 
 async def resolve_user_league(db: AsyncSession, user_id: int, league_id: Optional[str]) -> Optional[UserLeague]:
@@ -14,6 +35,45 @@ async def resolve_user_league(db: AsyncSession, user_id: int, league_id: Optiona
     # ponytail: league_id alone could match a Sleeper and an ESPN league with the same id;
     # add a platform param once ESPN leagues exist.
     return (await db.execute(q.limit(1))).scalar_one_or_none()
+
+
+def league_season(nfl_state: dict) -> int:
+    """
+    The season whose Sleeper leagues we should look at.
+
+    Sleeper always reports the upcoming season in `nfl_state` (e.g. 2026), but during
+    the offseason those leagues don't exist yet, so fall back to the completed season.
+    Both /api/leagues and /api/roster MUST use this so the dropdown and the roster
+    validation agree on which season's leagues are eligible. Never hardcode the year.
+    """
+    season = nfl_state["season"]
+    return season - 1 if nfl_state["season_type"] == "off" else season
+
+
+async def espn_leagues(user, season: int, db: AsyncSession) -> list[dict]:
+    """ESPN leagues for this user: every league their cookies unlock (filtered to redraft
+    PPR like Sleeper's), plus public leagues they added by link without cookies."""
+    from services import espn_service
+
+    out: dict[str, dict] = {}
+    if user.espn_s2 and user.swid:
+        try:
+            for l in await espn_service.get_espn_fan_leagues(user.espn_s2, user.swid, season):
+                league = await espn_service.get_espn_league(l["league_id"], season, user.espn_s2, user.swid)
+                if league and espn_service.espn_is_redraft_ppr(league):
+                    out[l["league_id"]] = {"league_id": l["league_id"], "name": l["name"], "platform": "ESPN",
+                                           "total_rosters": (league.get("settings") or {}).get("size"), "season": season}
+        except espn_service.EspnAuthError:
+            logger.warning(f"[Leagues] ESPN cookies expired for user {user.id}")
+            user.espn_needs_reconnect = True
+    public = (await db.execute(select(UserLeague).where(
+        UserLeague.user_id == user.id, UserLeague.platform == "ESPN",
+        UserLeague.team_id.isnot(None), UserLeague.season == season,
+    ))).scalars().all()
+    for ul in public:
+        out.setdefault(ul.league_id, {"league_id": ul.league_id, "name": ul.league_name, "platform": "ESPN",
+                                      "total_rosters": ul.total_rosters, "season": season, "public": True})
+    return list(out.values())
 
 
 RELEVANT_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
@@ -70,7 +130,10 @@ async def _store_roster(db: AsyncSession, user, ul: UserLeague, player_ids: list
         )
         await db.execute(stmt)
 
-    # Re-sync this league only; the user's other leagues keep their rows.
+    # Re-sync this league only; the user's other leagues keep their rows. The lock makes a
+    # second sync of the same league wait for the first to commit instead of colliding on
+    # my_roster's key (released at commit/rollback).
+    await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": ul.id})
     await db.execute(delete(MyRoster).where(MyRoster.user_league_id == ul.id))
     for r in rows:
         db.add(MyRoster(
@@ -90,6 +153,7 @@ async def _store_roster(db: AsyncSession, user, ul: UserLeague, player_ids: list
             db=db,
             weights=weights_from_user(user),
         )
+    ul.synced_at = datetime.utcnow()
     return {"player_ids": player_ids, "starters": starters, "slots": slots,
             "all_players": all_players, "projections": projections}
 
@@ -106,7 +170,12 @@ async def sync_sleeper_league(db: AsyncSession, user, sleeper_user_id: str, ul: 
     player_ids: list[str] = roster.get("players") or []
     starters: set[str] = set(roster.get("starters") or [])
     all_players = await sleeper_service.get_all_players()
-    slots = {pid: guess_slot(pid, starters, all_players) for pid in player_ids}
+    # Sleeper lists starters in the same order as the league's lineup slots, so pairing
+    # them gives the real slot (SUPER_FLEX, FLEX) instead of just the position.
+    lineup = [s for s in ((await sleeper_service.get_league(ul.league_id)) or {}).get("roster_positions") or []
+              if s not in ("BN", "IR", "TAXI")]
+    exact = dict(zip(roster.get("starters") or [], lineup)) if lineup else {}
+    slots = {pid: exact.get(pid) or guess_slot(pid, starters, all_players) for pid in player_ids}
     return await _store_roster(db, user, ul, player_ids, starters, slots, all_players, nfl_state)
 
 

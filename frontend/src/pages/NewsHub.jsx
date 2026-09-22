@@ -176,15 +176,8 @@ function NewsCard({ item, playerLabel, playerName }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function NewsHub() {
-  const { rosterData, newsData, newsLoading, fetchNews } = useApp()
+  const { newsData, newsLoading, fetchNews } = useApp()
   const [activeFilter, setActiveFilter] = useState('all')
-
-  const playerMap = useMemo(() => {
-    if (!rosterData?.roster) return {}
-    const map = {}
-    for (const p of rosterData.roster) map[p.player_id] = { name: p.name, position: p.position, nfl_team: p.nfl_team }
-    return map
-  }, [rosterData])
 
   const items = newsData?.news ?? []
 
@@ -196,10 +189,10 @@ export default function NewsHub() {
 
   const contradictionCount = useMemo(() => items.filter(i => i.contradictions_flagged).length, [items])
 
+  // Names come on each card from the server, so players on any of your leagues are named.
   function getPlayerLabel(item) {
-    const p = playerMap[item.player_id]
-    if (!p) return `Player ${item.player_id}`
-    return `${p.name} · ${p.position}${p.nfl_team ? ' · ' + p.nfl_team : ''}`
+    if (!item.player_name) return 'Unknown player'
+    return [item.player_name, item.position, item.nfl_team].filter(Boolean).join(' · ')
   }
 
   return (
@@ -274,7 +267,7 @@ export default function NewsHub() {
             <NewsCard
               item={item}
               playerLabel={getPlayerLabel(item)}
-              playerName={playerMap[item.player_id]?.name || ''}
+              playerName={item.player_name || ''}
             />
             </div>
           ))}

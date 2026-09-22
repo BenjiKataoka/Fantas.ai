@@ -47,8 +47,9 @@ const recency = (i) => (i.published_at ? new Date(i.published_at).getTime() : 0)
  *   items: news cards from AppContext newsData.news
  *   playerMap: { player_id: { name, position } } from rosterData
  *   maxItems: max alerts to display (default 6)
+ *   lineups: optional { player_id: lineups he starts in } (portfolio) → "affects N lineups"
  */
-export default function AlertFeed({ items = [], playerMap = {}, maxItems = 6 }) {
+export default function AlertFeed({ items = [], playerMap = {}, maxItems = 6, lineups = {} }) {
   // 1) keep only meaningful items, 2) best one per player, 3) rank, 4) cap.
   const bestPerPlayer = new Map()
   for (const item of items) {
@@ -71,8 +72,8 @@ export default function AlertFeed({ items = [], playerMap = {}, maxItems = 6 }) 
   return (
     <div className="flex flex-col gap-2">
       {visible.map(item => {
-        const player = playerMap[item.player_id]
-        const label  = player ? `${player.name} · ${player.position}` : `Player ${item.player_id}`
+        const player = playerMap[item.player_id] || (item.player_name && { name: item.player_name, position: item.position })
+        const label  = player ? `${player.name} · ${player.position}` : 'Unknown player'
         const type   = TYPE_LABEL[item.news_type]
         return (
           <div key={item.news_id} className="flex gap-2 py-2 border-b border-line/60 last:border-0">
@@ -83,8 +84,11 @@ export default function AlertFeed({ items = [], playerMap = {}, maxItems = 6 }) 
                 <span className="text-xs text-subtle/70 shrink-0 font-mono">{relativeTime(item.published_at)}</span>
               </div>
               <p className="text-xs text-subtle leading-snug line-clamp-2">{item.headline}</p>
-              {type && (
-                <span className={`text-[10px] font-semibold uppercase tracking-wide ${type.cls}`}>{type.text}</span>
+              {(type || lineups[item.player_id] > 1) && (
+                <span className="text-[10px] font-semibold uppercase tracking-wide">
+                  {type && <span className={type.cls}>{type.text}</span>}
+                  {lineups[item.player_id] > 1 && <span className="text-content/80">{type ? ' · ' : ''}Affects {lineups[item.player_id]} lineups</span>}
+                </span>
               )}
             </div>
           </div>
