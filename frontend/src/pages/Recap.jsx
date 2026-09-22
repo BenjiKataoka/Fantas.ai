@@ -99,10 +99,10 @@ export default function Recap() {
   useEffect(() => { if (currentWeek && week == null) setWeek(currentWeek) }, [currentWeek, week])
 
   useEffect(() => {
-    if (!credentials || !week || credentials.platform === 'ESPN') return
+    if (!credentials || !week) return
     let cancelled = false
     setLoading(true); setError(null)
-    getRecap(week, credentials.username, credentials.leagueId)
+    getRecap(week, credentials.username, credentials.leagueId, credentials.platform)
       .then(res => { if (!cancelled) setData(res.data) })
       .catch(err => { if (!cancelled) { setData(null); setError(err.response?.data?.detail || 'Could not load this recap.') } })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -110,7 +110,6 @@ export default function Recap() {
   }, [week, credentials])
 
   if (!credentials) return <p className="text-subtle text-sm py-16 text-center">Pick your league on the Dashboard first.</p>
-  if (credentials.platform === 'ESPN') return <p className="text-subtle text-sm py-16 text-center">Weekly recaps for ESPN leagues are coming next. Switch to a Sleeper league in the top bar to see them now.</p>
   if (rosterData?.season_type === 'off') return <p className="text-subtle text-sm py-16 text-center">Recaps start once the season does.</p>
 
   const best = new Set(data?.lineup.best_lineup_ids || [])

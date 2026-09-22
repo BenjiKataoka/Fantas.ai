@@ -6,7 +6,7 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.recap_service import best_lineup, build_recap
+from services.recap_service import best_lineup, build_recap, week_result
 
 SLOTS = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K", "DEF", "BN", "BN"]
 
@@ -76,7 +76,23 @@ def run_recap_tests():
     print("    PASS, DEF inferred; no projections -> no accuracy winner")
 
 
+def run_week_result_tests():
+    print("\n" + "=" * 50); print("RECAP, WEEK RESULT"); print("=" * 50)
+    def W(pid, pos, pts, started):
+        return {"player_id": pid, "name": pid, "position": pos, "actual": pts, "started": started}
+    players = [W("qb", "QB", 20, True), W("rb1", "RB", 10, True), W("rb_bench", "RB", 22.9, False),
+               W("wr", "WR", 8, True), W("wr_bench", "WR", 3, False)]
+    r = week_result(players, ["QB", "RB", "WR", "BN", "BN"], you=38.0, opp=35.5)
+    assert r["result"] == "W" and r["best_possible"] == 50.9 and r["left_on_bench"] == 12.9, r
+    assert [m["player_id"] for m in r["misses"]] == ["rb_bench"], r["misses"]
+    print("    PASS, win; best lineup 50.9; 12.9 left; the benched RB who belonged is the miss")
+    assert week_result(players, ["QB"], you=10, opp=10)["result"] == "T"
+    assert week_result(players, ["QB"], you=10, opp=None)["result"] is None
+    print("    PASS, ties and missing opponents")
+
+
 if __name__ == "__main__":
+    run_week_result_tests()
     run_lineup_tests()
     run_recap_tests()
     print("\nALL RECAP TESTS PASSED ✅")

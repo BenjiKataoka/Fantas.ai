@@ -19,11 +19,49 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+async def _espn_week(league_id: str, user: User, season: int, week: int, final: bool, db: AsyncSession):
+    """An ESPN week reshaped into the Sleeper-style matchup build_recap already reads:
+    the week's box score carries each player's points and lineup slot."""
+    from sqlalchemy import select
+
+    from models.user import UserLeague
+    from services import espn_service
+
+    team_id = (await db.execute(select(UserLeague.team_id).where(
+        UserLeague.user_id == user.id, UserLeague.platform == "ESPN", UserLeague.league_id == league_id,
+    ))).scalar_one_or_none()
+    try:
+        data = await espn_service.get_espn_boxscore(league_id, season, week, user.espn_s2, user.swid, live=not final)
+    except espn_service.EspnAuthError:
+        raise HTTPException(status_code=401, detail="Your ESPN cookies expired. Paste fresh ones in Settings.")
+    me = espn_service.espn_my_team(data or {}, swid=user.swid, team_id=team_id)
+    if not me:
+        raise HTTPException(status_code=404, detail="You don't have a team in this league.")
+    game = next((g for g in (data.get("schedule") or []) if g.get("matchupPeriodId") == week
+                 and me["id"] in ((g.get("home") or {}).get("teamId"), (g.get("away") or {}).get("teamId"))), None)
+    if not game:
+        raise HTTPException(status_code=502, detail=f"ESPN has no week {week} matchup for your team.")
+    side = game["home"] if game["home"]["teamId"] == me["id"] else game["away"]
+    entries = (side.get("rosterForCurrentScoringPeriod") or {}).get("entries") or []
+
+    all_players = await sleeper_service.get_all_players()
+    starters, players, points = [], [], {}
+    for pid, e in espn_service.espn_to_sleeper_ids(entries, all_players):
+        players.append(pid)
+        points[pid] = (e.get("playerPoolEntry") or {}).get("appliedStatTotal") or 0.0
+        if e.get("lineupSlotId") in espn_service.ESPN_TO_SLOT:
+            starters.append(pid)
+    matchup = {"starters": starters, "players": players, "players_points": points,
+               "points": side.get("totalPoints") or 0.0}
+    return matchup, espn_service.espn_roster_positions(data or {}), ((data or {}).get("settings") or {}).get("name")
+
+
 @router.get("/recap/{week}")
 async def get_recap(
     week: int,
     sleeper_username: str = Query(..., description="Sleeper username"),
-    league_id: str = Query(..., description="Sleeper league ID"),
+    league_id: str = Query(..., description="League ID on its platform"),
+    platform: str = Query("SLEEPER", pattern="^(SLEEPER|ESPN)$"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -35,20 +73,24 @@ async def get_recap(
         raise HTTPException(status_code=400, detail=f"Week {week} hasn't been played yet.")
     final = week < current_week  # Sleeper advances the week after Monday night
 
-    sleeper_user_id = await sleeper_service.get_user_id(sleeper_username)
-    if not sleeper_user_id:
-        raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
+    if platform == "ESPN":
+        matchup, slots, league_name = await _espn_week(league_id, user, season, week, final, db)
+    else:
+        sleeper_user_id = await sleeper_service.get_user_id(sleeper_username)
+        if not sleeper_user_id:
+            raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
 
-    league, roster, matchups = await asyncio.gather(
-        sleeper_service.get_league(league_id),
-        sleeper_service.get_roster(league_id, sleeper_user_id),
-        sleeper_service.get_matchups(league_id, week, live=not final),
-    )
-    if not roster:
-        raise HTTPException(status_code=404, detail="You don't have a roster in this league.")
-    matchup = find_matchup(matchups, roster["roster_id"])
-    if not matchup:
-        raise HTTPException(status_code=502, detail="Sleeper returned no matchup for this week.")
+        league, roster, matchups = await asyncio.gather(
+            sleeper_service.get_league(league_id),
+            sleeper_service.get_roster(league_id, sleeper_user_id),
+            sleeper_service.get_matchups(league_id, week, live=not final),
+        )
+        if not roster:
+            raise HTTPException(status_code=404, detail="You don't have a roster in this league.")
+        matchup = find_matchup(matchups, roster["roster_id"])
+        if not matchup:
+            raise HTTPException(status_code=502, detail="Sleeper returned no matchup for this week.")
+        slots, league_name = (league or {}).get("roster_positions") or [], (league or {}).get("name")
 
     pids = [p for p in matchup.get("players") or [] if p]
     proj_rows = (await db.execute(
@@ -70,8 +112,8 @@ async def get_recap(
             sp = all_players.get(pid) or {}
             info[pid] = {"name": sp.get("full_name") or pid, "position": sp.get("position") or "?", "nfl_team": sp.get("team")}
 
-    recap = build_recap(matchup, (league or {}).get("roster_positions") or [], projections, info, week, season, final)
-    recap["league_name"] = (league or {}).get("name")
+    recap = build_recap(matchup, slots, projections, info, week, season, final)
+    recap["league_name"] = league_name
     if not projections:
         recap["warning"] = f"No saved projections for Week {week}. The app only saves them when your roster is loaded that week."
     return recap

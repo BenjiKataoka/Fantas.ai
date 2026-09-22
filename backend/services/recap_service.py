@@ -102,3 +102,23 @@ def build_recap(matchup: dict, roster_positions: list[str], projections: dict[st
 
 def find_matchup(matchups: list[dict], roster_id: int) -> Optional[dict]:
     return next((m for m in matchups if m.get("roster_id") == roster_id), None)
+
+
+def week_result(players: list[dict], slots: list[str], you: float, opp: float | None) -> dict:
+    """Grade one finished week. players: {player_id, name, position, actual, started}.
+    Returns the result, the best lineup your roster could have played, the points left on
+    the bench, and the benched players who belonged in that best lineup."""
+    best = best_lineup(players, slots, _actual)
+    best_points = round(sum(_actual(p) for p in best), 2)
+    misses = sorted((p for p in best if not p["started"]), key=_actual, reverse=True)
+    if opp is None:
+        result = None
+    else:
+        result = "W" if you > opp else "L" if you < opp else "T"
+    return {
+        "result": result, "you": round(you, 2), "opp": round(opp, 2) if opp is not None else None,
+        "best_possible": best_points,
+        "left_on_bench": round(max(0.0, best_points - you), 2),
+        "misses": [{"player_id": p["player_id"], "name": p["name"], "position": p["position"],
+                    "points": round(_actual(p), 2)} for p in misses],
+    }

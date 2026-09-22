@@ -22,6 +22,11 @@ from services.recap_service import best_lineup
 from services.waiver_service import POSITIONS, rank_free_agents
 
 router = APIRouter()
+
+
+async def _none(value=None):
+    """Placeholder for a gather slot that only applies to one platform."""
+    return value
 logger = logging.getLogger(__name__)
 
 MIN_PROJ = 1.0      # below this a free agent isn't worth a roster spot unless he's trending
@@ -71,7 +76,34 @@ async def _recent_news(db: AsyncSession, candidates: dict[str, str]) -> dict[str
     return recent
 
 
-async def _board(sleeper_username: str, league_id: str, user: User, db: AsyncSession) -> dict:
+async def _espn_context(league_id: str, user: User, season: int, db: AsyncSession, all_players: dict) -> dict:
+    """The same three things the Sleeper path needs, from an ESPN league: who's taken
+    league-wide, your own players, and the league's lineup slots."""
+    from sqlalchemy import select
+
+    from models.user import UserLeague
+
+    team_id = (await db.execute(select(UserLeague.team_id).where(
+        UserLeague.user_id == user.id, UserLeague.platform == "ESPN", UserLeague.league_id == league_id,
+    ))).scalar_one_or_none()
+    data = await espn_service.get_espn_league(league_id, season, user.espn_s2, user.swid)
+    me = espn_service.espn_my_team(data or {}, swid=user.swid, team_id=team_id)
+    if not me:
+        raise HTTPException(status_code=404, detail="You don't have a team in this league.")
+    taken = {pid for t in (data.get("teams") or [])
+             for pid, _ in espn_service.espn_to_sleeper_ids((t.get("roster") or {}).get("entries") or [], all_players)}
+    mine = espn_service.espn_to_sleeper_ids((me.get("roster") or {}).get("entries") or [], all_players)
+    return {
+        "taken": taken,
+        # Everyone but IR counts as a player you could start.
+        "my_ids": [pid for pid, e in mine if e.get("lineupSlotId") != 21],
+        "slots": espn_service.espn_roster_positions(data or {}),
+        "name": ((data or {}).get("settings") or {}).get("name"),
+    }
+
+
+async def _board(sleeper_username: str, league_id: str, user: User, db: AsyncSession,
+                 platform: str = "SLEEPER") -> dict:
     """Ranked free agents plus the pieces the analyze prompt needs. Every upstream call is
     cached, so rebuilding this for one Analyze click is cheap."""
     state = await get_nfl_state()
@@ -85,8 +117,8 @@ async def _board(sleeper_username: str, league_id: str, user: User, db: AsyncSes
         raise HTTPException(status_code=404, detail=f"Sleeper user '{sleeper_username}' not found")
 
     league, rosters, all_players, (espn_by_id, espn_by_name), market, adds, drops, *sleeper_weeks = await asyncio.gather(
-        sleeper_service.get_league(league_id),
-        sleeper_service.get_league_rosters(league_id),
+        sleeper_service.get_league(league_id) if platform == "SLEEPER" else _none(),
+        sleeper_service.get_league_rosters(league_id) if platform == "SLEEPER" else _none([]),
         sleeper_service.get_all_players(),
         espn_service.get_espn_projections_full(season, week),
         espn_service.get_espn_market_pool(season, week),
@@ -94,11 +126,20 @@ async def _board(sleeper_username: str, league_id: str, user: User, db: AsyncSes
         sleeper_service.get_trending_players("drop", limit=100),
         *(sleeper_service.get_projections(season, w) for w in weeks),
     )
-    mine = next((r for r in rosters if r.get("owner_id") == sleeper_user_id), None)
-    if not mine:
-        raise HTTPException(status_code=404, detail="You don't have a roster in this league.")
-
-    taken = {pid for r in rosters for key in ("players", "reserve", "taxi") for pid in (r.get(key) or [])}
+    if platform == "ESPN":
+        ctx = await _espn_context(league_id, user, season, db, all_players)
+    else:
+        mine = next((r for r in rosters if r.get("owner_id") == sleeper_user_id), None)
+        if not mine:
+            raise HTTPException(status_code=404, detail="You don't have a roster in this league.")
+        benched = set(mine.get("reserve") or []) | set(mine.get("taxi") or [])
+        ctx = {
+            "taken": {pid for r in rosters for key in ("players", "reserve", "taxi") for pid in (r.get(key) or [])},
+            "my_ids": [pid for pid in (mine.get("players") or []) if pid not in benched],
+            "slots": (league or {}).get("roster_positions") or [],
+            "name": (league or {}).get("name"),
+        }
+    taken = ctx["taken"]
     add_counts = {t["player_id"]: t.get("count") or 0 for t in adds}
     drop_counts = {t["player_id"]: t.get("count") or 0 for t in drops}
     weights = weights_from_user(user)
@@ -131,24 +172,22 @@ async def _board(sleeper_username: str, league_id: str, user: User, db: AsyncSes
 
     pool = {pid for pid, s in sleeper_weeks[0].items() if (_extract_sleeper_pts(s) or 0) >= MIN_PROJ} | set(add_counts)
     free_agents = [r for pid in pool - taken if (r := row(pid))]
-    benched = set(mine.get("reserve") or []) | set(mine.get("taxi") or [])
-    my_rows = [r for pid in (mine.get("players") or []) if pid not in benched and (r := row(pid))]
+    my_rows = [r for pid in ctx["my_ids"] if (r := row(pid))]
 
-    slots = (league or {}).get("roster_positions") or []
-    candidates = rank_free_agents(free_agents, my_rows, slots)
+    candidates = rank_free_agents(free_agents, my_rows, ctx["slots"])
     news = await _recent_news(db, {c["player_id"]: c["name"] for c in candidates})
     for c in candidates:
         c["news"] = (news.get(c["player_id"]) or [None])[0]
 
     out = {
-        "league_name": (league or {}).get("name"),
+        "league_name": ctx["name"],
         "season": season,
         "week": week,
         "horizon_weeks": weeks,
         "candidates": candidates,
         # Your projected starters over the same horizon: the bar a pickup has to clear.
         "lineup": [{"slot": p["slot"], "name": p["name"], "position": p["position"], "proj": p["proj"]}
-                   for p in best_lineup(my_rows, slots, lambda r: r["proj"] or 0.0)],
+                   for p in best_lineup(my_rows, ctx["slots"], lambda r: r["proj"] or 0.0)],
     }
     if not espn_by_id:
         out["warning"] = "ESPN projections are unavailable right now, so these use Sleeper alone."
@@ -158,11 +197,12 @@ async def _board(sleeper_username: str, league_id: str, user: User, db: AsyncSes
 @router.get("/waivers")
 async def get_waivers(
     sleeper_username: str = Query(..., description="Sleeper username"),
-    league_id: str = Query(..., description="Sleeper league ID"),
+    league_id: str = Query(..., description="League ID on its platform"),
+    platform: str = Query("SLEEPER", pattern="^(SLEEPER|ESPN)$"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return (await _board(sleeper_username, league_id, user, db))["public"]
+    return (await _board(sleeper_username, league_id, user, db, platform))["public"]
 
 
 # ponytail: in-memory cache and per-user counter, both reset on restart. Move to Neon if
@@ -221,7 +261,8 @@ def _analyze_prompt(c: dict, my_rows: list[dict], news: list[dict], profile: dic
 async def analyze_free_agent(
     player_id: str,
     sleeper_username: str = Query(..., description="Sleeper username"),
-    league_id: str = Query(..., description="Sleeper league ID"),
+    league_id: str = Query(..., description="League ID on its platform"),
+    platform: str = Query("SLEEPER", pattern="^(SLEEPER|ESPN)$"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -234,7 +275,7 @@ async def analyze_free_agent(
         raise HTTPException(status_code=429, detail=f"You've used all {DAILY_ANALYZE_LIMIT} analyses for today. They reset at midnight.")
 
     # Rebuilt server-side rather than trusting row data from the client: it goes into the prompt.
-    board = await _board(sleeper_username, league_id, user, db)
+    board = await _board(sleeper_username, league_id, user, db, platform)
     c = next((x for x in board["public"]["candidates"] if x["player_id"] == player_id), None)
     if not c:
         raise HTTPException(status_code=404, detail="That player isn't on this league's waiver wire.")

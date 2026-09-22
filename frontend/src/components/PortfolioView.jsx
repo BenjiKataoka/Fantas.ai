@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { getMatchups, getPortfolio } from '../services/api'
-import { WeekHero, LeagueStrip, LeagueStripSkeleton, MostOnTheLine, NeedsYou, YourSunday } from './WeekBoard'
+import { getMatchups, getPortfolio, getResults, getWaivers } from '../services/api'
+import { BenchMisses, LeagueStrip, LeagueStripSkeleton, ModeToggle, MostOnTheLine, NeedsYou, Pickups, ResultTile, ResultsHero, Tile, WeekHero, YourSunday } from './WeekBoard'
 import { REVEAL, slotLabel, tiltHandlers } from '@/lib/utils'
 import { Hint } from '@/components/ui/tooltip'
 import PlayerAvatar from './PlayerAvatar'
@@ -82,8 +82,32 @@ function Row({ p, total, open, onToggle }) {
   )
 }
 
+// Tuesday and Wednesday (Eastern) sit between Monday night and Thursday night: the week
+// is over, so the Dashboard opens on last week's results.
+function resultsDay() {
+  const day = new Date().toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' })
+  return day === 'Tue' || day === 'Wed'
+}
+
+// Free agents who would start for you, combined across your Sleeper leagues.
+function combinePickups(boards) {
+  const byPlayer = new Map()
+  for (const { league, candidates } of boards) {
+    for (const c of candidates.filter(c => c.upgrade > 0)) {
+      const p = byPlayer.get(c.player_id) || { player_id: c.player_id, name: c.name, position: c.position, upgrade: 0, leagues: [] }
+      p.upgrade = Math.max(p.upgrade, c.upgrade)
+      p.leagues.push(league.name)
+      byPlayer.set(c.player_id, p)
+    }
+  }
+  return [...byPlayer.values()].sort((a, b) => b.leagues.length - a.leagues.length || b.upgrade - a.upgrade).slice(0, 4)
+}
+
 export default function PortfolioView({ onOpenLeague }) {
-  const { credentials, lastRefresh, newsData } = useApp()
+  const { credentials, lastRefresh, newsData, leagues } = useApp()
+  const [mode, setMode] = useState(() => (resultsDay() ? 'last' : 'this'))
+  const [results, setResults] = useState(null)
+  const [pickups, setPickups] = useState(null)
   const [data, setData] = useState(null)
   const [week, setWeek] = useState(null)
   const [error, setError] = useState(null)
@@ -104,6 +128,20 @@ export default function PortfolioView({ onOpenLeague }) {
     return () => { cancelled = true }
   }, [credentials, lastRefresh])
 
+  // Results mode loads on first use: last week's grades plus the combined waiver pickups.
+  useEffect(() => {
+    if (mode !== 'last' || !credentials || results || !leagues.length) return
+    let cancelled = false
+    getResults(credentials.username)
+      .then(res => { if (!cancelled) setResults(res.data) })
+      .catch(() => { if (!cancelled) setResults({ week: null, leagues: [], record: null, left_on_bench: 0, misses: [], warnings: ['Last week\'s results couldn\'t load.'] }) })
+    Promise.all(leagues.map(l => getWaivers(credentials.username, l.league_id, l.platform)
+      .then(res => ({ league: l, candidates: res.data.candidates }))
+      .catch(() => ({ league: l, candidates: [] }))))
+      .then(boards => { if (!cancelled) setPickups(combinePickups(boards)) })
+    return () => { cancelled = true }
+  }, [mode, credentials, results, leagues])
+
   const playerMap = useMemo(() => Object.fromEntries((data?.players || []).map(p => [p.player_id, { name: p.name, position: p.position }])), [data])
   const lineups = useMemo(() => Object.fromEntries((data?.players || []).map(p => [p.player_id, p.starting])), [data])
 
@@ -111,10 +149,24 @@ export default function PortfolioView({ onOpenLeague }) {
   const total = data?.summary.leagues
   return (
     <div className="flex flex-col gap-8">
-      {week?.leagues?.length ? (
+      {mode === 'last' ? (results ? (
         <>
-          <WeekHero data={week} />
-          <LeagueStrip leagues={week.leagues} onOpen={onOpenLeague} />
+          <ResultsHero data={results} toggle={<ModeToggle mode={mode} onChange={setMode} />} />
+          <LeagueStrip subtitle={`week ${results.week} results`} count={results.leagues.length}>
+            {results.leagues.map(r => <ResultTile key={`${r.platform}:${r.league_id}`} r={r} onOpen={onOpenLeague} />)}
+            </LeagueStrip>
+          <div className={`grid grid-cols-1 lg:grid-cols-3 gap-4 ${REVEAL}`} style={{ animationDelay: '180ms' }}>
+            <div className="lg:col-span-2"><BenchMisses misses={results.misses} /></div>
+            <Pickups pickups={pickups || []} loading={!pickups} />
+          </div>
+          {results.warnings.map(w => <p key={w} className="text-sm text-warn -mt-4">{w}</p>)}
+        </>
+      ) : <LeagueStripSkeleton />) : week?.leagues?.length ? (
+        <>
+          <WeekHero data={week} toggle={<ModeToggle mode={mode} onChange={setMode} />} />
+          <LeagueStrip subtitle={`${week.leagues.length} matchups this week`} count={week.leagues.length}>
+            {week.leagues.map(l => <Tile key={`${l.platform}:${l.league_id}`} l={l} onOpen={onOpenLeague} />)}
+          </LeagueStrip>
           {/* Bento: wide cards on the left, narrow on the right; rows share a height. */}
           <div className={`grid grid-cols-1 lg:grid-cols-3 gap-4 ${REVEAL}`} style={{ animationDelay: '180ms' }}>
             <div className="lg:col-span-2"><NeedsYou needs={week.needs} leagues={week.leagues} /></div>

@@ -24,13 +24,15 @@ export default function Ticker() {
   const drag = useRef({ active: false, startX: 0, startScroll: 0 })
   const pos = useRef(0)                      // float accumulator (scrollLeft rounds to int on set)
 
-  // Auto-scroll loop with seamless wrap (content is duplicated, so one "set" = scrollWidth/2).
+  // One loop for the component's whole life: it reads the element each frame, so swapping
+  // leagues (which empties the roster for a moment) can't leave the drift stopped.
   useEffect(() => {
-    const el = scrollRef.current
-    if (!el || !players.length) return
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     let raf
     const step = () => {
+      raf = requestAnimationFrame(step)
+      const el = scrollRef.current
+      if (!el) return
       if (!reduced && !drag.current.active) pos.current += SPEED
       const half = el.scrollWidth / 2
       if (half > 0) {
@@ -38,28 +40,38 @@ export default function Ticker() {
         else if (pos.current < 0) pos.current += half
       }
       el.scrollLeft = pos.current
-      raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
-  }, [players.length])
 
-  if (!players.length) return null
+    // A release anywhere ends the drag. Without this, letting go off the strip (or while it
+    // re-renders) left it "held" and the ticker never moved again.
+    const release = () => { drag.current.active = false }
+    window.addEventListener('pointerup', release)
+    window.addEventListener('pointercancel', release)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('pointerup', release)
+      window.removeEventListener('pointercancel', release)
+    }
+  }, [])
+
+  // Keep the bar (and the loop's element) mounted while a league loads.
+  if (!players.length) return <div className="border-b border-line bg-surface/70 h-8" />
   const strip = [...players, ...players] // duplicated for a seamless loop
 
   const onPointerDown = (e) => {
     drag.current = { active: true, startX: e.clientX, startScroll: pos.current }
-    scrollRef.current.setPointerCapture?.(e.pointerId)
+    scrollRef.current?.setPointerCapture?.(e.pointerId)
   }
   const onPointerMove = (e) => {
-    if (!drag.current.active) return
+    if (!drag.current.active || !scrollRef.current) return
     pos.current = drag.current.startScroll - (e.clientX - drag.current.startX)
     scrollRef.current.scrollLeft = pos.current
   }
   const endDrag = (e) => {
     if (!drag.current.active) return
     drag.current.active = false
-    scrollRef.current?.releasePointerCapture?.(e.pointerId)
+    try { scrollRef.current?.releasePointerCapture?.(e.pointerId) } catch { /* already released */ }
   }
 
   return (

@@ -187,7 +187,7 @@ export default function Waivers() {
     if (analyses[p.player_id]?.data) return setOpenId(id => (id === p.player_id ? null : p.player_id))
     setAnalyses(a => ({ ...a, [p.player_id]: { loading: true } }))
     try {
-      const res = await analyzeFreeAgent(p.player_id, credentials.username, leagueId)
+      const res = await analyzeFreeAgent(p.player_id, credentials.username, leagueId, credentials.platform)
       setAnalyses(a => ({ ...a, [p.player_id]: { data: res.data } }))
       setOpenId(p.player_id)
       if (!res.data.cached && res.data.remaining <= 3) toast(`${res.data.remaining} analyses left today.`)
@@ -198,17 +198,16 @@ export default function Waivers() {
   }
 
   useEffect(() => {
-    if (!credentials || !leagueId || credentials.platform === 'ESPN') return
+    if (!credentials || !leagueId) return
     let cancelled = false
     setError(null); setData(null); setAnalyses({}); setOpenId(null)
-    getWaivers(credentials.username, leagueId)
+    getWaivers(credentials.username, leagueId, credentials.platform)
       .then(res => { if (!cancelled) setData(res.data) })
       .catch(err => { if (!cancelled) setError(err.response?.data?.detail || 'Could not load the waiver wire.') })
     return () => { cancelled = true }
   }, [credentials, leagueId])
 
   if (!credentials) return <p className="text-subtle text-sm py-16 text-center">Pick your league on the Dashboard first.</p>
-  if (credentials.platform === 'ESPN') return <p className="text-subtle text-sm py-16 text-center">The waiver wire for ESPN leagues is coming next. Switch to a Sleeper league in the top bar to use it now.</p>
   if (rosterData?.season_type === 'off') return <p className="text-subtle text-sm py-16 text-center">The waiver wire opens once the season does.</p>
 
   const all = data?.candidates || []

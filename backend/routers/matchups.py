@@ -56,7 +56,7 @@ async def get_matchups(
         try:
             if l["platform"] == "ESPN":
                 return await matchup_service.espn_matchup({**l, "team_id": picked.get(l["league_id"])},
-                                                         user, league_season(state), all_players, proj)
+                                                         user, league_season(state), week, all_players, proj)
             return await matchup_service.sleeper_matchup(l, sleeper_user_id, week, all_players, proj)
         except espn_service.EspnAuthError:
             return "expired"
@@ -76,11 +76,16 @@ async def get_matchups(
             continue
         meta = {"league_id": l["league_id"], "platform": l["platform"], "name": l["name"], "url": m["url"]}
         issues = matchup_service.lineup_issues(meta, m["you"], m["bench"], schedule)
+        # Live totals: real points for players whose game has started, projections for the rest.
         you = matchup_service.team_score(m["you"], schedule)
         opp = matchup_service.team_score(m["opp"], schedule) if m["opp"] else None
+        left = matchup_service.remaining(m["you"], schedule) + (matchup_service.remaining(m["opp"], schedule) if m["opp"] else 0)
+        full = sum((p.get("proj") or 0) for p in m["you"] + (m["opp"] or []))
+        progress = matchup_service.lineup_progress(m["you"], schedule)
         out_leagues.append({
             **meta, "record": m["record"], "opp_name": m["opp_name"], "you": you, "opp": opp,
-            "win_prob": matchup_service.win_probability(you, opp) if opp is not None else None,
+            "progress": progress, "live": progress["in_play"] > 0 or (0 < progress["played"] < progress["total"]),
+            "win_prob": matchup_service.win_probability(you, opp, left, full) if opp is not None else None,
             "issues": sum(1 for i in issues if i["severity"] == "out"),
             "warnings": sum(1 for i in issues if i["severity"] == "warn"),
         })

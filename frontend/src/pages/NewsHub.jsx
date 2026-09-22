@@ -1,10 +1,12 @@
 import { REVEAL } from '@/lib/utils'
 import { useState, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
+import { Search } from 'lucide-react'
 import StockBadge from '../components/StockBadge'
 import ContradictionAlert from '../components/ContradictionAlert'
 import PlayerAvatar from '../components/PlayerAvatar'
 import { CardListSkeleton } from '../components/Skeletons'
+import { LoadingDots } from '../components/Spinner'
 
 function relativeTime(isoStr) {
   if (!isoStr) return ''
@@ -178,8 +180,19 @@ function NewsCard({ item, playerLabel, playerName }) {
 export default function NewsHub() {
   const { newsData, newsLoading, fetchNews } = useApp()
   const [activeFilter, setActiveFilter] = useState('all')
+  const [query, setQuery] = useState('')
 
-  const items = newsData?.news ?? []
+  // Search narrows the feed first; the filter chips and their counts work on the result.
+  // Every word has to match somewhere: player, position, team, headline, or source.
+  const items = useMemo(() => {
+    const all = newsData?.news ?? []
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+    if (!words.length) return all
+    return all.filter(i => {
+      const text = [i.player_name, i.position, i.nfl_team, i.headline, i.source, i.news_type].filter(Boolean).join(' ').toLowerCase()
+      return words.every(w => text.includes(w))
+    })
+  }, [newsData, query])
 
   const filtered = useMemo(() => {
     if (activeFilter === 'all') return items
@@ -202,7 +215,7 @@ export default function NewsHub() {
           <h1 className="text-2xl font-display font-bold text-content">News Hub</h1>
           {newsData && (
             <p className="text-sm text-subtle mt-0.5">
-              {items.length} items · last 7 days
+              {query ? `${items.length} of ${newsData.news?.length ?? 0} items` : `${items.length} items`} · last 7 days
               {newsData.season_type && <span className="ml-2 capitalize text-subtle/60">({newsData.season_type}season)</span>}
             </p>
           )}
@@ -212,8 +225,21 @@ export default function NewsHub() {
           disabled={newsLoading}
           className="px-3 py-1.5 bg-raised hover:bg-line disabled:opacity-40 text-subtle hover:text-content text-xs font-medium rounded-lg border border-line transition-colors"
         >
-          {newsLoading ? 'Refreshing...' : 'Refresh'}
+          {newsLoading ? <span className="inline-flex items-center gap-1.5">Refreshing <LoadingDots /></span> : 'Refresh'}
         </button>
+      </div>
+
+      <div className={`relative mb-3 ${REVEAL}`} style={{ animationDelay: '35ms' }}>
+        <label htmlFor="news-search" className="sr-only">Search news</label>
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-subtle pointer-events-none" aria-hidden />
+        <input
+          id="news-search"
+          type="search"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Search players, teams, or headlines"
+          className="w-full rounded-lg bg-surface border border-line pl-9 pr-3 py-2.5 text-sm text-content placeholder:text-subtle/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-content/25"
+        />
       </div>
 
       <div className={`flex gap-2 mb-5 flex-wrap ${REVEAL}`} style={{ animationDelay: '70ms' }}>
@@ -247,7 +273,14 @@ export default function NewsHub() {
 
       {newsLoading && !newsData && <CardListSkeleton count={5} />}
 
-      {!newsLoading && !items.length && (
+      {!newsLoading && query && !items.length && (newsData?.news?.length ?? 0) > 0 && (
+        <div className="text-center py-12 text-subtle/70">
+          <p className="text-sm">No news matches "{query}".</p>
+          <button onClick={() => setQuery('')} className="text-sm text-content underline underline-offset-2 mt-2">Clear search</button>
+        </div>
+      )}
+
+      {!newsLoading && !query && !items.length && (
         <div className="text-center py-16 text-subtle/70">
           <p className="text-sm">No news found for your roster.</p>
           <p className="text-xs mt-1">Make sure your league is set up in Settings.</p>

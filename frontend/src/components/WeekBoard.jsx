@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Check, TriangleAlert, ExternalLink } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { REVEAL, slotLabel, tiltHandlers, dotFieldHandlers } from '@/lib/utils'
 import { Hint } from '@/components/ui/tooltip'
+import { LoadingDots } from './Spinner'
 
 const PLATFORM = { SLEEPER: 'Sleeper', ESPN: 'ESPN' }
 const CARD = 'bg-surface border border-line rounded-xl'
@@ -19,31 +21,73 @@ const kickoffLabel = (iso) =>
   iso ? new Date(iso).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : null
 
 // ── Hero ──────────────────────────────────────────────────────────────────────
-export function WeekHero({ data }) {
+// "This week" / "Last week" switch shown in either hero.
+export function ModeToggle({ mode, onChange }) {
+  const opt = (value, label) => (
+    <button
+      type="button"
+      onClick={() => onChange(value)}
+      aria-pressed={mode === value}
+      className={`px-3 py-1 rounded-md text-sm font-medium ${mode === value ? 'bg-brand text-brand-fg' : 'text-subtle hover:text-content'}`}
+    >
+      {label}
+    </button>
+  )
+  return <div className="inline-flex gap-1 p-1 rounded-lg bg-raised/80 border border-line">{opt('this', 'This week')}{opt('last', 'Last week')}</div>
+}
+
+function HeroCard({ eyebrow, title, stat, statLabel, statTone = 'text-content', toggle }) {
+  return (
+    <div {...dotFieldHandlers} className={`dot-field ${CARD} px-8 py-8 flex flex-col gap-5 ${REVEAL}`}>
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-subtle">{eyebrow}</p>
+        {toggle}
+      </div>
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <p className="font-display font-bold text-7xl leading-none tracking-tight text-content">{title}</p>
+        {stat != null && (
+          <div className="text-right pb-1">
+            <p className={`font-display font-semibold text-4xl tabular-nums ${statTone}`}>{stat}</p>
+            <p className="text-sm text-subtle">{statLabel}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function ResultsHero({ data, toggle }) {
+  const r = data.record || { wins: 0, losses: 0, ties: 0 }
+  return (
+    <HeroCard
+      eyebrow={`Week ${data.week} final`}
+      title={`You went ${r.wins}-${r.losses}${r.ties ? `-${r.ties}` : ''}`}
+      stat={data.left_on_bench.toFixed(1)}
+      statLabel="points left on your benches"
+      statTone={data.left_on_bench >= 10 ? 'text-bear' : 'text-content'}
+      toggle={toggle}
+    />
+  )
+}
+
+export function WeekHero({ data, toggle }) {
   const leagues = data.leagues.filter(l => l.win_prob != null)
   const wins = leagues.filter(l => l.win_prob >= 0.5).length
   const avg = data.leagues.length ? data.leagues.reduce((s, l) => s + l.you, 0) / data.leagues.length : null
   const until = untilLabel(data.next_kickoff)
   return (
-    <div {...dotFieldHandlers} className={`dot-field ${CARD} px-8 py-9 flex flex-wrap items-end justify-between gap-6 ${REVEAL}`}>
-      <div>
-        <p className="text-sm text-subtle">Week {data.week}{until ? ` · next kickoff in ${until}` : ''}</p>
-        <p className="font-display font-bold text-7xl leading-none tracking-tight text-content mt-1">
-          Projected {wins}-{leagues.length - wins}
-        </p>
-      </div>
-      {avg != null && (
-        <div className="text-right pb-1">
-          <p className="font-display font-semibold text-4xl tabular-nums text-content">{avg.toFixed(1)}</p>
-          <p className="text-sm text-subtle">avg projected score per team</p>
-        </div>
-      )}
-    </div>
+    <HeroCard
+      eyebrow={`Week ${data.week}${until ? ` · next kickoff in ${until}` : ''}`}
+      title={`Projected ${wins}-${leagues.length - wins}`}
+      stat={avg != null ? avg.toFixed(1) : null}
+      statLabel="avg projected score per team"
+      toggle={toggle}
+    />
   )
 }
 
 // ── League strip (drag to scroll) ─────────────────────────────────────────────
-function Tile({ l, onOpen }) {
+export function Tile({ l, onOpen }) {
   const favored = l.win_prob != null && l.win_prob >= 0.5
   const pct = l.win_prob != null ? Math.round(l.win_prob * 100) : null
   const tone = favored ? 'text-bull' : 'text-bear'
@@ -56,7 +100,13 @@ function Tile({ l, onOpen }) {
     >
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold text-sm text-content truncate">{l.name}</span>
-        <span className="font-mono text-xs text-subtle shrink-0">{PLATFORM[l.platform]}</span>
+        {l.live
+          ? <Hint text="Scores are live: players whose games have started count their real points, the rest still show projections.">
+              <span className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-bull">
+                <span className="size-1.5 rounded-full bg-bull motion-safe:animate-pulse" />Live
+              </span>
+            </Hint>
+          : <span className="font-mono text-xs text-subtle shrink-0">{PLATFORM[l.platform]}</span>}
       </div>
       <div>
         <div className="flex items-baseline justify-between">
@@ -76,10 +126,14 @@ function Tile({ l, onOpen }) {
             <div className="absolute left-1/2 -top-1 w-0.5 h-3.5 rounded-sm bg-mark" />
           </div>
           <div className="flex justify-between text-xs">
-            <Hint text="Chance to win, from both lineups' projections (Sleeper and ESPN, with your weights). The yellow line marks 50%.">
+            <Hint text={l.live
+              ? "Chance to win from the live score plus what's left to play. It tightens as games finish."
+              : "Chance to win, from both lineups' projections (Sleeper and ESPN, with your weights). The yellow line marks 50%."}>
               <span className={`font-semibold ${tone}`}>{pct}% to win</span>
             </Hint>
-            <span className="font-mono text-subtle">{l.record}</span>
+            <span className="font-mono text-subtle">
+              {l.live && l.progress ? `${l.progress.played} of ${l.progress.total} played` : l.record}
+            </span>
           </div>
         </div>
       )}
@@ -97,7 +151,36 @@ function Tile({ l, onOpen }) {
   )
 }
 
-export function LeagueStrip({ leagues, onOpen }) {
+// A finished week's tile: result, final score, and what the bench left behind.
+export function ResultTile({ r, onOpen }) {
+  const chip = r.result === 'W' ? 'bg-bull' : r.result === 'L' ? 'bg-bear' : 'bg-subtle'
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(r)}
+      className={`${CARD} shrink-0 w-80 text-left p-5 flex flex-col gap-3 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:border-content/25`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold text-sm text-content truncate">{r.name}</span>
+        {r.result && <span className={`font-display font-bold text-sm px-2 py-0.5 rounded text-ink ${chip}`}>{r.result}</span>}
+      </div>
+      <div className="flex items-baseline gap-2.5">
+        <span className="font-display font-bold text-4xl tabular-nums text-content">{r.you.toFixed(1)}</span>
+        <span className="text-sm text-subtle">to</span>
+        <span className="font-display font-semibold text-2xl tabular-nums text-subtle">{r.opp != null ? r.opp.toFixed(1) : '-'}</span>
+      </div>
+      <p className="text-sm text-subtle truncate -mt-2">vs {r.opp_name}</p>
+      <div className="flex justify-between pt-2.5 border-t border-line text-sm">
+        <Hint text="Points your best possible lineup would have added. It compares what your bench actually scored with who you started.">
+          <span className="text-subtle">Left on bench</span>
+        </Hint>
+        <span className={`font-mono font-semibold ${r.left_on_bench >= 10 ? 'text-bear' : 'text-subtle'}`}>{r.left_on_bench.toFixed(1)}</span>
+      </div>
+    </button>
+  )
+}
+
+export function LeagueStrip({ subtitle, count, children }) {
   const strip = useRef(null)
   const drag = useRef(null)
   const moved = useRef(false)
@@ -112,7 +195,7 @@ export function LeagueStrip({ leagues, onOpen }) {
     onScroll()
     window.addEventListener('resize', onScroll)
     return () => window.removeEventListener('resize', onScroll)
-  }, [leagues])
+  }, [count])
 
   // Click-and-drag scrolling; a real drag swallows the click that follows so letting go
   // over a tile doesn't open it.
@@ -129,14 +212,23 @@ export function LeagueStrip({ leagues, onOpen }) {
     strip.current.scrollLeft = drag.current.left - dx
   }
   const up = () => { drag.current = null; setDragging(false) }
+  // Releasing outside the strip has to end the drag too, or it stays "held".
+  useEffect(() => {
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    return () => {
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+  }, [])
   const guard = (e) => { if (moved.current) { e.preventDefault(); e.stopPropagation(); moved.current = false } }
 
   return (
     <section aria-labelledby="leagues" className={`flex flex-col gap-3 ${REVEAL}`} style={{ animationDelay: '90ms' }}>
       <div className="flex items-baseline gap-3">
         <h2 id="leagues" className={H2}>Your leagues</h2>
-        <span className="text-sm text-subtle">{leagues.length} matchups this week</span>
-        {leagues.length > 3 && <span className="ml-auto text-sm text-subtle">Drag to see more</span>}
+        <span className="text-sm text-subtle">{subtitle}</span>
+        {count > 3 && <span className="ml-auto text-sm text-subtle">Drag to see more</span>}
       </div>
       <div
         ref={strip}
@@ -148,7 +240,7 @@ export function LeagueStrip({ leagues, onOpen }) {
         onScroll={onScroll}
         className={`flex gap-4 overflow-x-auto no-scrollbar select-none pb-1 ${atEnd ? '' : 'league-strip'} ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       >
-        {leagues.map(l => <Tile key={`${l.platform}:${l.league_id}`} l={l} onOpen={onOpen} />)}
+        {children}
         {/* Trailing space so the last tile can scroll fully clear of the edge. */}
         <div className="shrink-0 w-4" aria-hidden />
       </div>
@@ -265,6 +357,49 @@ export function MostOnTheLine({ players }) {
           <span className="font-display font-semibold text-xl text-content shrink-0">{p.starting}<span className="text-sm text-subtle font-sans font-normal"> lineups</span></span>
         </div>
       )) : <p className="text-sm text-subtle">No one starts for you in more than one league, so one bad game only hurts one team.</p>}
+    </section>
+  )
+}
+
+// ── Results mode cards ────────────────────────────────────────────────────────
+export function BenchMisses({ misses }) {
+  return (
+    <section aria-labelledby="misses" {...tiltHandlers} className={`${CARD} tilt h-full p-6 flex flex-col gap-3`}>
+      <h2 id="misses" className={H2}>Points that sat on your bench</h2>
+      {misses.length ? misses.map(m => (
+        <div key={`${m.league_name}:${m.player_id}`} className="flex items-center gap-4 px-4 py-3 rounded-lg bg-raised">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-content">{m.name} scored {m.points.toFixed(1)} on your bench</p>
+            <p className="text-xs text-subtle mt-0.5 truncate">{m.league_name} · {m.position}</p>
+          </div>
+          <span className="font-display font-semibold text-2xl text-bear shrink-0">{m.points.toFixed(1)}</span>
+        </div>
+      )) : (
+        <p className="flex items-center gap-2 text-sm text-content py-2">
+          <Check className="size-4 text-bull" /> You started the right players everywhere.
+        </p>
+      )}
+    </section>
+  )
+}
+
+export function Pickups({ pickups, loading }) {
+  return (
+    <section aria-labelledby="pickups" {...tiltHandlers} className={`${CARD} tilt h-full p-6 flex flex-col gap-3`}>
+      <h2 id="pickups" className={H2}>Before waivers run</h2>
+      <p className="text-sm text-subtle -mt-1">Free agents who would start for you, and where.</p>
+      {loading ? <LoadingDots className="text-lg text-subtle my-2" /> : pickups.length ? pickups.map(p => (
+        <div key={p.player_id} className="flex flex-col gap-0.5 pb-3 border-b border-line last:border-0">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-sm font-medium text-content truncate">{p.name}, {p.position}</span>
+            <span className="font-mono text-xs font-semibold text-bull shrink-0">+{p.upgrade.toFixed(1)} / wk</span>
+          </div>
+          <span className="text-xs text-subtle truncate">Would start in {p.leagues.join(', ')}</span>
+        </div>
+      )) : <p className="text-sm text-subtle">No free agent beats your current starters in any league right now.</p>}
+      <Link to="/waivers" className="mt-auto self-start inline-flex items-center min-h-11 px-4 rounded-lg bg-brand text-brand-fg text-sm font-semibold hover:brightness-110">
+        Open the waiver wire
+      </Link>
     </section>
   )
 }

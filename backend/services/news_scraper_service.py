@@ -205,6 +205,10 @@ async def scrape_and_analyze(
         )
         tracked_names = [row[0] for row in name_rows.fetchall()]
 
+    # Hand the connection back before the slow network fetch. Holding it idle through the
+    # RotoWire retries let Neon close it, and the next query failed mid-operation.
+    await db.commit()
+
     # Fetch today's schedule + raw news concurrently
     rw_news, espn_news, rss_news, teams_playing_today = await asyncio.gather(
         asyncio.to_thread(
@@ -348,7 +352,9 @@ async def scrape_and_analyze(
         if added:
             enqueued_for_gemini += 1
 
-    await db.flush()
+    # Save the new items now, and again after each Gemini call below, so no connection sits
+    # open across a model round trip either.
+    await db.commit()
 
     # Drain the queue up to the rate limit
     gemini_ran = 0
@@ -375,6 +381,7 @@ async def scrape_and_analyze(
         else:
             news_item.analysis_status = "SKIPPED"
         gemini_ran += 1
+        await db.commit()
 
     await db.commit()
 

@@ -7,7 +7,8 @@ import sys
 from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.matchup_service import group_needs, kickoff_windows, lineup_issues, team_score, win_probability
+from services.matchup_service import (group_needs, kickoff_windows, lineup_issues, lineup_progress,
+                                      remaining, team_score, win_probability)
 
 SUN1 = datetime(2026, 9, 27, 17, 0, tzinfo=timezone.utc)
 SNF = datetime(2026, 9, 28, 0, 20, tzinfo=timezone.utc)
@@ -26,6 +27,23 @@ def run_tests():
     assert win_probability(100, 100) == 0.5
     assert win_probability(125, 100) > 0.8 and win_probability(100, 125) < 0.2
     print("    PASS, win probability: even at a tie, ~84% when up a full spread")
+
+
+    print("\n[live] Once games start, real points replace projections...")
+    live_sched = {"HOU": {"kickoff": SUN1, "state": "post"}, "TB": {"kickoff": SUN1, "state": "in"},
+                  "KC": {"kickoff": SNF, "state": "pre"}}
+    lineup = [dict(P("done", "WR", "HOU", 12), actual=25.0), dict(P("playing", "RB", "TB", 10), actual=4.0),
+              dict(P("later", "QB", "KC", 20), actual=0.0)]
+    assert team_score(lineup, live_sched) == 49.0, team_score(lineup, live_sched)   # 25 + 4 + 20 projected
+    assert remaining(lineup, live_sched) == 20.0
+    assert lineup_progress(lineup, live_sched) == {"played": 1, "in_play": 1, "total": 3}
+    print("    PASS, finished and in-progress players count their real points, the rest their projection")
+
+    # A 10-point lead is worth more with little left to play than with everything left.
+    early = win_probability(110, 100, left_to_play=200, full=200)
+    late = win_probability(110, 100, left_to_play=10, full=200)
+    assert late > early > 0.5 and late > 0.9, (early, late)
+    print(f"    PASS, win % tightens as games finish ({early} early, {late} late)")
 
     starters = [P("qb", "QB", "KC", 20), P("wr_out", "WR", "HOU", 15, "Out"), P("te_bye", "TE", "DAL", 9),
                 P("rb_q", "RB", "TB", 12, "Questionable")]

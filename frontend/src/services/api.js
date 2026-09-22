@@ -69,14 +69,17 @@ export const getSentimentHistory = (playerId, range = 'season') =>
 export const getStartSit = (week, leagueId) => api.get(`/startsit/${week}`, { params: { league_id: leagueId } })
 
 // --- Recap ---
-export const getRecap = (week, sleeperUsername, leagueId) =>
-  api.get(`/recap/${week}`, { params: { sleeper_username: sleeperUsername, league_id: leagueId } })
+export const getRecap = (week, sleeperUsername, leagueId, platform = 'SLEEPER') =>
+  api.get(`/recap/${week}`, { params: { sleeper_username: sleeperUsername, league_id: leagueId, platform } })
 
-export const getWaivers = (sleeperUsername, leagueId) =>
-  api.get('/waivers', { params: { sleeper_username: sleeperUsername, league_id: leagueId } })
+export const getWaivers = (sleeperUsername, leagueId, platform = 'SLEEPER') =>
+  api.get('/waivers', { params: { sleeper_username: sleeperUsername, league_id: leagueId, platform } })
 
-export const analyzeFreeAgent = (playerId, sleeperUsername, leagueId) =>
-  api.post(`/waivers/analyze/${playerId}`, null, { params: { sleeper_username: sleeperUsername, league_id: leagueId } })
+export const analyzeFreeAgent = (playerId, sleeperUsername, leagueId, platform = 'SLEEPER') =>
+  api.post(`/waivers/analyze/${playerId}`, null, { params: { sleeper_username: sleeperUsername, league_id: leagueId, platform } })
+
+export const getResults = (sleeperUsername, week) =>
+  api.get('/results', { params: { sleeper_username: sleeperUsername, week } })
 
 export const getMatchups = (sleeperUsername) =>
   api.get('/matchups', { params: { sleeper_username: sleeperUsername } })

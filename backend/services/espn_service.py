@@ -314,6 +314,15 @@ ESPN_TO_SLOT = {
 }
 FAN_API = "https://fan.api.espn.com/apis/v2/fans/{swid}"
 
+# ESPN proTeamId → Sleeper's team abbreviation, which is also its team-defense player id.
+# Without it every ESPN D/ST drops out and team totals come up short.
+PRO_TEAM_ID = {
+    1: "ATL", 2: "BUF", 3: "CHI", 4: "CIN", 5: "CLE", 6: "DAL", 7: "DEN", 8: "DET", 9: "GB",
+    10: "TEN", 11: "IND", 12: "KC", 13: "LV", 14: "LAR", 15: "MIA", 16: "MIN", 17: "NE",
+    18: "NO", 19: "NYG", 20: "NYJ", 21: "PHI", 22: "ARI", 23: "PIT", 24: "LAC", 25: "SF",
+    26: "SEA", 27: "TB", 28: "WAS", 29: "CAR", 30: "JAX", 33: "BAL", 34: "HOU",
+}
+
 
 def _cookie_headers(espn_s2: str | None, swid: str | None) -> dict:
     """Public leagues need no cookies; private ones need both."""
@@ -432,6 +441,11 @@ def espn_to_sleeper_ids(entries: list[dict], all_players: dict) -> list[tuple[st
     out = []
     for e in entries:
         pl = (e.get("playerPoolEntry") or {}).get("player") or {}
+        if pl.get("defaultPositionId") == 16:   # D/ST: Sleeper keys these by team abbreviation
+            team = PRO_TEAM_ID.get(pl.get("proTeamId"))
+            if team and team in all_players:
+                out.append((team, e))
+            continue
         pid = by_espn.get(str(pl.get("id"))) or by_name.get(
             (normalize_name(pl.get("fullName") or ""), _espn_position(pl.get("defaultPositionId"))))
         if pid:
@@ -439,3 +453,33 @@ def espn_to_sleeper_ids(entries: list[dict], all_players: dict) -> list[tuple[st
         else:
             logger.info(f"[ESPN] no Sleeper match for {pl.get('fullName')} ({pl.get('id')})")
     return out
+
+
+async def get_espn_boxscore(league_id: str, season: int, week: int, espn_s2: str | None = None,
+                            swid: str | None = None, live: bool = False) -> dict | None:
+    """One week: every matchup with each player's points and lineup slot, plus settings and
+    team names. A finished week caches 24h; the current week caches 10 minutes so scores
+    move during games."""
+    cache_key = f"espn_box_{league_id}_{season}_{week}"
+    cached = _get_cache(cache_key)
+    if cached is not None:
+        return cached
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.get(
+                f"{ESPN_BASE}/seasons/{season}/segments/0/leagues/{league_id}",
+                headers=_cookie_headers(espn_s2, swid),
+                params=[("view", "mSettings"), ("view", "mTeam"), ("view", "mMatchupScore"),
+                        ("view", "mBoxscore"), ("scoringPeriodId", str(week))],
+            )
+    except Exception as e:
+        logger.error(f"[ESPN] boxscore failed for {league_id} week {week}: {e}")
+        return None
+    if resp.status_code == 401:
+        raise EspnAuthError("ESPN cookies were rejected")
+    if resp.status_code != 200:
+        logger.error(f"[ESPN] boxscore {league_id} week {week} status {resp.status_code}")
+        return None
+    data = resp.json()
+    _set_cache(cache_key, data, ttl_hours=(1 / 6) if live else 24)
+    return data

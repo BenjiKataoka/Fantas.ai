@@ -136,12 +136,18 @@ def run_multi_league_tests():
     all_players = {
         "4881": {"espn_id": 4362238, "full_name": "Puka Nacua", "position": "WR"},
         "9999": {"espn_id": None, "full_name": "Bucky Irving", "position": "RB"},
+        "BAL": {"espn_id": None, "position": "DEF"},
     }
-    entry = lambda pid, name, pos: {"lineupSlotId": 4, "playerPoolEntry": {"player": {"id": pid, "fullName": name, "defaultPositionId": pos}}}
+    def entry(pid, name, pos, team=None):
+        player = {"id": pid, "fullName": name, "defaultPositionId": pos}
+        if team:
+            player["proTeamId"] = team
+        return {"lineupSlotId": 4, "playerPoolEntry": {"player": player}}
     matched = espn_to_sleeper_ids([entry(4362238, "Puka Nacua", 3), entry(1, "Bucky Irving", 2),
-                                   entry(-16002, "Bills D/ST", 16)], all_players)
-    assert [pid for pid, _ in matched] == ["4881", "9999"], matched
-    print("    PASS, matched by espn_id, then name + position; D/ST dropped")
+                                   entry(-16033, "Ravens D/ST", 16, team=33),
+                                   entry(-16002, "Bills D/ST", 16, team=2)], all_players)
+    assert [pid for pid, _ in matched] == ["4881", "9999", "BAL"], matched
+    print("    PASS, matched by espn_id, then name + position; D/ST by pro team (Bills absent, so dropped)")
 
 
 if __name__ == "__main__":
