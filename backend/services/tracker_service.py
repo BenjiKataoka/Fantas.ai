@@ -14,7 +14,7 @@ from typing import Optional
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.news import PlayerNews, NewsAnalysis
+from models.news import PlayerNews
 from models.player import Player
 from models.roster import MyRoster
 from models.tracker import TrackedPlayer, PlayerStockProfile, PlayerSentimentHistory

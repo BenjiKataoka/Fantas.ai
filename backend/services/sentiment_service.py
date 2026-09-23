@@ -22,7 +22,6 @@ import logging
 from typing import Optional
 
 
-from services.utils import WRITING_STYLE, strip_dashes
 
 from config import GEMINI_PRIMARY, GEMINI_FALLBACK
 from services import gemini_client

@@ -3,7 +3,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +13,7 @@ from models.player import Player
 from models.projection import Projection
 from models.roster import MyRoster
 from models.user import User, UserLeague
-from services import espn_service, sleeper_service, tracker_service
+from services import espn_service, tracker_service
 from services.league_service import all_leagues, get_or_create_user_league, league_season, resolve_sleeper_user_id, sync_league
 from services.portfolio_service import build_portfolio
 from services.projection_service import get_nfl_state

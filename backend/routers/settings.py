@@ -8,9 +8,7 @@ GET/PUT/DELETE /api/settings/espn → ESPN cookie status / save (validated) / re
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator, model_validator
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import get_db
 from models.user import User
 from auth import get_current_user
 

@@ -279,7 +279,7 @@ export function LeagueStrip({ subtitle, count, children }) {
   )
 }
 
-export function LeagueStripSkeleton() {
+function LeagueStripSkeleton() {
   return (
     <div className="flex gap-4 overflow-hidden">
       {[0, 1, 2, 3].map(i => (
@@ -323,7 +323,7 @@ function StackRow({ dot, action }) {
 }
 
 // The pickup rows alone: the card around them is already on screen while they load.
-export function PickupsSkeleton({ rows = 3 }) {
+function PickupsSkeleton({ rows = 3 }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (

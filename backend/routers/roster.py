@@ -1,12 +1,12 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models.user import User, UserLeague
-from services.sleeper_service import get_user_id, get_eligible_leagues
+from services.sleeper_service import get_eligible_leagues
 from auth import get_current_user
 from services import tracker_service
 from services import espn_service

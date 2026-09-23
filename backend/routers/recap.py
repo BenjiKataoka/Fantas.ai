@@ -23,8 +23,6 @@ logger = logging.getLogger(__name__)
 async def _espn_week(league_id: str, user: User, season: int, week: int, final: bool, db: AsyncSession):
     """An ESPN week reshaped into the Sleeper-style matchup build_recap already reads:
     the week's box score carries each player's points and lineup slot."""
-    from sqlalchemy import select
-
     from models.user import UserLeague
     from services import espn_service
 

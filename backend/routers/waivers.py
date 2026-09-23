@@ -80,8 +80,6 @@ async def _recent_news(db: AsyncSession, candidates: dict[str, str]) -> dict[str
 async def _espn_context(league_id: str, user: User, season: int, db: AsyncSession, all_players: dict) -> dict:
     """The same three things the Sleeper path needs, from an ESPN league: who's taken
     league-wide, your own players, and the league's lineup slots."""
-    from sqlalchemy import select
-
     from models.user import UserLeague
 
     team_id = (await db.execute(select(UserLeague.team_id).where(

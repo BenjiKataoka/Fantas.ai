@@ -41,7 +41,6 @@ export const getRoster = (sleeperUsername, leagueId, platform = 'SLEEPER', force
   api.get('/roster', { params: { sleeper_username: sleeperUsername, league_id: leagueId, platform, force } })
 
 // --- Projections ---
-export const getProjections = (week, leagueId) => api.get(`/projections/${week}`, { params: { league_id: leagueId } })
 
 // --- Settings ---
 export const getSettings = () => api.get('/settings')
@@ -56,10 +55,8 @@ export const searchPlayers = (q) => api.get('/players/search', { params: { q } }
 
 // --- Tracker ---
 export const getTrackerList = () => api.get('/tracker')
-export const getTrackerDetail = (playerId) => api.get(`/tracker/${playerId}`)
 export const starPlayer = (playerId) => api.post(`/tracker/star/${playerId}`)
 export const unstarPlayer = (playerId) => api.delete(`/tracker/star/${playerId}`)
-export const refreshPlayer = (playerId) => api.post(`/tracker/refresh/${playerId}`)
 export const analyzeRoster = (force = false) => api.post('/tracker/analyze-roster', null, { params: { force } })
 export const getRosterAnalysis = () => api.get('/tracker/roster-analysis')
 export const getSentimentHistory = (playerId, range = 'season') =>

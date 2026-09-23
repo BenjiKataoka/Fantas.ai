@@ -7,7 +7,6 @@ player_historical_stats table. Refreshes once per day.
 Never raises, returns {} on failure.
 """
 import logging
-from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

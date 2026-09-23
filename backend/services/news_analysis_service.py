@@ -21,7 +21,6 @@ from datetime import datetime
 from typing import Optional
 
 
-from services.utils import WRITING_STYLE, strip_dashes
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -27,7 +27,6 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy import select, func
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.player import Player
