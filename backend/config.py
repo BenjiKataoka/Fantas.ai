@@ -12,6 +12,10 @@ ESPN_S2: str | None = os.environ.get("ESPN_S2")
 SWID: str | None = os.environ.get("SWID")
 SLEEPER_USERNAME: str | None = os.environ.get("SLEEPER_USERNAME")
 
+# Optional: highlights come from YouTube's Data API. Unset means the Tape page is off,
+# never an error. Keep this separate from GEMINI_API_KEY so a leak can't burn LLM quota.
+YOUTUBE_API_KEY: str | None = os.environ.get("YOUTUBE_API_KEY")
+
 # Projection source weights (user-adjustable via /api/settings)
 DEFAULT_WEIGHTS = {
     "sleeper": 0.35,

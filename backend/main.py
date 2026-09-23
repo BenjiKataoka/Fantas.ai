@@ -26,12 +26,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from routers import roster, projections, settings, news, tracker, startsit, admin, recap, waivers, portfolio, matchups, results
+from routers import roster, projections, settings, news, tracker, startsit, admin, recap, waivers, portfolio, matchups, results, tape
 app.include_router(recap.router, prefix="/api")
 app.include_router(waivers.router, prefix="/api")
 app.include_router(portfolio.router, prefix="/api")
 app.include_router(matchups.router, prefix="/api")
 app.include_router(results.router, prefix="/api")
+app.include_router(tape.router, prefix="/api")
 app.include_router(roster.router, prefix="/api")
 app.include_router(projections.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")

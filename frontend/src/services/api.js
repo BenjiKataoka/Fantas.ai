@@ -99,3 +99,5 @@ export const approveUser = (userId) => api.post(`/admin/approve/${userId}`)
 export const revokeUser = (userId) => api.post(`/admin/revoke/${userId}`)
 
 export default api
+
+export const getTape = (week) => api.get('/tape', { params: week ? { week } : {} })

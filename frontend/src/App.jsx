@@ -12,6 +12,7 @@ import PlayerTracker from './pages/PlayerTracker'
 import StartSit from './pages/StartSit'
 import Recap from './pages/Recap'
 import Waivers from './pages/Waivers'
+import Tape from './pages/Tape'
 import Settings from './pages/Settings'
 import Admin from './pages/Admin'
 import Spinner, { LoadingDots } from './components/Spinner'
@@ -27,6 +28,7 @@ const NAV_LINKS = [
   { to: '/startsit', label: 'Start/Sit' },
   { to: '/waivers',  label: 'Waivers' },
   { to: '/recap',    label: 'Recap' },
+  { to: '/tape',     label: 'Tape' },
   { to: '/settings', label: 'Settings' },
 ]
 
@@ -237,6 +239,7 @@ function RoutedMain({ isAdmin }) {
           <Route path="/startsit" element={<StartSit />} />
           <Route path="/recap"    element={<Recap />} />
           <Route path="/waivers"  element={<Waivers />} />
+          <Route path="/tape"     element={<Tape />} />
           <Route path="/settings" element={<Settings />} />
           {isAdmin && <Route path="/admin" element={<Admin />} />}
         </Routes>
