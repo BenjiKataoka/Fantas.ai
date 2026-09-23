@@ -493,7 +493,7 @@ def run_sentiment_snapshot_tests():
     print("\n" + "=" * 50)
     print("TRACKER, SENTIMENT HISTORY SNAPSHOT")
     print("=" * 50)
-    from services.tracker_service import _append_sentiment_snapshot
+    from services.stock_analysis_service import _append_sentiment_snapshot
     from models.tracker import PlayerSentimentHistory
 
     # [1] Completed run → one history row added with the run's values
