@@ -116,8 +116,7 @@ def run_edgecase_tests():
     asyncio.run(_isolation())
 
     async def _cache():
-        rss_service._cache["data"] = None
-        rss_service._cache["expires_at"] = None
+        rss_service._cache.clear()
         spy = AsyncMock(return_value=[("PFT", _entry("Nico Collins hurt", "x", "https://pft.com/9"))])
         with patch.object(rss_service, "_fetch_feed", new=spy), \
              patch.object(rss_service, "FEEDS", [("PFT", "http://pft")]):

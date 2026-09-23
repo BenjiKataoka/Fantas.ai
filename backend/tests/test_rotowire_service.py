@@ -130,8 +130,7 @@ def run_cache_tests():
         return mock_response
 
     # Clear cache before test
-    rotowire_service._cache["data"] = None
-    rotowire_service._cache["expires_at"] = None
+    rotowire_service._cache.clear()
 
     with patch("services.rotowire_service.requests.get", side_effect=mock_get):
         result1 = rotowire_service.scrape_rotowire_news(force_refresh=True)
@@ -161,8 +160,7 @@ def run_failure_mode_tests():
 
     # Reset cache before each test
     def reset_cache():
-        rotowire_service._cache["data"] = None
-        rotowire_service._cache["expires_at"] = None
+        rotowire_service._cache.clear()
 
     # [1] 403 response → retries 3 times, returns empty list (not an exception)
     print("\n[1] 403 response retries then returns []...")

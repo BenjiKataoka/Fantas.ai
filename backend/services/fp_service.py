@@ -14,6 +14,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from services.utils import normalize_name
+from services.cache_service import TTLCache
 
 logger = logging.getLogger(__name__)
 
@@ -31,19 +32,8 @@ HEADERS = {
 }
 
 # 4h cache, never scrape more than once per 4h window
-_cache: dict = {}
 CACHE_TTL_HOURS = 4
-
-
-def _get_cache(key: str):
-    entry = _cache.get(key)
-    if entry and datetime.utcnow() < entry[1]:
-        return entry[0]
-    return None
-
-
-def _set_cache(key: str, data, ttl_hours: int = CACHE_TTL_HOURS):
-    _cache[key] = (data, datetime.utcnow() + timedelta(hours=ttl_hours))
+_cache = TTLCache(default_ttl_hours=CACHE_TTL_HOURS)
 
 
 async def get_fp_projections(week: int) -> dict[str, float]:
@@ -54,7 +44,7 @@ async def get_fp_projections(week: int) -> dict[str, float]:
     Returns empty dict during offseason, FantasyPros tables are empty until season starts.
     """
     cache_key = f"fp_proj_{week}"
-    cached = _get_cache(cache_key)
+    cached = _cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -78,7 +68,7 @@ async def get_fp_projections(week: int) -> dict[str, float]:
             f"[FP] No projections returned for week {week}. Expected during offseason."
         )
 
-    _set_cache(cache_key, all_projections)
+    _cache.set(cache_key, all_projections)
     return all_projections
 
 

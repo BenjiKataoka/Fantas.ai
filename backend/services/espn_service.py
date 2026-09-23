@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import httpx
 
 from services.utils import normalize_name
+from services.cache_service import TTLCache
 
 logger = logging.getLogger(__name__)
 
@@ -23,18 +24,7 @@ ESPN_SLOT_MAP = {
 }
 
 # In-memory cache: {key: (data, expires_at)}
-_cache: dict = {}
-
-
-def _get_cache(key: str):
-    entry = _cache.get(key)
-    if entry and datetime.utcnow() < entry[1]:
-        return entry[0]
-    return None
-
-
-def _set_cache(key: str, data, ttl_hours: int = 6):
-    _cache[key] = (data, datetime.utcnow() + timedelta(hours=ttl_hours))
+_cache = TTLCache(default_ttl_hours=6)
 
 
 # ESPN stat entry discriminators (in player.stats[])
@@ -80,7 +70,7 @@ async def get_espn_projections_full(
     each player's stats array, see _extract_espn_proj.
     """
     cache_key = f"espn_proj_{season}_{week}"
-    cached = _get_cache(cache_key)
+    cached = _cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -129,7 +119,7 @@ async def get_espn_projections_full(
         )
 
     result = (by_id, by_name)
-    _set_cache(cache_key, result, ttl_hours=6)
+    _cache.set(cache_key, result, ttl_hours=6)
     logger.info(f"[ESPN] Loaded {len(by_id)} projections for week {week}")
     return result
 
@@ -146,7 +136,7 @@ async def get_espn_market_pool(season: int, week: int) -> dict[str, dict]:
     ADP / % rostered. Cached 6h.
     """
     cache_key = f"espn_market_{season}_{week}"
-    cached = _get_cache(cache_key)
+    cached = _cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -204,7 +194,7 @@ async def get_espn_market_pool(season: int, week: int) -> dict[str, dict]:
             "percent_rostered": round(r["percent_rostered"], 1) if r.get("percent_rostered") is not None else None,
         }
 
-    _set_cache(cache_key, pool, ttl_hours=6)
+    _cache.set(cache_key, pool, ttl_hours=6)
     logger.info(f"[ESPN] market pool: {len(pool)} players, {len(ranked)} ranked by projection (week {week})")
     return pool
 
@@ -227,7 +217,7 @@ async def get_espn_roster(
     Returns list of {espn_player_id, name, position, is_starter, slot}.
     """
     cache_key = f"espn_roster_{league_id}_{season}"
-    cached = _get_cache(cache_key)
+    cached = _cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -296,7 +286,7 @@ async def get_espn_roster(
             })
 
     logger.info(f"[ESPN] Loaded {len(roster_out)} players from ESPN roster for league {league_id}")
-    _set_cache(cache_key, roster_out, ttl_hours=6)
+    _cache.set(cache_key, roster_out, ttl_hours=6)
     return roster_out
 
 
@@ -367,7 +357,7 @@ async def get_espn_league(league_id: str, season: int, espn_s2: str | None = Non
     Sleeper rosters, since waiver claims change ownership. Cookies are optional for public
     leagues. Raises EspnAuthError on 401 (bad cookies, or a private league without them)."""
     cache_key = f"espn_league_{league_id}_{season}"
-    cached = None if force else _get_cache(cache_key)
+    cached = None if force else _cache.get(cache_key)
     if cached is not None:
         return cached
     try:
@@ -386,7 +376,7 @@ async def get_espn_league(league_id: str, season: int, espn_s2: str | None = Non
         logger.error(f"[ESPN] get_espn_league {league_id} status {resp.status_code}")
         return None
     data = resp.json()
-    _set_cache(cache_key, data, ttl_hours=0.25)
+    _cache.set(cache_key, data, ttl_hours=0.25)
     return data
 
 
@@ -461,7 +451,7 @@ async def get_espn_boxscore(league_id: str, season: int, week: int, espn_s2: str
     team names. A finished week caches 24h; the current week caches 10 minutes so scores
     move during games."""
     cache_key = f"espn_box_{league_id}_{season}_{week}"
-    cached = _get_cache(cache_key)
+    cached = _cache.get(cache_key)
     if cached is not None:
         return cached
     try:
@@ -481,5 +471,5 @@ async def get_espn_boxscore(league_id: str, season: int, week: int, espn_s2: str
         logger.error(f"[ESPN] boxscore {league_id} week {week} status {resp.status_code}")
         return None
     data = resp.json()
-    _set_cache(cache_key, data, ttl_hours=(1 / 6) if live else 24)
+    _cache.set(cache_key, data, ttl_hours=(1 / 6) if live else 24)
     return data

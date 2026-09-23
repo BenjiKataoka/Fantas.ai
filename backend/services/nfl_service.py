@@ -2,6 +2,7 @@ import httpx
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
+from services.cache_service import TTLCache
 
 logger = logging.getLogger(__name__)
 
@@ -14,22 +15,7 @@ ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nf
 # ESPN's scoreboard abbreviations that differ from Sleeper's (the app's canonical ones).
 ESPN_TO_SLEEPER_TEAM = {"WSH": "WAS"}
 
-# In-memory cache keyed by endpoint
-_cache: dict = {}
-
-
-def _get_cache(key: str):
-    entry = _cache.get(key)
-    if entry and datetime.utcnow() < entry["expires_at"]:
-        return entry["data"]
-    return None
-
-
-def _set_cache(key: str, data, ttl_hours: float = 1.0):
-    _cache[key] = {
-        "data": data,
-        "expires_at": datetime.utcnow() + timedelta(hours=ttl_hours),
-    }
+_cache = TTLCache(default_ttl_hours=1.0)
 
 
 async def get_espn_news(limit: int = 50, force_refresh: bool = False) -> list[dict]:
@@ -40,7 +26,7 @@ async def get_espn_news(limit: int = 50, force_refresh: bool = False) -> list[di
     """
     cache_key = f"espn_news_{limit}"
     if not force_refresh:
-        cached = _get_cache(cache_key)
+        cached = _cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -54,7 +40,7 @@ async def get_espn_news(limit: int = 50, force_refresh: bool = False) -> list[di
         return []
 
     items = _parse_espn_news(data)
-    _set_cache(cache_key, items, ttl_hours=1.0)
+    _cache.set(cache_key, items, ttl_hours=1.0)
     logger.info(f"[ESPN News] fetched {len(items)} news items")
     return items
 
@@ -127,7 +113,7 @@ async def get_espn_injuries(team_id: int, force_refresh: bool = False) -> list[d
     """
     cache_key = f"espn_injuries_{team_id}"
     if not force_refresh:
-        cached = _get_cache(cache_key)
+        cached = _cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -142,7 +128,7 @@ async def get_espn_injuries(team_id: int, force_refresh: bool = False) -> list[d
         return []
 
     items = _parse_espn_injuries(data)
-    _set_cache(cache_key, items, ttl_hours=2.0)
+    _cache.set(cache_key, items, ttl_hours=2.0)
     return items
 
 
@@ -179,7 +165,7 @@ async def get_espn_transactions(limit: int = 50, force_refresh: bool = False) ->
     """
     cache_key = f"espn_transactions_{limit}"
     if not force_refresh:
-        cached = _get_cache(cache_key)
+        cached = _cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -193,7 +179,7 @@ async def get_espn_transactions(limit: int = 50, force_refresh: bool = False) ->
         return []
 
     items = _parse_espn_news(data)  # same shape as news articles
-    _set_cache(cache_key, items, ttl_hours=2.0)
+    _cache.set(cache_key, items, ttl_hours=2.0)
     logger.info(f"[ESPN Transactions] fetched {len(items)} items")
     return items
 
@@ -205,7 +191,7 @@ async def get_player_injury_status(espn_athlete_id: str) -> Optional[dict]:
     Cache TTL: 1h.
     """
     cache_key = f"espn_athlete_{espn_athlete_id}"
-    cached = _get_cache(cache_key)
+    cached = _cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -228,7 +214,7 @@ async def get_player_injury_status(espn_athlete_id: str) -> Optional[dict]:
         detail = latest.get("details", {}).get("detail")
 
     result = {"injury_status": status, "injury_detail": detail}
-    _set_cache(cache_key, result, ttl_hours=1.0)
+    _cache.set(cache_key, result, ttl_hours=1.0)
     return result
 
 
@@ -244,7 +230,7 @@ async def get_teams_playing_today(force_refresh: bool = False) -> set[str]:
     cache_key = f"teams_playing_{today_str}"
 
     if not force_refresh:
-        cached = _get_cache(cache_key)
+        cached = _cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -268,7 +254,7 @@ async def get_teams_playing_today(force_refresh: bool = False) -> set[str]:
                 if abbrev:
                     teams.add(abbrev.upper())
 
-    _set_cache(cache_key, teams, ttl_hours=1.0)
+    _cache.set(cache_key, teams, ttl_hours=1.0)
     logger.info(f"[ESPN Scoreboard] {len(teams)} teams playing today: {sorted(teams)}")
     return teams
 
@@ -278,7 +264,7 @@ async def get_week_schedule(season: int, week: int) -> dict[str, dict]:
     season week, in Sleeper's team abbreviations. A team missing from the map is on bye.
     Cached 1 hour (game states change on Sundays)."""
     cache_key = f"schedule_{season}_{week}"
-    cached = _get_cache(cache_key)
+    cached = _cache.get(cache_key)
     if cached is not None:
         return cached
     try:
@@ -302,5 +288,5 @@ async def get_week_schedule(season: int, week: int) -> dict[str, dict]:
             if abbr:
                 out[ESPN_TO_SLEEPER_TEAM.get(abbr, abbr)] = {"kickoff": kickoff, "state": state}
     # 15 minutes: game states (pre → in → post) drive live scoring on Sundays.
-    _set_cache(cache_key, out, ttl_hours=0.25)
+    _cache.set(cache_key, out, ttl_hours=0.25)
     return out

@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from typing import Optional
+from services.cache_service import TTLCache
 
 logger = logging.getLogger(__name__)
 
@@ -17,22 +18,9 @@ HEADERS = {
     )
 }
 
-# In-memory cache: list of scraped news items + expiry
-_cache: dict = {"data": None, "expires_at": None}
 CACHE_TTL_MINUTES = 30  # game days; caller can override
-
-
-def _is_cache_valid() -> bool:
-    return (
-        _cache["data"] is not None
-        and _cache["expires_at"] is not None
-        and datetime.utcnow() < _cache["expires_at"]
-    )
-
-
-def _set_cache(data: list, ttl_minutes: int = CACHE_TTL_MINUTES):
-    _cache["data"] = data
-    _cache["expires_at"] = datetime.utcnow() + timedelta(minutes=ttl_minutes)
+_cache = TTLCache()
+_KEY = "rotowire_news"  # one feed, so one key
 
 
 def scrape_rotowire_news(force_refresh: bool = False, ttl_minutes: int = CACHE_TTL_MINUTES) -> list[dict]:
@@ -41,8 +29,8 @@ def scrape_rotowire_news(force_refresh: bool = False, ttl_minutes: int = CACHE_T
     Returns list of dicts: {player_name, headline, news_body, published_at, source_url, source}.
     Does NOT scrape the paywalled ANALYSIS section, Gemini generates analysis instead.
     """
-    if not force_refresh and _is_cache_valid():
-        return _cache["data"]
+    if not force_refresh and (hit := _cache.get(_KEY)) is not None:
+        return hit
 
     items = []
     for attempt in range(3):
@@ -61,7 +49,7 @@ def scrape_rotowire_news(force_refresh: bool = False, ttl_minutes: int = CACHE_T
             if attempt < 2:
                 time.sleep(2 ** attempt)
 
-    _set_cache(items, ttl_minutes=ttl_minutes)
+    _cache.set_minutes(_KEY, items, ttl_minutes)
     logger.info(f"[RotoWire] scraped {len(items)} news items")
     return items
 

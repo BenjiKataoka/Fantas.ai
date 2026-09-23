@@ -21,6 +21,7 @@ import feedparser
 import httpx
 
 from services.utils import normalize_name
+from services.cache_service import TTLCache
 
 logger = logging.getLogger(__name__)
 
@@ -38,16 +39,9 @@ _UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML
 _TAG_RE = re.compile(r"<[^>]+>")
 _MAX_BODY = 2000  # PlayerNews.news_body cap
 
-_cache: dict = {"data": None, "expires_at": None}
 CACHE_TTL_MINUTES = 30
-
-
-def _is_cache_valid() -> bool:
-    return (
-        _cache["data"] is not None
-        and _cache["expires_at"] is not None
-        and datetime.utcnow() < _cache["expires_at"]
-    )
+_cache = TTLCache()
+_KEY = "rss_entries"  # all feeds fetched together, so one key
 
 
 def _strip_html(text: str) -> str:
@@ -105,14 +99,11 @@ async def fetch_rss_news(
     if not matcher:
         return []  # nobody to match against → skip the network entirely
 
-    if not force_refresh and _is_cache_valid():
-        entries = _cache["data"]
-    else:
+    entries = None if force_refresh else _cache.get(_KEY)
+    if entries is None:
         async with httpx.AsyncClient(follow_redirects=True) as client:
             results = await asyncio.gather(*[_fetch_feed(client, s, u) for s, u in FEEDS])
-        entries = [pair for feed in results for pair in feed]
-        _cache["data"] = entries
-        _cache["expires_at"] = datetime.utcnow() + timedelta(minutes=CACHE_TTL_MINUTES)
+        entries = _cache.set_minutes(_KEY, [pair for feed in results for pair in feed], CACHE_TTL_MINUTES)
 
     items: list[dict] = []
     for source, entry in entries:
