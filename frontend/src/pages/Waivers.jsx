@@ -121,14 +121,19 @@ function Row({ p, i, analysis, open, onAnalyze, lineAbove }) {
       <td className="px-3 py-2.5 text-right"><Num className="text-subtle">{p.percent_rostered != null ? `${p.percent_rostered}%` : '-'}</Num></td>
       <td className="px-3 py-2.5 text-right"><Trend p={p} /></td>
       <td className="px-3 py-2.5 pl-5">
+        {/* Fills the cell so Analyze, Hide and the loading dots all occupy the same
+            box; the column is fixed-width, so a wider label would spill out of it. */}
         <button
           onClick={onAnalyze}
           disabled={analysis?.loading}
           aria-expanded={open}
-          className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors disabled:opacity-60 ${
+          aria-busy={analysis?.loading || undefined}
+          aria-label={analysis?.loading ? `Analyzing ${p.name}` : undefined}
+          className={`w-full inline-flex items-center justify-center px-2.5 py-1 rounded-md text-xs font-medium leading-4 border transition-colors disabled:opacity-60 ${
             open ? 'border-brand text-brand' : 'border-line text-subtle hover:text-content hover:bg-raised'}`}
         >
-          {analysis?.loading ? <span className="inline-flex items-center gap-1.5">Analyzing <LoadingDots /></span> : open ? 'Hide' : 'Analyze'}
+          {/* h-4 matches the text line box, so the button keeps its height while loading. */}
+          {analysis?.loading ? <span className="inline-flex h-4 items-center"><LoadingDots /></span> : open ? 'Hide' : 'Analyze'}
         </button>
       </td>
     </tr>

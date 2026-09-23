@@ -25,6 +25,65 @@ export function TableSkeleton({ rows = 8 }) {
   )
 }
 
+// Portfolio "Your players": the same four columns as the real table, so the
+// exposure dots and projection bars don't jump when the data lands.
+export function PortfolioTableSkeleton({ rows = 8, leagues = 4 }) {
+  const td = 'px-3 py-2.5'
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between">
+        <Skeleton className="h-7 w-40" />
+        <Skeleton className="h-3.5 w-64 max-w-[45%]" />
+      </div>
+      <div className="bg-surface border border-line rounded-xl">
+        <table className="w-full table-fixed text-sm">
+          <colgroup><col /><col className="w-14" /><col className="w-24" /><col className="w-60" /></colgroup>
+          <thead>
+            <tr>
+              <th className={td}><Skeleton className="h-2.5 w-12" /></th>
+              <th className={td}><Skeleton className="h-2.5 w-6" /></th>
+              <th className={td}><Skeleton className="h-2.5 w-8 mx-auto" /></th>
+              <th className={td}><Skeleton className="h-2.5 w-20" /></th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: rows }).map((_, i) => (
+              <tr key={i} className="border-t border-line/50">
+                <td className={td}>
+                  <div className="flex items-center gap-2.5">
+                    <Skeleton className="size-3.5 shrink-0" />
+                    <Skeleton className="h-8 w-1 rounded-full shrink-0" />
+                    <Skeleton className="size-8 rounded-full shrink-0" />
+                    <div className="min-w-0 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-3.5 w-32" />
+                        {i % 4 === 1 && <Skeleton className="h-4 w-9 rounded" />}
+                      </div>
+                      <Skeleton className="h-2.5 w-10" />
+                    </div>
+                  </div>
+                </td>
+                <td className={td}><Skeleton className="h-3 w-7" /></td>
+                <td className={td}><Skeleton className="h-4 w-14 mx-auto rounded-full" /></td>
+                <td className={td}>
+                  <div className="flex items-center gap-3">
+                    <span className="flex gap-1">
+                      {Array.from({ length: leagues }).map((_, d) => (
+                        <Skeleton key={d} className="size-2 rounded-full" />
+                      ))}
+                    </span>
+                    <Skeleton className="h-2.5 w-24" />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function RecapRow() {
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 border-t border-line/50">
@@ -125,7 +184,7 @@ export function WaiverSkeleton({ rows = 10 }) {
                     <Skeleton className="h-3 w-20 ml-auto" />
                     {i % 4 === 1 && <Skeleton className="h-3 w-24 ml-auto mt-1.5" />}
                   </td>
-                  <td className={`${td} pl-5`}><Skeleton className="h-6 w-16 rounded-md" /></td>
+                  <td className={`${td} pl-5`}><Skeleton className="h-6 w-full rounded-md" /></td>
                 </tr>
               ))}
             </tbody>

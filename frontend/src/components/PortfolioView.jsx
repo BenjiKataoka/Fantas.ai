@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { getMatchups, getPortfolio, getResults, getWaivers } from '../services/api'
 import Notice from './Notice'
-import { BenchMisses, LeagueStrip, LeagueStripSkeleton, ModeToggle, MostOnTheLine, NeedsYou, Pickups, ResultTile, ResultsHero, Tile, WeekHero, YourSunday } from './WeekBoard'
+import { BenchMisses, BoardSkeleton, LeagueStrip, ModeToggle, MostOnTheLine, NeedsYou, Pickups, ResultTile, ResultsHero, Tile, WeekHero, YourSunday } from './WeekBoard'
 import { REVEAL, slotLabel, tiltHandlers } from '@/lib/utils'
 import { Hint } from '@/components/ui/tooltip'
 import PlayerAvatar from './PlayerAvatar'
@@ -13,7 +13,7 @@ import AlertFeed from './AlertFeed'
 import CollapseRow from './CollapseRow'
 import { ConcernFlag } from './RosterTable'
 import TeamAccent from './TeamAccent'
-import { TableSkeleton } from './Skeletons'
+import { PortfolioTableSkeleton } from './Skeletons'
 
 const POS_COLORS = { QB: 'text-pos-qb', RB: 'text-pos-rb', WR: 'text-pos-wr', TE: 'text-pos-te', K: 'text-subtle' }
 const TH = 'px-3 py-2.5 text-left text-xs font-medium text-subtle'
@@ -131,19 +131,28 @@ export default function PortfolioView({ onOpenLeague }) {
     return () => { cancelled = true }
   }, [credentials, lastRefresh])
 
-  // Results mode loads on first use: last week's grades plus the combined waiver pickups.
+  // Results mode loads on first use: last week's grades.
   useEffect(() => {
-    if (mode !== 'last' || !credentials || results || !leagues.length) return
+    if (mode !== 'last' || !credentials || results) return
     let cancelled = false
     getResults(credentials.username)
       .then(res => { if (!cancelled) setResults(res.data) })
       .catch(() => { if (!cancelled) setResults({ week: null, leagues: [], record: null, left_on_bench: 0, misses: [], warnings: ['Last week\'s results couldn\'t load.'] }) })
+    return () => { cancelled = true }
+  }, [mode, credentials, results])
+
+  // Pickups are one waiver board per league, so they finish well after the results do.
+  // Kept in their own effect: sharing one with the results meant setResults re-ran it,
+  // which cancelled these still-in-flight requests and left the card loading forever.
+  useEffect(() => {
+    if (mode !== 'last' || !credentials || pickups || !leagues.length) return
+    let cancelled = false
     Promise.all(leagues.map(l => getWaivers(credentials.username, l.league_id, l.platform)
       .then(res => ({ league: l, candidates: res.data.candidates }))
       .catch(() => ({ league: l, candidates: [] }))))
       .then(boards => { if (!cancelled) setPickups(combinePickups(boards)) })
     return () => { cancelled = true }
-  }, [mode, credentials, results, leagues])
+  }, [mode, credentials, pickups, leagues])
 
   // The portfolio paints from what's stored and syncs stale leagues behind it; poll until done.
   useEffect(() => {
@@ -184,7 +193,7 @@ export default function PortfolioView({ onOpenLeague }) {
           </div>
           {results.warnings.map(w => <p key={w} className="text-sm text-warn -mt-4">{w}</p>)}
         </>
-      ) : <LeagueStripSkeleton />) : week?.leagues?.length ? (
+      ) : <BoardSkeleton mode="last" />) : week?.leagues?.length ? (
         <>
           <WeekHero data={week} toggle={<ModeToggle mode={mode} onChange={setMode} />} />
           <LeagueStrip subtitle={`${week.leagues.length} matchups this week`} count={week.leagues.length}>
@@ -201,11 +210,11 @@ export default function PortfolioView({ onOpenLeague }) {
             {data ? <MostOnTheLine players={data.players} /> : <div />}
           </div>
         </>
-      ) : !week ? <LeagueStripSkeleton /> : null}
+      ) : !week ? <BoardSkeleton mode="this" /> : null}
       {warnings.map(w => <p key={w} className="text-sm text-warn -mt-4">{w}</p>)}
 
       {error && !data && <Notice tone="error" title={error} message="Your leagues may be slow to respond right now." actionLabel="Try again" onAction={() => window.location.reload()} />}
-      {!data && !error && <TableSkeleton rows={8} />}
+      {!data && !error && <PortfolioTableSkeleton rows={8} leagues={leagues.length || 4} />}
       {data && (
       <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">

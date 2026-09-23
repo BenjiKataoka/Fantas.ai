@@ -4,7 +4,6 @@ import { Check, TriangleAlert, ExternalLink } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { REVEAL, slotLabel, tiltHandlers, dotFieldHandlers } from '@/lib/utils'
 import { Hint } from '@/components/ui/tooltip'
-import { LoadingDots } from './Spinner'
 
 const PLATFORM = { SLEEPER: 'Sleeper', ESPN: 'ESPN' }
 const PLATFORM_LOGO = { SLEEPER: '/platform/sleeper.png', ESPN: '/platform/espn.png' }
@@ -261,6 +260,7 @@ export function LeagueStrip({ subtitle, count, children }) {
         <span className="text-sm text-subtle">{subtitle}</span>
         {count > 3 && <span className="ml-auto text-sm text-subtle">Drag to see more</span>}
       </div>
+      {/* overflow-x clips vertically too, so py-2 gives the tiles' hover lift room to live in. */}
       <div
         ref={strip}
         onPointerDown={down}
@@ -269,7 +269,7 @@ export function LeagueStrip({ subtitle, count, children }) {
         onPointerLeave={up}
         onClickCapture={guard}
         onScroll={onScroll}
-        className={`flex gap-4 overflow-x-auto no-scrollbar select-none pb-1 ${atEnd ? '' : 'league-strip'} ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`flex gap-4 overflow-x-auto no-scrollbar select-none py-2 ${atEnd ? '' : 'league-strip'} ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       >
         {children}
         {/* Trailing space so the last tile can scroll fully clear of the edge. */}
@@ -292,6 +292,137 @@ export function LeagueStripSkeleton() {
         </div>
       ))}
     </div>
+  )
+}
+
+// One bento card's frame: heading, an optional right-hand meta line, then its rows.
+function CardSkeleton({ span, titleW, metaW, children }) {
+  return (
+    <section className={`${CARD} h-full p-6 flex flex-col gap-3 ${span || ''}`}>
+      <div className="flex items-baseline gap-2.5">
+        <Skeleton className={`h-7 ${titleW}`} />
+        {metaW && <Skeleton className={`h-3.5 ml-auto ${metaW}`} />}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+// A raised row carrying two lines and either a Fix button or a score.
+function StackRow({ dot, action }) {
+  return (
+    <div className="flex items-center gap-4 px-4 py-3.5 rounded-lg bg-raised">
+      {dot && <Skeleton className="size-2.5 rounded-full shrink-0" />}
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <Skeleton className="h-3.5 w-48 max-w-full" />
+        <Skeleton className="h-2.5 w-60 max-w-full" />
+      </div>
+      <Skeleton className={action ? 'h-11 w-32 rounded-lg shrink-0' : 'h-6 w-12 shrink-0'} />
+    </div>
+  )
+}
+
+// The pickup rows alone: the card around them is already on screen while they load.
+export function PickupsSkeleton({ rows = 3 }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex flex-col gap-1.5 pb-3 border-b border-line last:border-0">
+          <div className="flex items-baseline justify-between gap-3">
+            <Skeleton className="h-3.5 w-36" />
+            <Skeleton className="h-3 w-16 shrink-0" />
+          </div>
+          <Skeleton className="h-2.5 w-44 max-w-full" />
+        </div>
+      ))}
+    </>
+  )
+}
+
+// The whole board while it loads: hero, league tiles, and every bento card that
+// follows, so the page keeps its shape instead of growing a card at a time.
+export function BoardSkeleton({ mode = 'this' }) {
+  const three = [0, 1, 2]
+  return (
+    <>
+      <div className={`${CARD} px-8 py-8 flex flex-col gap-5`}>
+        <div className="flex items-center justify-between gap-4">
+          <Skeleton className="h-3.5 w-52 max-w-[50%]" />
+          <Skeleton className="h-9 w-48 rounded-lg shrink-0" />
+        </div>
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <Skeleton className="h-16 w-72 max-w-full" />
+          <div className="flex flex-col items-end gap-2 pb-1">
+            <Skeleton className="h-9 w-24" />
+            <Skeleton className="h-3.5 w-48 max-w-full" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-baseline gap-3">
+          <Skeleton className="h-7 w-36" />
+          <Skeleton className="h-3.5 w-40" />
+        </div>
+        <LeagueStripSkeleton />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {mode === 'last' ? (
+          <>
+            <CardSkeleton span="lg:col-span-2" titleW="w-72 max-w-full">
+              {three.map(i => <StackRow key={i} />)}
+            </CardSkeleton>
+            <CardSkeleton titleW="w-48">
+              <Skeleton className="h-3.5 w-56 max-w-full -mt-1" />
+              <PickupsSkeleton />
+              <Skeleton className="h-11 w-44 rounded-lg mt-auto" />
+            </CardSkeleton>
+          </>
+        ) : (
+          <>
+            <CardSkeleton span="lg:col-span-2" titleW="w-36" metaW="w-40">
+              {three.map(i => <StackRow key={i} dot action />)}
+            </CardSkeleton>
+            <CardSkeleton titleW="w-52" metaW="w-16">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="grid grid-cols-[6.5rem_minmax(0,1fr)_2rem] items-center gap-3">
+                  <Skeleton className="h-3 w-20" />
+                  <div className="min-w-0 flex flex-col gap-1.5">
+                    <Skeleton className="h-2.5 rounded-full" style={{ width: `${100 - i * 18}%` }} />
+                    <Skeleton className="h-2.5 w-full" />
+                  </div>
+                  <Skeleton className="h-5 w-6 ml-auto" />
+                </div>
+              ))}
+            </CardSkeleton>
+            <CardSkeleton span="lg:col-span-2" titleW="w-24">
+              {three.map(i => (
+                <div key={i} className="flex items-start gap-3 py-1">
+                  <Skeleton className="size-9 rounded-full shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <Skeleton className="h-3.5 w-3/4" />
+                    <Skeleton className="h-2.5 w-1/3" />
+                  </div>
+                  <Skeleton className="h-5 w-16 rounded shrink-0" />
+                </div>
+              ))}
+            </CardSkeleton>
+            <CardSkeleton titleW="w-44" metaW="w-32">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <Skeleton className="h-3.5 w-36 max-w-full" />
+                    <Skeleton className="h-2.5 w-44 max-w-full" />
+                  </div>
+                  <Skeleton className="h-5 w-20 shrink-0" />
+                </div>
+              ))}
+            </CardSkeleton>
+          </>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -419,7 +550,7 @@ export function Pickups({ pickups, loading }) {
     <section aria-labelledby="pickups" {...tiltHandlers} className={`${CARD} tilt h-full p-6 flex flex-col gap-3`}>
       <h2 id="pickups" className={H2}>Before waivers run</h2>
       <p className="text-sm text-subtle -mt-1">Free agents who would start for you, and where.</p>
-      {loading ? <LoadingDots className="text-lg text-subtle my-2" /> : pickups.length ? pickups.map(p => (
+      {loading ? <PickupsSkeleton /> : pickups.length ? pickups.map(p => (
         <div key={p.player_id} className="flex flex-col gap-0.5 pb-3 border-b border-line last:border-0">
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-sm font-medium text-content truncate">{p.name}, {p.position}</span>
