@@ -21,16 +21,14 @@ import json
 import logging
 from typing import Optional
 
-from google import genai
 
 from services.utils import WRITING_STYLE, strip_dashes
 
-from config import GEMINI_API_KEY, GEMINI_PRIMARY, GEMINI_FALLBACK, LLM_ENABLED
-from services import llm_budget
+from config import GEMINI_PRIMARY, GEMINI_FALLBACK
+from services import gemini_client
 
 logger = logging.getLogger(__name__)
 
-_genai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 ADP_PENALTY = {"RISING": -1, "STABLE": 0, "FALLING": 2}
 
@@ -239,52 +237,13 @@ async def run_full_analysis(
 
 async def _run_pass(prompt: str, model: str, pass_num: int) -> Optional[dict]:
     """Call Gemini and parse JSON. Falls back to the other model on failure."""
-    result = await _call_gemini(prompt, model)
+    result = await gemini_client.call_json(prompt, model, "Sentiment")
     if result is None:
         fallback = GEMINI_FALLBACK if model == GEMINI_PRIMARY else GEMINI_PRIMARY
         logger.warning(f"[Sentiment] Pass {pass_num} failed on {model}, trying {fallback}")
-        result = await _call_gemini(prompt, fallback)
+        result = await gemini_client.call_json(prompt, fallback, "Sentiment")
     if result is None:
         logger.error(f"[Sentiment] Pass {pass_num} failed on both models")
     return result
 
 
-async def _call_gemini(prompt: str, model: str) -> Optional[dict]:
-    text = await _call_gemini_text(prompt, model)
-    if not text:
-        return None
-    try:
-        cleaned = text.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("```")[1]
-            if cleaned.startswith("json"):
-                cleaned = cleaned[4:]
-        return json.loads(cleaned.strip())
-    except json.JSONDecodeError as e:
-        logger.error(f"[Sentiment] JSON parse failed ({model}): {e}\nRaw: {text[:300]}")
-        return None
-
-
-async def _call_gemini_text(prompt: str, model: str) -> Optional[str]:
-    if not LLM_ENABLED:
-        logger.info(f"[Sentiment] LLM disabled (LLM_ENABLED=false), skipping {model} call")
-        return None
-    if not llm_budget.can_spend(model):
-        logger.warning(f"[Sentiment] Daily budget exhausted for {model}, skipping call")
-        return None
-    llm_budget.record_call(model)
-    try:
-        # Every pass expects a JSON object back. Forcing response_mime_type makes Gemini
-        # emit raw JSON (no markdown fences / prose), which nearly eliminates the parse
-        # failures that were leaving concern/sentiment fields null on some players.
-        # .aio = the SDK's async client; the sync call blocked the whole event loop for
-        # the seconds Gemini takes, stalling every other request during a roster run.
-        response = await _genai_client.aio.models.generate_content(
-            model=model,
-            contents=prompt + WRITING_STYLE,
-            config={"response_mime_type": "application/json"},
-        )
-        return strip_dashes(response.text)
-    except Exception as e:
-        logger.error(f"[Sentiment] Gemini call failed ({model}): {e}")
-        return None

@@ -233,10 +233,10 @@ def run_analysis_service_tests():
         mock_db.add = MagicMock()  # Session.add() is sync, not a coroutine
 
         with patch(
-            "services.news_analysis_service._call_gemini",
+            "services.gemini_client.call_json",
             new=AsyncMock(return_value=pass1_response)
         ), patch(
-            "services.news_analysis_service._call_gemini_text",
+            "services.gemini_client.call_text",
             new=AsyncMock(return_value="Context summary placeholder")
         ):
             result = await analyze_news_item(news_item, player_context, mock_db)
@@ -252,10 +252,10 @@ def run_analysis_service_tests():
         print("\n[2] HIGH magnitude blocked at confidence=0.60...")
         low_conf_response = {**pass1_response, "stock_magnitude": "HIGH", "confidence_score": 0.60}
         with patch(
-            "services.news_analysis_service._call_gemini",
+            "services.gemini_client.call_json",
             new=AsyncMock(return_value=low_conf_response)
         ), patch(
-            "services.news_analysis_service._call_gemini_text",
+            "services.gemini_client.call_text",
             new=AsyncMock(return_value="summary")
         ):
             result2 = await analyze_news_item(news_item, player_context, mock_db)
@@ -283,14 +283,14 @@ def run_analysis_service_tests():
         mock_db2.add = MagicMock()  # Session.add() is sync
 
         call_count = {"n": 0}
-        async def _mock_gemini(prompt, model):
+        async def _mock_gemini(prompt, model, tag):
             call_count["n"] += 1
             if call_count["n"] == 1:
                 return needs_check_response
             return pass2_response
 
-        with patch("services.news_analysis_service._call_gemini", new=_mock_gemini), \
-             patch("services.news_analysis_service._call_gemini_text", new=AsyncMock(return_value="summary")):
+        with patch("services.gemini_client.call_json", new=_mock_gemini), \
+             patch("services.gemini_client.call_text", new=AsyncMock(return_value="summary")):
             result3 = await analyze_news_item(news_item, player_context, mock_db2)
 
         assert result3 is not None
@@ -365,28 +365,45 @@ def run_router_tests():
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_async_client_tests():
-    """Both Gemini callers must await the SDK's async client (.aio). A sync
-    generate_content inside an async def blocks the whole FastAPI event loop."""
+    """The one Gemini caller must await the SDK's async client (.aio). A sync
+    generate_content inside an async def blocks the whole FastAPI event loop.
+    Also pins the json_mode contract: JSON passes force response_mime_type, prose does not."""
     import asyncio
     from unittest.mock import AsyncMock, MagicMock, patch
-    from services import news_analysis_service, sentiment_service
+    from services import gemini_client, news_analysis_service, sentiment_service
 
     print("\n" + "=" * 50)
     print("GEMINI, ASYNC CLIENT (no event-loop blocking)")
     print("=" * 50)
 
-    for svc in (news_analysis_service, sentiment_service):
-        client = MagicMock()
-        client.aio.models.generate_content = AsyncMock(return_value=MagicMock(text='{"ok": true}'))
-        with patch.object(svc, "_genai_client", client), \
-             patch.object(svc, "LLM_ENABLED", True), \
-             patch.object(svc.llm_budget, "can_spend", return_value=True), \
-             patch.object(svc.llm_budget, "record_call"):
-            out = asyncio.run(svc._call_gemini_text("prompt", "gemini-3.1-flash-lite"))
+    client = MagicMock()
+    client.aio.models.generate_content = AsyncMock(return_value=MagicMock(text='{"ok": true}'))
+    with patch.object(gemini_client, "_genai_client", client), \
+         patch.object(gemini_client, "LLM_ENABLED", True), \
+         patch.object(gemini_client.llm_budget, "can_spend", return_value=True), \
+         patch.object(gemini_client.llm_budget, "record_call"):
+        out = asyncio.run(gemini_client.call_text("prompt", "gemini-3.1-flash-lite", "Test"))
         assert out == '{"ok": true}', out
         assert client.aio.models.generate_content.await_count == 1
         assert not client.models.generate_content.called, "sync client used, blocks the event loop"
-        print(f"    PASS, {svc.__name__.split('.')[-1]} awaits client.aio")
+        print("    PASS, gemini_client awaits client.aio")
+
+        # Prose calls must NOT force JSON, or the rolling news summary comes back as JSON.
+        assert client.aio.models.generate_content.await_args.kwargs["config"] is None
+        print("    PASS, call_text leaves config unset for prose")
+
+        parsed = asyncio.run(gemini_client.call_json("prompt", "gemini-3.1-flash-lite", "Test"))
+        assert parsed == {"ok": True}, parsed
+        cfg = client.aio.models.generate_content.await_args.kwargs["config"]
+        assert cfg == {"response_mime_type": "application/json"}, cfg
+        print("    PASS, call_json forces response_mime_type (news pipeline had been missing this)")
+
+    # Both pipelines route through the shared client, so neither can drift again.
+    for svc in (news_analysis_service, sentiment_service):
+        assert svc.gemini_client is gemini_client
+        assert not hasattr(svc, "_call_gemini"), f"{svc.__name__} still has its own copy"
+        print(f"    PASS, {svc.__name__.split('.')[-1]} delegates to gemini_client")
+
     from services.utils import strip_dashes, WRITING_STYLE
     assert strip_dashes("Hamstring issue — could sit") == "Hamstring issue, could sit"
     assert strip_dashes("out 1–3 weeks") == "out 1-3 weeks"

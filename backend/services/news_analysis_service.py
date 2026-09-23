@@ -20,20 +20,16 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from google import genai
 
 from services.utils import WRITING_STYLE, strip_dashes
-from google.genai import types
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import GEMINI_API_KEY, GEMINI_PRIMARY, GEMINI_FALLBACK, LLM_ENABLED
-from services import llm_budget
+from config import GEMINI_PRIMARY, GEMINI_FALLBACK
+from services import gemini_client
 from models.news import NewsAnalysis, NewsHistoryContext, PlayerNews
 
 logger = logging.getLogger(__name__)
-
-_genai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 # ── Pass 1 prompt ──────────────────────────────────────────────────────────────
@@ -175,10 +171,10 @@ async def _run_pass1(news_item: PlayerNews, ctx: dict) -> Optional[dict]:
         news_body=news_item.news_body or "(no body)",
     )
 
-    result = await _call_gemini(prompt, model=GEMINI_PRIMARY)
+    result = await gemini_client.call_json(prompt, GEMINI_PRIMARY, "NewsAnalysis")
     if result is None:
         # Fallback to flash
-        result = await _call_gemini(prompt, model=GEMINI_FALLBACK)
+        result = await gemini_client.call_json(prompt, GEMINI_FALLBACK, "NewsAnalysis")
     return result
 
 
@@ -190,7 +186,7 @@ async def _run_pass2(pass1_result: dict, history_context: str) -> Optional[dict]
         history_context=history_context,
     )
     # Pass 2 always uses flash (more capable for contradiction detection)
-    result = await _call_gemini(prompt, model=GEMINI_FALLBACK)
+    result = await gemini_client.call_json(prompt, GEMINI_FALLBACK, "NewsAnalysis")
     return result
 
 
@@ -231,7 +227,7 @@ async def _update_history_context(player_id: str, player_name: str, db: AsyncSes
     )
 
     # Use flash-lite for context regeneration, cheap and sufficient
-    summary = await _call_gemini_text(prompt, model=GEMINI_PRIMARY)
+    summary = await gemini_client.call_text(prompt, GEMINI_PRIMARY, "NewsAnalysis")
     if not summary:
         return
 
@@ -254,41 +250,3 @@ async def _update_history_context(player_id: str, player_name: str, db: AsyncSes
 
 # ── Gemini helpers ─────────────────────────────────────────────────────────────
 
-async def _call_gemini(prompt: str, model: str) -> Optional[dict]:
-    """Call Gemini and parse the JSON response. Returns None on failure."""
-    text = await _call_gemini_text(prompt, model)
-    if not text:
-        return None
-    try:
-        # Strip markdown code fences if present
-        cleaned = text.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("```")[1]
-            if cleaned.startswith("json"):
-                cleaned = cleaned[4:]
-        return json.loads(cleaned.strip())
-    except json.JSONDecodeError as e:
-        logger.error(f"[NewsAnalysis] JSON parse failed ({model}): {e}\nRaw: {text[:300]}")
-        return None
-
-
-async def _call_gemini_text(prompt: str, model: str) -> Optional[str]:
-    """Call Gemini and return raw text. Returns None on failure, when LLM is disabled,
-    or when the daily call cap is exhausted."""
-    if not LLM_ENABLED:
-        logger.info(f"[NewsAnalysis] LLM disabled (LLM_ENABLED=false), skipping {model} call")
-        return None
-    if not llm_budget.can_spend(model):
-        logger.warning(f"[NewsAnalysis] Daily budget exhausted for {model}, skipping call")
-        return None
-    llm_budget.record_call(model)
-    try:
-        # .aio = async client, so a Gemini call doesn't block the event loop.
-        response = await _genai_client.aio.models.generate_content(
-            model=model,
-            contents=prompt + WRITING_STYLE,
-        )
-        return strip_dashes(response.text)
-    except Exception as e:
-        logger.error(f"[NewsAnalysis] Gemini call failed ({model}): {e}")
-        return None

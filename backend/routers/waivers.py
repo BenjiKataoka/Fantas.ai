@@ -13,7 +13,7 @@ from config import GEMINI_PRIMARY
 from database import get_db
 from models.news import PlayerNews
 from models.user import User
-from services import espn_service, nfl_service, rotowire_service, sentiment_service, sleeper_service, tracker_service
+from services import espn_service, gemini_client, nfl_service, rotowire_service, sleeper_service, tracker_service
 from services.projection_engine import this_week_projection, weights_from_user
 from services.projection_service import _extract_sleeper_pts, get_nfl_state
 from services.rule_filter_service import classify_news_type
@@ -284,7 +284,7 @@ async def analyze_free_agent(
 
     prompt = _analyze_prompt(c, board["my_rows"], board["news"].get(player_id) or [], profile,
                              board["public"]["horizon_weeks"])
-    result = await sentiment_service._call_gemini(prompt, GEMINI_PRIMARY)
+    result = await gemini_client.call_json(prompt, GEMINI_PRIMARY, "Waivers")
     if not result or result.get("verdict") not in VERDICTS:
         raise HTTPException(status_code=503, detail="The AI analysis is unavailable right now. Try again later.")
 
