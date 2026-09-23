@@ -20,8 +20,7 @@ from auth import get_current_user
 from services.projection_engine import compute_weighted_projection, weights_from_user
 from services.projection_service import get_nfl_state
 from services import espn_service, fp_service, sleeper_service
-from services.projection_service import _extract_sleeper_pts
-from services.utils import normalize_name
+from services.utils import extract_sleeper_pts, normalize_name
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -89,7 +88,7 @@ async def get_projections(
     projections_out = []
     for roster, player in rows:
         pid = player.player_id
-        sleeper_pts = _extract_sleeper_pts(sleeper_raw.get(pid))
+        sleeper_pts = extract_sleeper_pts(sleeper_raw.get(pid))
         espn_pts = espn_raw.get(espn_id_map.get(pid, ""))
         fp_pts = fp_raw.get(name_map.get(pid, ""))
 

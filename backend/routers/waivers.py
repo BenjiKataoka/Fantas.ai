@@ -15,9 +15,9 @@ from models.news import PlayerNews
 from models.user import User
 from services import espn_service, gemini_client, nfl_service, rotowire_service, sleeper_service, tracker_service
 from services.projection_engine import this_week_projection, weights_from_user
-from services.projection_service import _extract_sleeper_pts, get_nfl_state
+from services.projection_service import get_nfl_state
 from services.rule_filter_service import classify_news_type
-from services.utils import normalize_name
+from services.utils import extract_sleeper_pts, normalize_name
 from services.recap_service import best_lineup
 from services.league_service import resolve_sleeper_user_id
 from services.waiver_service import POSITIONS, rank_free_agents
@@ -152,7 +152,7 @@ async def _board(sleeper_username: str, league_id: str, user: User, db: AsyncSes
         w = this_week_projection(sp, sleeper_weeks[0].get(pid), espn_by_id, espn_by_name, weights)
         # Sleeper keeps projecting injured players, so availability overrides the numbers.
         # ESPN only projects the current week; later weeks are Sleeper's.
-        per_week = [w["weighted_proj"] or 0.0] + [_extract_sleeper_pts(p.get(pid)) or 0.0 for p in sleeper_weeks[1:]]
+        per_week = [w["weighted_proj"] or 0.0] + [extract_sleeper_pts(p.get(pid)) or 0.0 for p in sleeper_weeks[1:]]
         if status in OUT_LONG:
             per_week = [0.0] * len(per_week)
         elif status in OUT_WEEK:
@@ -169,7 +169,7 @@ async def _board(sleeper_username: str, league_id: str, user: User, db: AsyncSes
             "being_dropped": n_drop >= DROP_WARN_MIN and n_drop > n_add,
         }
 
-    pool = {pid for pid, s in sleeper_weeks[0].items() if (_extract_sleeper_pts(s) or 0) >= MIN_PROJ} | set(add_counts)
+    pool = {pid for pid, s in sleeper_weeks[0].items() if (extract_sleeper_pts(s) or 0) >= MIN_PROJ} | set(add_counts)
     free_agents = [r for pid in pool - taken if (r := row(pid))]
     my_rows = [r for pid in ctx["my_ids"] if (r := row(pid))]
 

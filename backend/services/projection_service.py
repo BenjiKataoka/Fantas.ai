@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.projection import Projection
 from services import espn_service, fp_service, sleeper_service
 from services.projection_engine import compute_weighted_projection
-from services.utils import normalize_name  # re-exported for external use
+from services.utils import extract_sleeper_pts, normalize_name  # re-exported for external use
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ async def sync_projections(
     result: dict[str, dict] = {}
 
     for pid in player_ids:
-        sleeper_pts = _extract_sleeper_pts(sleeper_raw.get(pid))
+        sleeper_pts = extract_sleeper_pts(sleeper_raw.get(pid))
         # Match ESPN by espn_id first; fall back to normalized name when Sleeper
         # has no espn_id for this player (otherwise ESPN would be dropped for them).
         espn_pts = espn_by_id.get(espn_id_map.get(pid, ""))
@@ -126,13 +126,3 @@ async def sync_projections(
         f"for season={season} week={week}"
     )
     return result
-
-
-def _extract_sleeper_pts(raw: dict | None) -> float | None:
-    """Pull PPR points from a Sleeper projection dict. Returns None if unavailable."""
-    if not raw:
-        return None
-    pts = raw.get("pts_ppr") or raw.get("pts_half_ppr") or raw.get("pts_std")
-    if pts is None:
-        return None
-    return round(float(pts), 2)

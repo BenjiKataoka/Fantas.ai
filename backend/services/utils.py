@@ -38,3 +38,13 @@ def strip_dashes(text: str | None) -> str | None:
         return text
     text = re.sub(r"(\d)\s*[—–]\s*(\d)", r"\1-\2", text)   # ranges: "1–3 weeks" -> "1-3 weeks"
     return re.sub(r"\s*[—–]\s*", ", ", text)
+
+
+def extract_sleeper_pts(raw: dict | None) -> float | None:
+    """Pull PPR points from a Sleeper projection dict. Returns None if unavailable."""
+    if not raw:
+        return None
+    pts = raw.get("pts_ppr") or raw.get("pts_half_ppr") or raw.get("pts_std")
+    if pts is None:
+        return None
+    return round(float(pts), 2)

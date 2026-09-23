@@ -9,6 +9,7 @@ Used by both sync_projections (bulk DB sync) and the /api/projections endpoint
 (on-demand, per-user weights).
 """
 from config import DEFAULT_WEIGHTS
+from services.utils import extract_sleeper_pts, normalize_name
 
 
 def compute_weighted_projection(
@@ -94,9 +95,6 @@ def this_week_projection(sp: dict, sleeper_stats: dict | None, espn_by_id: dict,
     """One player's projection for this week from Sleeper + ESPN with the user's weights.
     Used where every player must be scored the same way (waivers, both sides of a
     matchup): FantasyPros only covers the top 10 per position, so it's left out."""
-    from services.projection_service import _extract_sleeper_pts
-    from services.utils import normalize_name
-
     name = sp.get("full_name") or f"{sp.get('first_name', '')} {sp.get('last_name', '')}".strip()
     espn = espn_by_id.get(str(sp.get("espn_id"))) or espn_by_name.get(normalize_name(name))
-    return compute_weighted_projection(_extract_sleeper_pts(sleeper_stats), espn, None, weights)
+    return compute_weighted_projection(extract_sleeper_pts(sleeper_stats), espn, None, weights)
