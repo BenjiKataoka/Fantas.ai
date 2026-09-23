@@ -9,9 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import get_current_user
 from database import get_db
-from models.user import User, UserLeague
+from models.user import User
 from services import espn_service, matchup_service, nfl_service, sleeper_service
-from services.league_service import all_leagues, league_season, resolve_sleeper_user_id
+from services.league_service import all_leagues, espn_team_ids, league_season, resolve_sleeper_user_id
 from services.projection_engine import this_week_projection, weights_from_user
 from services.projection_service import get_nfl_state
 
@@ -31,10 +31,7 @@ async def get_matchups(
     season, week = state["season"], state["week"]
     sleeper_user_id = await resolve_sleeper_user_id(user, sleeper_username)
     leagues = await all_leagues(user, sleeper_user_id, league_season(state), db)
-    # Public ESPN leagues find your team by the one you picked, not by SWID.
-    picked = dict((await db.execute(select(UserLeague.league_id, UserLeague.team_id).where(
-        UserLeague.user_id == user.id, UserLeague.platform == "ESPN", UserLeague.team_id.isnot(None),
-    ))).all())
+    picked = await espn_team_ids(db, user.id)
 
     all_players, sleeper_proj, (espn_by_id, espn_by_name), schedule = await asyncio.gather(
         sleeper_service.get_all_players(),

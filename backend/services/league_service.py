@@ -11,6 +11,21 @@ from models.user import UserLeague
 logger = logging.getLogger(__name__)
 
 
+async def espn_team_ids(db: AsyncSession, user_id: int) -> dict[str, int]:
+    """Your picked team id per public ESPN league, keyed by league_id. Public leagues
+    find your team by the one you picked, not by SWID."""
+    return dict((await db.execute(select(UserLeague.league_id, UserLeague.team_id).where(
+        UserLeague.user_id == user_id, UserLeague.platform == "ESPN", UserLeague.team_id.isnot(None),
+    ))).all())
+
+
+async def espn_team_id(db: AsyncSession, user_id: int, league_id: str) -> Optional[int]:
+    """The same, for one league. None when the team was never picked."""
+    return (await db.execute(select(UserLeague.team_id).where(
+        UserLeague.user_id == user_id, UserLeague.platform == "ESPN", UserLeague.league_id == league_id,
+    ))).scalar_one_or_none()
+
+
 async def get_or_create_user_league(db: AsyncSession, user_id: int, platform: str, league_id: str,
                                     **fields) -> UserLeague:
     """The user's row for this league, creating it if needed. Race-safe: two requests

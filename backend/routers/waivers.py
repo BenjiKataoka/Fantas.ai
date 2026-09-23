@@ -19,7 +19,7 @@ from services.projection_service import get_nfl_state
 from services.rule_filter_service import classify_news_type
 from services.utils import extract_sleeper_pts, normalize_name
 from services.recap_service import best_lineup
-from services.league_service import resolve_sleeper_user_id
+from services.league_service import espn_team_id, resolve_sleeper_user_id
 from services.waiver_service import POSITIONS, rank_free_agents
 
 router = APIRouter()
@@ -80,11 +80,8 @@ async def _recent_news(db: AsyncSession, candidates: dict[str, str]) -> dict[str
 async def _espn_context(league_id: str, user: User, season: int, db: AsyncSession, all_players: dict) -> dict:
     """The same three things the Sleeper path needs, from an ESPN league: who's taken
     league-wide, your own players, and the league's lineup slots."""
-    from models.user import UserLeague
 
-    team_id = (await db.execute(select(UserLeague.team_id).where(
-        UserLeague.user_id == user.id, UserLeague.platform == "ESPN", UserLeague.league_id == league_id,
-    ))).scalar_one_or_none()
+    team_id = await espn_team_id(db, user.id, league_id)
     data = await espn_service.get_espn_league(league_id, season, user.espn_s2, user.swid)
     me = espn_service.espn_my_team(data or {}, swid=user.swid, team_id=team_id)
     if not me:

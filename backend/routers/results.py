@@ -8,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import get_current_user
 from database import get_db
-from models.user import User, UserLeague
+from models.user import User
 from services import espn_service, matchup_service, sleeper_service
-from services.league_service import all_leagues, league_season, resolve_sleeper_user_id
+from services.league_service import all_leagues, espn_team_ids, league_season, resolve_sleeper_user_id
 from services.projection_service import get_nfl_state
 
 router = APIRouter()
@@ -31,9 +31,7 @@ async def get_results(
     season = league_season(state)
     sleeper_user_id = await resolve_sleeper_user_id(user, sleeper_username)
     leagues = await all_leagues(user, sleeper_user_id, season, db)
-    picked = dict((await db.execute(select(UserLeague.league_id, UserLeague.team_id).where(
-        UserLeague.user_id == user.id, UserLeague.platform == "ESPN", UserLeague.team_id.isnot(None),
-    ))).all())
+    picked = await espn_team_ids(db, user.id)
     all_players = await sleeper_service.get_all_players()
 
     async def one(l: dict):

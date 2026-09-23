@@ -13,7 +13,7 @@ from models.projection import Projection
 from models.user import User
 from services import sleeper_service
 from services.projection_service import get_nfl_state
-from services.league_service import resolve_sleeper_user_id
+from services.league_service import espn_team_id, resolve_sleeper_user_id
 from services.recap_service import build_recap, find_matchup
 
 router = APIRouter()
@@ -23,12 +23,9 @@ logger = logging.getLogger(__name__)
 async def _espn_week(league_id: str, user: User, season: int, week: int, final: bool, db: AsyncSession):
     """An ESPN week reshaped into the Sleeper-style matchup build_recap already reads:
     the week's box score carries each player's points and lineup slot."""
-    from models.user import UserLeague
     from services import espn_service
 
-    team_id = (await db.execute(select(UserLeague.team_id).where(
-        UserLeague.user_id == user.id, UserLeague.platform == "ESPN", UserLeague.league_id == league_id,
-    ))).scalar_one_or_none()
+    team_id = await espn_team_id(db, user.id, league_id)
     try:
         data = await espn_service.get_espn_boxscore(league_id, season, week, user.espn_s2, user.swid, live=not final)
     except espn_service.EspnAuthError:
