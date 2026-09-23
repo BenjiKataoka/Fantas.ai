@@ -12,12 +12,11 @@ import { toast } from 'sonner'
 import CollapseRow from '../components/CollapseRow'
 import { LoadingDots } from '../components/Spinner'
 import { Hint } from '@/components/ui/tooltip'
+import Num from '../components/Num'
 
 const FILTERS = ['All', 'QB', 'RB', 'WR', 'TE', 'K']
 const POS_COLORS = { QB: 'text-pos-qb', RB: 'text-pos-rb', WR: 'text-pos-wr', TE: 'text-pos-te' }
 const ALL_LIMIT = 25
-
-const Num = ({ children, className = '' }) => <span className={`font-mono tabular-nums ${className}`}>{children}</span>
 
 function compact(n) {
   if (n == null) return '-'

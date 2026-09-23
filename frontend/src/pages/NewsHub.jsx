@@ -1,4 +1,4 @@
-import { REVEAL } from '@/lib/utils'
+import { REVEAL, relativeTime } from '@/lib/utils'
 import { useState, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
 import { Search } from 'lucide-react'
@@ -8,17 +8,6 @@ import PlayerAvatar from '../components/PlayerAvatar'
 import { CardListSkeleton } from '../components/Skeletons'
 import Notice from '../components/Notice'
 import { LoadingDots } from '../components/Spinner'
-
-function relativeTime(isoStr) {
-  if (!isoStr) return ''
-  const diff = Date.now() - new Date(isoStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1)  return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24)  return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
-}
 
 // Preferred display casing per source. Acronyms stay uppercase; unknown sources
 // fall back to Title case so a new feed still renders sensibly.

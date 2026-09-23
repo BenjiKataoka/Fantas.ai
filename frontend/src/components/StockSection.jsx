@@ -2,15 +2,7 @@ import { TriangleAlert } from 'lucide-react'
 import ConcernMeter from './ConcernMeter'
 import SentimentGauge from './SentimentGauge'
 import StockBadge from './StockBadge'
-
-// Relative "analyzed 3h ago" from an ISO timestamp.
-function timeAgo(iso) {
-  if (!iso) return null
-  const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000)
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
-  return `${Math.floor(secs / 86400)}d ago`
-}
+import { relativeTime } from '@/lib/utils'
 
 function FactorList({ label, items, tone }) {
   if (!items?.length) return null
@@ -71,7 +63,7 @@ export default function StockSection({ stock }) {
           )}
         </div>
         {last_full_analysis && (
-          <span className="text-[11px] text-subtle/60 font-mono shrink-0">analyzed {timeAgo(last_full_analysis)}</span>
+          <span className="text-[11px] text-subtle/60 font-mono shrink-0">analyzed {relativeTime(last_full_analysis)}</span>
         )}
       </div>
 

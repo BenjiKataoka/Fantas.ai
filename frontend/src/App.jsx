@@ -18,6 +18,7 @@ import Spinner, { LoadingDots } from './components/Spinner'
 import Ticker from './components/Ticker'
 import { getMe } from './services/api'
 import { useApp } from './context/AppContext'
+import { relativeTime } from '@/lib/utils'
 
 const NAV_LINKS = [
   { to: '/',         label: 'Dashboard' },
@@ -61,13 +62,6 @@ function LeagueSwitcher() {
   )
 }
 
-function ago(date, now) {
-  const mins = Math.floor((now - date) / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  return `${Math.floor(mins / 60)}h ago`
-}
-
 // Last roster sync plus a manual refresh. Refreshing normally happens on its own (tab
 // return after 15 min, league switch, and the server's 6-hour sync).
 function RefreshStatus() {
@@ -82,7 +76,7 @@ function RefreshStatus() {
     <div className="flex items-center gap-1.5 text-xs text-subtle">
       {rosterLoading
         ? <span className="flex items-center gap-2">Updating <LoadingDots /></span>
-        : lastRefresh && <span className="font-mono">Updated {ago(lastRefresh, now)}</span>}
+        : lastRefresh && <span className="font-mono">Updated {relativeTime(lastRefresh, now)}</span>}
       <button
         onClick={() => refreshAll({ force: true })}
         disabled={rosterLoading}

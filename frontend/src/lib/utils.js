@@ -42,3 +42,15 @@ export const dotFieldHandlers = {
     e.currentTarget.style.setProperty('--my', '-999px')
   },
 }
+
+// One relative-time label for the whole app. Accepts an ISO string or a Date.
+// `now` is a parameter so a component with its own ticking clock re-renders as it passes.
+export function relativeTime(value, now = Date.now()) {
+  if (!value) return ''
+  const mins = Math.floor((now - new Date(value).getTime()) / 60000)
+  if (mins < 1)  return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24)  return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}

@@ -5,13 +5,12 @@ import PlayerAvatar from '../components/PlayerAvatar'
 import { RecapSkeleton } from '../components/Skeletons'
 import Notice from '../components/Notice'
 import { REVEAL, tiltHandlers } from '@/lib/utils'
+import Num from '../components/Num'
 
 const SOURCE_NAMES = { sleeper: 'Sleeper', espn: 'ESPN', fp: 'FantasyPros', weighted: 'Your blend' }
 const POS_COLORS = { QB: 'text-pos-qb', RB: 'text-pos-rb', WR: 'text-pos-wr', TE: 'text-pos-te' }
 
 const fmt = (v) => (v == null ? '-' : v.toFixed(1))
-const Num = ({ children, className = '' }) => <span className={`font-mono tabular-nums ${className}`}>{children}</span>
-
 function Diff({ v }) {
   if (v == null) return <Num className="text-subtle/40">-</Num>
   const cls = v >= 3 ? 'text-bull' : v <= -3 ? 'text-bear' : 'text-subtle'
