@@ -1,5 +1,4 @@
 """GET /api/results: a finished week graded in every league, for the Dashboard's results mode."""
-import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, Query
@@ -9,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth import get_current_user
 from database import get_db
 from models.user import User
-from services import espn_service, matchup_service, sleeper_service
-from services.league_service import all_leagues, espn_team_ids, league_season, resolve_sleeper_user_id
+from services import matchup_service, sleeper_service
+from services.league_service import (all_leagues, espn_team_ids, gather_per_league, league_season,
+                                     resolve_sleeper_user_id)
 from services.projection_service import get_nfl_state
 
 router = APIRouter()
@@ -34,18 +34,13 @@ async def get_results(
     picked = await espn_team_ids(db, user.id)
     all_players = await sleeper_service.get_all_players()
 
-    async def one(l: dict):
-        try:
-            if l["platform"] == "ESPN":
-                return await matchup_service.espn_week({**l, "team_id": picked.get(l["league_id"])}, user, season, week, all_players)
-            return await matchup_service.sleeper_week(l, sleeper_user_id, week, all_players)
-        except espn_service.EspnAuthError:
-            return "expired"
-        except Exception as e:
-            logger.error(f"[Results] {l['platform']} {l['league_id']} week {week} failed: {e}")
-            return None
-
-    graded = await asyncio.gather(*(one(l) for l in leagues))
+    graded = await gather_per_league(
+        leagues,
+        sleeper=lambda l: matchup_service.sleeper_week(l, sleeper_user_id, week, all_players),
+        espn=lambda l: matchup_service.espn_week({**l, "team_id": picked.get(l["league_id"])},
+                                                 user, season, week, all_players),
+        tag=f"Results week {week}",
+    )
     out, warnings = [], []
     for l, g in zip(leagues, graded):
         if g in (None, "expired"):

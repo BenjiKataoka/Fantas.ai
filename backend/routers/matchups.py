@@ -11,7 +11,8 @@ from auth import get_current_user
 from database import get_db
 from models.user import User
 from services import espn_service, matchup_service, nfl_service, sleeper_service
-from services.league_service import all_leagues, espn_team_ids, league_season, resolve_sleeper_user_id
+from services.league_service import (all_leagues, espn_team_ids, gather_per_league, league_season,
+                                     resolve_sleeper_user_id)
 from services.projection_engine import this_week_projection, weights_from_user
 from services.projection_service import get_nfl_state
 
@@ -44,19 +45,13 @@ async def get_matchups(
     proj = {pid: this_week_projection(all_players[pid], stats, espn_by_id, espn_by_name, weights)["weighted_proj"]
             for pid, stats in sleeper_proj.items() if pid in all_players}
 
-    async def one(l: dict):
-        try:
-            if l["platform"] == "ESPN":
-                return await matchup_service.espn_matchup({**l, "team_id": picked.get(l["league_id"])},
-                                                         user, league_season(state), week, all_players, proj)
-            return await matchup_service.sleeper_matchup(l, sleeper_user_id, week, all_players, proj)
-        except espn_service.EspnAuthError:
-            return "expired"
-        except Exception as e:
-            logger.error(f"[Matchups] {l['platform']} {l['league_id']} failed: {e}")
-            return None
-
-    fetched = await asyncio.gather(*(one(l) for l in leagues))
+    fetched = await gather_per_league(
+        leagues,
+        sleeper=lambda l: matchup_service.sleeper_matchup(l, sleeper_user_id, week, all_players, proj),
+        espn=lambda l: matchup_service.espn_matchup({**l, "team_id": picked.get(l["league_id"])},
+                                                    user, league_season(state), week, all_players, proj),
+        tag="Matchups",
+    )
 
     out_leagues, needs, all_starters, warnings = [], [], [], []
     for l, m in zip(leagues, fetched):

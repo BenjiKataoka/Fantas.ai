@@ -1,4 +1,5 @@
 """Connected leagues: which one a request means, which ones a user has, and syncing their rosters."""
+import asyncio
 import logging
 from datetime import datetime
 from typing import Optional
@@ -7,8 +8,29 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.user import UserLeague
+from services.espn_service import EspnAuthError
 
 logger = logging.getLogger(__name__)
+
+
+async def gather_per_league(leagues: list[dict], sleeper, espn, tag: str) -> list:
+    """Run one call per league in parallel, dispatched on platform.
+
+    Returns results positionally matching `leagues`: the call's value, the string
+    "expired" when ESPN rejected the cookies, or None when the league failed. One
+    league going down never takes the others with it, which is why every caller
+    zips this back against `leagues` to build its own warnings.
+    """
+    async def one(league: dict):
+        try:
+            return await (espn(league) if league["platform"] == "ESPN" else sleeper(league))
+        except EspnAuthError:
+            return "expired"
+        except Exception as e:
+            logger.error(f"[{tag}] {league['platform']} {league['league_id']} failed: {e}")
+            return None
+
+    return await asyncio.gather(*(one(l) for l in leagues))
 
 
 async def espn_team_ids(db: AsyncSession, user_id: int) -> dict[str, int]:
