@@ -255,12 +255,28 @@ async def sync_league(db: AsyncSession, user, ul: UserLeague, nfl_state: dict) -
 
 async def resolve_sleeper_user_id(user, sleeper_username: Optional[str]) -> Optional[str]:
     """The Sleeper account for this request, or None for an ESPN-only user. Falls back to
-    the id saved on the user so pages work without passing a username every time."""
+    the id saved on the user so pages work without passing a username every time.
+
+    `sleeper_username` arrives from the query string, so it is pinned to the account this
+    login has already connected. It used to be trusted: one request naming someone else
+    rebound your stored Sleeper identity and synced their roster into your dashboard.
+    The first connection does the binding (nothing saved yet); DELETE /api/settings/sleeper
+    is how you undo it.
+    """
+    from fastapi import HTTPException
+
     from services import sleeper_service
 
-    if sleeper_username:
-        return await sleeper_service.get_user_id(sleeper_username)
-    return user.sleeper_user_id
+    if not sleeper_username:
+        return user.sleeper_user_id
+    resolved = await sleeper_service.get_user_id(sleeper_username)
+    if user.sleeper_user_id and resolved and resolved != user.sleeper_user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="That Sleeper account isn't the one connected to your login. "
+                   "Disconnect Sleeper in Settings first.",
+        )
+    return resolved
 
 
 async def all_leagues(user, sleeper_user_id: Optional[str], season: int, db: AsyncSession) -> list[dict]:

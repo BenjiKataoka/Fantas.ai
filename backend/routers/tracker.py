@@ -7,7 +7,7 @@ GET    /api/tracker                        , all starred players with stock prof
 GET    /api/tracker/{player_id}            , single player detail
 POST   /api/tracker/refresh/{player_id}    , manually re-run 4-pass analysis
 
-user_id is a placeholder until Clerk auth is wired in Phase 5.
+Every route scopes on the authenticated user's id, never one from the request.
 """
 import logging
 

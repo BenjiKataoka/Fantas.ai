@@ -4,11 +4,15 @@ Settings router, per-user projection weight management.
 GET  /api/settings              → current projection weights
 PUT  /api/settings              → validates and saves new weights to the users table
 GET/PUT/DELETE /api/settings/espn → ESPN cookie status / save (validated) / remove
+DELETE /api/settings/sleeper     → unbind the Sleeper account (and its leagues)
 """
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator, model_validator
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
 from models.user import User
 from auth import get_current_user
 
@@ -125,3 +129,26 @@ async def remove_espn_credentials(user: User = Depends(get_current_user)):
     user.espn_s2 = user.swid = None
     user.espn_needs_reconnect = False
     return {"connected": False, "needs_reconnect": False}
+
+
+@router.delete("/settings/sleeper")
+async def remove_sleeper_account(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Unbind the Sleeper account so a different one can be connected.
+
+    `resolve_sleeper_user_id` pins requests to the account already connected, so without
+    this a first connection with the wrong username would be permanent. Their Sleeper
+    leagues go too, otherwise they'd linger in the switcher pointing at someone else's
+    team; my_roster rows cascade from user_leagues.
+    """
+    from sqlalchemy import delete
+
+    from models.user import UserLeague
+
+    await db.execute(delete(UserLeague).where(
+        UserLeague.user_id == user.id, UserLeague.platform == "SLEEPER",
+    ))
+    user.sleeper_username = user.sleeper_user_id = None
+    return {"connected": False}   # get_db commits at the end of the request

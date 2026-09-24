@@ -12,8 +12,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from unittest.mock import AsyncMock, patch
+
+from fastapi import HTTPException
+
 from services.espn_service import EspnAuthError
-from services.league_service import gather_per_league
+from services.league_service import gather_per_league, resolve_sleeper_user_id
 
 LEAGUES = [
     {"platform": "SLEEPER", "league_id": "s1"},
@@ -57,5 +61,48 @@ def run_gather_tests():
     print("\n✅ gather_per_league tests passed.")
 
 
+def run_sleeper_pin_tests():
+    """sleeper_username comes from the query string, so it must be pinned to the account
+    this login already connected. Untrusted, one request naming someone else rebound the
+    caller's stored Sleeper identity and synced a stranger's roster into their dashboard."""
+    print("\n" + "=" * 50)
+    print("SLEEPER ACCOUNT PINNING")
+    print("=" * 50)
+
+    class U:
+        def __init__(self, uid): self.sleeper_user_id = uid
+
+    def resolve(user, username, lookup="stranger99"):
+        with patch("services.sleeper_service.get_user_id", AsyncMock(return_value=lookup)):
+            return asyncio.run(resolve_sleeper_user_id(user, username))
+
+    # No username: the saved account, which is how every page works after connecting.
+    assert resolve(U("mine123"), None) == "mine123"
+    print("    PASS, no username falls back to the connected account")
+
+    # First connection: nothing saved yet, so this is what does the binding.
+    assert resolve(U(None), "newuser", lookup="fresh456") == "fresh456"
+    print("    PASS, the first connection can still bind an account")
+
+    # Your own username, spelled out. The common case, must not 403.
+    assert resolve(U("mine123"), "myname", lookup="mine123") == "mine123"
+    print("    PASS, naming your own connected account is allowed")
+
+    # Someone else's. This is the hole.
+    try:
+        resolve(U("mine123"), "someone_else", lookup="stranger99")
+        raise AssertionError("a stranger's username was accepted")
+    except HTTPException as e:
+        assert e.status_code == 403, e.status_code
+    print("    PASS, a stranger's username is refused with 403")
+
+    # An unresolvable username must not read as "no mismatch" and slip through.
+    assert resolve(U("mine123"), "ghost", lookup=None) is None
+    print("    PASS, an unknown username resolves to None rather than the saved account")
+
+    print("\n✅ Sleeper pinning tests passed.")
+
+
 if __name__ == "__main__":
     run_gather_tests()
+    run_sleeper_pin_tests()
