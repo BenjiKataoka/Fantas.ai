@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { getAdminUsers, approveUser, revokeUser } from '../services/api'
 import { TableSkeleton } from '../components/Skeletons'
+import { LoadingDots } from '../components/Spinner'
 
 export default function Admin() {
   const [users, setUsers]     = useState([])
@@ -93,7 +94,7 @@ export default function Admin() {
                       disabled={busyId === u.id}
                       className="px-3 py-1 text-xs font-medium rounded-md bg-raised hover:bg-line text-subtle hover:text-content border border-line disabled:opacity-40 transition-colors"
                     >
-                      {busyId === u.id ? '...' : 'Revoke'}
+                      {busyId === u.id ? <LoadingDots /> : 'Revoke'}
                     </button>
                   ) : (
                     <button
@@ -101,7 +102,7 @@ export default function Admin() {
                       disabled={busyId === u.id}
                       className="px-3 py-1 text-xs font-semibold rounded-md bg-brand hover:brightness-110 text-brand-fg disabled:opacity-40 transition-all"
                     >
-                      {busyId === u.id ? '...' : 'Approve'}
+                      {busyId === u.id ? <LoadingDots /> : 'Approve'}
                     </button>
                   )}
                 </td>

@@ -1,6 +1,7 @@
 import { Search } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { searchPlayers, starPlayer } from '../services/api'
+import { LoadingDots } from './Spinner'
 
 const POS_COLORS = {
   QB: 'text-pos-qb', RB: 'text-pos-rb',
@@ -91,7 +92,7 @@ export default function PlayerSearchModal({ starredIds, onStar, onClose }) {
               type="text"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search player name..."
+              placeholder="Search player name"
               className="flex-1 bg-transparent text-sm text-content placeholder-subtle/60 focus:outline-none"
             />
             {searching && (
@@ -139,7 +140,7 @@ export default function PlayerSearchModal({ starredIds, onStar, onClose }) {
                       : 'bg-brand hover:brightness-110 border-brand text-brand-fg disabled:opacity-50'
                   }`}
                 >
-                  {isStarring ? '...' : alreadyStarred ? 'Starred' : '+ Star'}
+                  {isStarring ? <LoadingDots /> : alreadyStarred ? 'Starred' : '+ Star'}
                 </button>
               </div>
             )
