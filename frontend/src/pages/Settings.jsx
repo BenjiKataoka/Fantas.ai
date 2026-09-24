@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { getLeagues, getEspnStatus, saveEspn, removeEspn, lookupEspnLeague, addPublicEspnLeague, removeEspnLeague } from '../services/api'
+import { getLeagues, getMe, getEspnStatus, saveEspn, removeEspn, removeSleeper, lookupEspnLeague, addPublicEspnLeague, removeEspnLeague } from '../services/api'
 import { toast } from 'sonner'
 import { useApp } from '../context/AppContext'
 import WeightSlider from '../components/WeightSlider'
-import Spinner from '../components/Spinner'
+import Spinner, { LoadingDots } from '../components/Spinner'
 import { parseEspnCookies } from '@/lib/utils'
 
 // Neither espn_s2 nor SWID is HttpOnly (checked against live Set-Cookie headers,
@@ -60,7 +60,7 @@ function WeightsSection() {
       )}
       <div className="flex items-center gap-4 mt-6">
         <button onClick={handleSave} disabled={!sumOk || saving} className={`px-4 py-2 ${btnPrimary}`}>
-          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Weights'}
+          {saving ? <>Saving<LoadingDots /></> : saved ? 'Saved' : 'Save weights'}
         </button>
         <span className={`text-sm font-mono tabular-nums ${sumOk ? 'text-subtle' : 'text-bear'}`}>Total: {sum}%</span>
       </div>
@@ -69,85 +69,158 @@ function WeightsSection() {
   )
 }
 
-// ── League Setup ──────────────────────────────────────────────────────────────
-function LeagueSection() {
-  const { credentials, saveCredentials } = useApp()
-  const [username, setUsername]   = useState(credentials?.username || '')
-  const [leagues, setLeagues]     = useState([])
-  // "PLATFORM:league_id", since the list mixes Sleeper and ESPN leagues
-  const [leagueKey, setLeagueKey] = useState(credentials ? `${credentials.platform}:${credentials.leagueId}` : '')
-  const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState(null)
-  const [saved, setSaved]         = useState(false)
+// ── Leagues ───────────────────────────────────────────────────────────────────
+// One card, in setup order: connect Sleeper, connect ESPN, then pick the league the
+// Dashboard opens on. It used to be two cards, and the picker lived in the Sleeper one,
+// which is why an ESPN-only user could never save a league from here.
+function Block({ title, children, first }) {
+  return (
+    <div className={first ? '' : 'border-t border-line pt-6 mt-6'}>
+      <h3 className="text-sm font-medium text-content mb-3">{title}</h3>
+      {children}
+    </div>
+  )
+}
 
+function SleeperAccount({ onFound }) {
+  const { credentials, saveCredentials, clearCredentials, leagues } = useApp()
+  // The server's binding is the truth, not this browser's localStorage: a new device
+  // would otherwise show Sleeper as disconnected while every request still resolves it.
+  const [serverName, setServerName] = useState(undefined)
   useEffect(() => {
-    if (username) loadLeagues(username)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    getMe().then(res => setServerName(res.data.sleeper_username || null)).catch(() => setServerName(null))
+  }, [])
+  const connectedAs = serverName === null ? credentials?.username || '' : serverName || credentials?.username || ''
+  const [username, setUsername] = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState(null)
 
-  const loadLeagues = async (u) => {
-    if (!u.trim()) return
-    setLoading(true)
-    setError(null)
+  const find = async () => {
+    if (!username.trim()) return
+    setLoading(true); setError(null)
     try {
-      const res = await getLeagues(u.trim())
-      const list = res.data.leagues || []
-      setLeagues(list)
-      if (!list.find(l => `${l.platform}:${l.league_id}` === leagueKey) && list.length) setLeagueKey(`${list[0].platform}:${list[0].league_id}`)
+      const res = await getLeagues(username.trim())
+      onFound(username.trim(), res.data.leagues || [])
     } catch (err) {
       setError(err.response?.data?.detail || 'Sleeper user not found.')
-      setLeagues([])
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSave = () => {
-    if (!username || !leagueKey) return
-    const [platform, leagueId] = leagueKey.split(':')
-    saveCredentials(username.trim(), leagueId, platform)
+  // The server pins requests to the connected Sleeper account, so switching accounts
+  // means unbinding first. Its leagues go with it; the Dashboard falls back to an ESPN
+  // league if there is one.
+  const disconnect = async () => {
+    try {
+      await removeSleeper()
+    } catch {
+      toast.error("Couldn't disconnect Sleeper. Try again.")
+      return
+    }
+    setServerName(null)
+    const espn = leagues.find(l => l.platform === 'ESPN')
+    if (credentials?.platform === 'ESPN') saveCredentials('', credentials.leagueId, 'ESPN')
+    else if (espn) saveCredentials('', espn.league_id, 'ESPN')
+    else clearCredentials()
+    toast(`Disconnected ${connectedAs} from Sleeper.`)
+  }
+
+  if (serverName === undefined) return <Spinner label="Checking your Sleeper connection" />
+  if (connectedAs) {
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm text-content">Connected as <span className="font-medium">{connectedAs}</span>.</p>
+        <button onClick={disconnect} className="px-3 py-1.5 text-sm text-subtle border border-line rounded-lg hover:text-content hover:bg-raised">
+          Disconnect Sleeper
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-col gap-2 max-w-sm">
+      <label htmlFor="sleeper-username" className="text-sm text-subtle">Sleeper username</label>
+      <div className="flex gap-2">
+        <input
+          id="sleeper-username"
+          type="text"
+          value={username}
+          onChange={e => { setUsername(e.target.value); setError(null) }}
+          onKeyDown={e => e.key === 'Enter' && find()}
+          placeholder="your username"
+          className={`flex-1 min-w-0 ${field}`}
+        />
+        <button
+          onClick={find}
+          disabled={loading || !username.trim()}
+          className="px-3 py-2 bg-raised hover:bg-line disabled:opacity-40 text-content text-sm rounded-lg border border-line transition-colors"
+        >
+          {loading ? <LoadingDots /> : 'Find'}
+        </button>
+      </div>
+      {error && <p className="text-bear text-sm">{error}</p>}
+      <p className="text-xs text-faint">Optional. ESPN-only works too.</p>
+    </div>
+  )
+}
+
+function ActiveLeague({ pending }) {
+  const { credentials, saveCredentials, leagues } = useApp()
+  // A username just found but not saved yet brings its own list; otherwise every league
+  // the connected accounts already unlock.
+  const list = pending?.leagues ?? leagues
+  const username = pending?.username ?? credentials?.username ?? ''
+  const current = credentials ? `${credentials.platform}:${credentials.leagueId}` : ''
+  const [key, setKey]     = useState(current)
+  const [saved, setSaved] = useState(false)
+  const selected = list.some(l => `${l.platform}:${l.league_id}` === key)
+    ? key : (list[0] ? `${list[0].platform}:${list[0].league_id}` : '')
+
+  if (!list.length) {
+    return <p className="text-sm text-subtle">Connect Sleeper or ESPN above and your leagues show up here.</p>
+  }
+  const save = () => {
+    const [platform, leagueId] = selected.split(':')
+    saveCredentials(platform === 'SLEEPER' || username ? username : '', leagueId, platform)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
-
   return (
-    <Section title="League Setup" description="Your Sleeper username and the league to track on the Dashboard.">
-      <div className="flex flex-col gap-3 max-w-sm">
-        <div>
-          <label className="block text-sm text-subtle mb-1">Sleeper Username</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={username}
-              onChange={e => { setUsername(e.target.value); setLeagues([]); setSaved(false) }}
-              onKeyDown={e => e.key === 'Enter' && loadLeagues(username)}
-              placeholder="your username"
-              className={`flex-1 ${field}`}
-            />
-            <button
-              onClick={() => loadLeagues(username)}
-              disabled={loading || !username.trim()}
-              className="px-3 py-2 bg-raised hover:bg-line disabled:opacity-40 text-content text-sm rounded-lg border border-line transition-colors"
-            >
-              {loading ? '...' : 'Find'}
-            </button>
-          </div>
-        </div>
+    <div className="flex flex-col gap-3 max-w-sm">
+      <select value={selected} onChange={e => { setKey(e.target.value); setSaved(false) }} className={`w-full ${field}`} aria-label="League the Dashboard opens on">
+        {list.map(l => (
+          <option key={`${l.platform}:${l.league_id}`} value={`${l.platform}:${l.league_id}`}>
+            {l.name}{l.platform === 'ESPN' ? ' (ESPN)' : ' (Sleeper)'}
+          </option>
+        ))}
+      </select>
+      <button onClick={save} disabled={!selected} className={`w-fit px-4 py-2 ${btnPrimary}`}>
+        {saved ? 'Saved' : pending ? 'Save and connect' : 'Save league'}
+      </button>
+    </div>
+  )
+}
 
-        {error && <p className="text-bear text-sm">{error}</p>}
-
-        {leagues.length > 0 && (
-          <div>
-            <label className="block text-sm text-subtle mb-1">Active League</label>
-            <select value={leagueKey} onChange={e => { setLeagueKey(e.target.value); setSaved(false) }} className={`w-full ${field}`}>
-              {leagues.map(l => <option key={`${l.platform}:${l.league_id}`} value={`${l.platform}:${l.league_id}`}>{l.name}{l.platform === 'ESPN' ? ' (ESPN)' : ''}</option>)}
-            </select>
-          </div>
-        )}
-
-        <button onClick={handleSave} disabled={!username || !leagueKey} className={`w-fit px-4 py-2 ${btnPrimary}`}>
-          {saved ? 'Saved!' : 'Save League'}
-        </button>
-      </div>
+function LeaguesSection() {
+  // A Sleeper username that was found but not saved yet: its leagues feed the picker
+  // until Save connects it.
+  const [found, setFound] = useState(null)
+  const { credentials } = useApp()
+  // Once saved, the found username IS the connected one, so it stops being pending.
+  const pending = found && found.username !== credentials?.username ? found : null
+  return (
+    <Section title="Leagues" description="Connect your accounts, then choose the league the Dashboard opens on. Every connected league also shows in the league switcher.">
+      <Block title="Sleeper" first>
+        <SleeperAccount onFound={(username, leagues) => setFound({ username, leagues })} />
+      </Block>
+      <Block title="ESPN">
+        <EspnAccount />
+        <div className="border-t border-line border-dashed my-5" />
+        <PublicLeagueForm />
+      </Block>
+      <Block title="Dashboard league">
+        <ActiveLeague pending={pending} />
+      </Block>
     </Section>
   )
 }
@@ -196,14 +269,13 @@ function PublicLeagueForm() {
 
   return (
     <div className="flex flex-col gap-3 max-w-sm">
-      <h3 className="text-sm font-medium text-content">Add a public league</h3>
-      <p className="text-sm text-subtle">If your league manager made the league public, paste its link. No ESPN login needed.</p>
+      <p className="text-sm text-subtle">Or add a public league by its link. No ESPN login needed.</p>
       <div className="flex gap-2">
         <input
           value={link}
           onChange={e => { setLink(e.target.value); setFound(null) }}
           onKeyDown={e => e.key === 'Enter' && link.trim() && find()}
-          placeholder="fantasy.espn.com/football/league?leagueId=..."
+          placeholder="fantasy.espn.com/football/league?leagueId=12345"
           className={`flex-1 min-w-0 ${field}`}
         />
         <button onClick={find} disabled={busy || !link.trim()} className="px-3 py-2 bg-raised hover:bg-line disabled:opacity-40 text-content text-sm rounded-lg border border-line">
@@ -237,7 +309,7 @@ function PublicLeagueForm() {
 // ── ESPN account ──────────────────────────────────────────────────────────────
 // Cookies are write-only: the API checks them against ESPN, saves them, and never sends
 // them back, so this form only ever shows connected / not connected.
-function ESPNSection() {
+function EspnAccount() {
   const { reloadLeagues, refreshEspnStatus } = useApp()
   const [connected, setConnected] = useState(null)
   const [expired, setExpired]     = useState(false)
@@ -283,23 +355,17 @@ function ESPNSection() {
   }
 
   return (
-    <Section
-      title="ESPN leagues"
-      description="Add ESPN leagues next to your Sleeper ones in the league switcher."
-    >
-      <PublicLeagueForm />
-      <div className="border-t border-line my-6" />
-      <h3 className="text-sm font-medium text-content mb-1">Private leagues: connect your ESPN account</h3>
-      <p className="text-sm text-subtle mb-3">Finds every ESPN league you're in, public or private.</p>
+    <>
+      <p className="text-sm text-subtle mb-3">Connect your account to find every ESPN league you're in, public or private.</p>
       {connected === null ? <Spinner label="Checking your ESPN connection" /> : connected ? (
-        <div className="flex flex-col gap-3 max-w-sm">
+        <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-content">
             Connected.{' '}
             {found && (found.length
               ? `Found ${found.length === 1 ? '1 league' : `${found.length} leagues`}: ${found.map(l => l.name).join(', ')}.`
               : 'No ESPN football leagues found for this season.')}
           </p>
-          <button onClick={disconnect} className="w-fit px-3 py-1.5 text-sm text-subtle border border-line rounded-lg hover:text-content hover:bg-raised">
+          <button onClick={disconnect} className="px-3 py-1.5 text-sm text-subtle border border-line rounded-lg hover:text-content hover:bg-raised">
             Disconnect ESPN
           </button>
         </div>
@@ -322,7 +388,7 @@ function ESPNSection() {
           </button>
         </div>
       )}
-    </Section>
+    </>
   )
 }
 
@@ -333,8 +399,7 @@ export default function Settings() {
       <h1 className="text-2xl font-display font-bold text-content mb-6">Settings</h1>
       <div className="flex flex-col gap-5">
         <WeightsSection />
-        <LeagueSection />
-        <ESPNSection />
+        <LeaguesSection />
       </div>
     </div>
   )

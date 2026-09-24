@@ -88,6 +88,7 @@ export const getPortfolio = (sleeperUsername) =>
 export const getEspnStatus = () => api.get('/settings/espn')
 export const saveEspn = (espn_s2, swid) => api.put('/settings/espn', { espn_s2, swid })
 export const removeEspn = () => api.delete('/settings/espn')
+export const removeSleeper = () => api.delete('/settings/sleeper')
 export const lookupEspnLeague = (league) => api.post('/leagues/espn/lookup', { league })
 export const addPublicEspnLeague = (leagueId, teamId) => api.post('/leagues/espn/public', { league_id: leagueId, team_id: teamId })
 export const removeEspnLeague = (leagueId) => api.delete(`/leagues/espn/${leagueId}`)
