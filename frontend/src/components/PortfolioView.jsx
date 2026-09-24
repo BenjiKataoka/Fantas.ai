@@ -49,7 +49,7 @@ function LeagueList({ p }) {
           <span className={`w-14 shrink-0 font-mono text-xs ${l.is_starter ? 'text-bull' : 'text-subtle'}`}>
             {l.is_starter ? slotLabel(l.slot) : 'Bench'}
           </span>
-          <span className="text-content/90 truncate">{l.name}</span>
+          <span className="text-content truncate">{l.name}</span>
           <span className="text-xs text-subtle">{l.platform === 'ESPN' ? 'ESPN' : 'Sleeper'}</span>
         </li>
       ))}
@@ -63,7 +63,7 @@ function Row({ p, total, open, onToggle }) {
       <tr className="border-t border-line/50 hover:bg-raised/50 transition-colors cursor-pointer" onClick={onToggle} aria-expanded={open}>
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-2.5">
-            <ChevronRight className={`size-3.5 shrink-0 text-subtle/50 transition-transform ${open ? 'rotate-90 text-brand' : ''}`} />
+            <ChevronRight className={`size-3.5 shrink-0 text-faint transition-transform ${open ? 'rotate-90 text-brand' : ''}`} />
             <TeamAccent team={p.nfl_team} />
             <PlayerAvatar playerId={p.player_id} name={p.name} size="md" />
             <div className="min-w-0">
@@ -85,13 +85,6 @@ function Row({ p, total, open, onToggle }) {
   )
 }
 
-// Tuesday and Wednesday (Eastern) sit between Monday night and Thursday night: the week
-// is over, so the Dashboard opens on last week's results.
-function resultsDay() {
-  const day = new Date().toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/New_York' })
-  return day === 'Tue' || day === 'Wed'
-}
-
 // Free agents who would start for you, combined across your Sleeper leagues.
 function combinePickups(boards) {
   const byPlayer = new Map()
@@ -108,7 +101,9 @@ function combinePickups(boards) {
 
 export default function PortfolioView({ onOpenLeague }) {
   const { credentials, lastRefresh, newsData, leagues } = useApp()
-  const [mode, setMode] = useState(() => (resultsDay() ? 'last' : 'this'))
+  // Always opens on the week board. Last week's results are a toggle away, but they are
+  // not what you came to look at, and guessing from the weekday got it wrong anyway.
+  const [mode, setMode] = useState('this')
   const [results, setResults] = useState(null)
   const [pickups, setPickups] = useState(null)
   const [data, setData] = useState(null)

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth import get_current_user
 from database import get_db
 from models.user import User
-from services import matchup_service, sleeper_service
+from services import matchup_service, nfl_service, sleeper_service
 from services.league_service import (all_leagues, espn_team_ids, gather_per_league, league_season,
                                      resolve_sleeper_user_id)
 from services.projection_service import get_nfl_state
@@ -25,7 +25,9 @@ async def get_results(
     db: AsyncSession = Depends(get_db),
 ):
     state = await get_nfl_state()
-    week = week or state["week"] - 1
+    # The same "is it over" question the Recap page asks. Sleeper's week does not roll
+    # over until the Tuesday after Monday night, so week - 1 was a week behind for a day.
+    week = week or await nfl_service.last_complete_week(state["season"], state["week"])
     if state.get("season_type") not in ("regular", "post") or week < 1:
         return {"week": week, "leagues": [], "record": None, "left_on_bench": 0, "misses": [], "warnings": []}
     season = league_season(state)
