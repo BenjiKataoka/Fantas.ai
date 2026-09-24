@@ -77,6 +77,12 @@ CLERK_ADMIN_IDS: set[str] = {
 
 AUTH_ENABLED: bool = bool(CLERK_SECRET_KEY)
 
+# Fernet key that encrypts ESPN cookies at rest (models.user.EncryptedString). Losing or
+# rotating it is recoverable, not fatal: stored cookies stop decrypting, read back as
+# "not connected", and each user reconnects ESPN with the Settings bookmarklet.
+# Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+ESPN_COOKIE_KEY: str | None = os.environ.get("ESPN_COOKIE_KEY")
+
 # Exact frontend origins (comma-separated). One list drives BOTH CORS and the Clerk
 # `azp` check. Exact strings only, Starlette CORS does not expand wildcards.
 # Production: add the Vercel URL, e.g. ALLOWED_ORIGINS=https://fantas-ai.vercel.app
