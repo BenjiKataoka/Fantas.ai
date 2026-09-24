@@ -90,13 +90,15 @@ function Accuracy({ d }) {
 
 export default function Recap() {
   const { credentials, rosterData } = useApp()
-  const currentWeek = rosterData?.week
+  // Only finished weeks are recappable; a week still being played grades your lineup
+  // against zeros. The server decides, since Sleeper's week lags Monday night by a day.
+  const lastWeek = rosterData?.last_complete_week
   const [week, setWeek] = useState(null)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => { if (currentWeek && week == null) setWeek(currentWeek) }, [currentWeek, week])
+  useEffect(() => { if (lastWeek > 0 && week == null) setWeek(lastWeek) }, [lastWeek, week])
 
   useEffect(() => {
     if (!credentials || !week) return
@@ -111,6 +113,7 @@ export default function Recap() {
 
   if (!credentials) return <Notice title="No league yet" message="Pick a league on the Dashboard to see how its weeks went." actionLabel="Go to the Dashboard" to="/" />
   if (rosterData?.season_type === 'off') return <Notice title="Recaps start once the season does." message="They compare what your players scored with what each source projected." />
+  if (lastWeek === 0) return <Notice title="No finished weeks yet." message="A recap appears once the week's last game is over." />
 
   const best = new Set(data?.lineup.best_lineup_ids || [])
   const starters = data?.players.filter(p => p.started) || []
@@ -123,9 +126,9 @@ export default function Recap() {
           <h1 className="text-2xl font-display font-bold text-content">Week {week ?? ''} recap</h1>
           {data?.league_name && <p className="text-sm text-subtle mt-0.5">{data.league_name}</p>}
         </div>
-        {currentWeek && (
-          <div className="flex gap-1">
-            {Array.from({ length: currentWeek }, (_, i) => i + 1).map(w => (
+        {lastWeek > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {Array.from({ length: lastWeek }, (_, i) => i + 1).map(w => (
               <button
                 key={w}
                 onClick={() => setWeek(w)}
@@ -144,9 +147,6 @@ export default function Recap() {
       {data && (
         <div key={data.week} className={`flex flex-col gap-6 transition-opacity ${loading ? 'opacity-50' : ''}`}>
           <div className={REVEAL}>
-            {!data.final && (
-              <p className="text-sm text-warn mb-2">This week isn't over yet, so these numbers will still move.</p>
-            )}
             <Summary d={data} />
             {data.warning && <p className="text-sm text-warn mt-2">{data.warning}</p>}
           </div>

@@ -11,7 +11,7 @@ from database import get_db
 from models.player import Player
 from models.projection import Projection
 from models.user import User
-from services import sleeper_service
+from services import nfl_service, sleeper_service
 from services.projection_service import get_nfl_state
 from services.league_service import espn_team_id, resolve_sleeper_user_id
 from services.recap_service import build_recap, find_matchup
@@ -65,9 +65,12 @@ async def get_recap(
     season, current_week = state["season"], state["week"]
     if state.get("season_type") == "off":
         raise HTTPException(status_code=400, detail="Recaps are only available during the season.")
-    if week < 1 or week > current_week:
-        raise HTTPException(status_code=400, detail=f"Week {week} hasn't been played yet.")
-    final = week < current_week  # Sleeper advances the week after Monday night
+    # There is nothing to recap until a week's last game is over, so only completed weeks
+    # are served. A week still being played would otherwise grade a lineup against zeros.
+    complete = await nfl_service.last_complete_week(season, current_week)
+    if week < 1 or week > complete:
+        raise HTTPException(status_code=400, detail=f"Week {week} isn't finished yet.")
+    final = True
 
     if platform == "ESPN":
         matchup, slots, league_name = await _espn_week(league_id, user, season, week, final, db)

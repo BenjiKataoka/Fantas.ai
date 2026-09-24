@@ -9,7 +9,7 @@ from models.user import User, UserLeague
 from services.sleeper_service import get_eligible_leagues
 from auth import get_current_user
 from services import tracker_service
-from services import espn_service
+from services import espn_service, nfl_service
 from services.league_service import (RELEVANT_POSITIONS, all_leagues, espn_leagues as _espn_leagues, full_name,
                                      resolve_sleeper_user_id,
                                      get_or_create_user_league,
@@ -204,7 +204,7 @@ async def get_my_roster(
             "stock": stock_map.get(pid),
         })
 
-    position_order = {"QB": 0, "RB": 1, "WR": 2, "TE": 3, "K": 4}
+    position_order = {"QB": 0, "RB": 1, "WR": 2, "TE": 3, "K": 4, "DEF": 5}
     roster_out.sort(key=lambda x: (0 if x["is_starter"] else 1, position_order.get(x["position"], 9)))
 
     return {
@@ -215,6 +215,9 @@ async def get_my_roster(
         "platform": platform,
         "season": nfl_state["season"],
         "week": nfl_state["week"],
+        # The last week whose games are all over. The Recap page builds its week picker
+        # from this, so it never offers a week that is still being played.
+        "last_complete_week": await nfl_service.last_complete_week(nfl_state["season"], nfl_state["week"]),
         "season_type": nfl_state["season_type"],
         "league_id": league_id,
     }

@@ -293,10 +293,36 @@ def run_espn_news_failure_tests():
     print("\n✅ All ESPN news failure mode tests passed.")
 
 
+def run_last_complete_week_tests():
+    """A week counts as recappable only once every one of its games is final."""
+    print("\n" + "=" * 50)
+    print("LAST COMPLETE WEEK")
+    print("=" * 50)
+
+    from services import nfl_service
+
+    async def _test():
+        cases = [
+            ("all games final (Monday night is over)", {"KC": {"state": "post"}, "SF": {"state": "post"}}, 3),
+            ("Monday night still playing",             {"KC": {"state": "post"}, "SF": {"state": "in"}},   2),
+            ("nothing kicked off yet",                 {"KC": {"state": "pre"}, "SF": {"state": "pre"}},   2),
+            ("scoreboard unreachable",                 {},                                                 2),
+        ]
+        for label, schedule, expected in cases:
+            with patch("services.nfl_service.get_week_schedule", AsyncMock(return_value=schedule)):
+                got = await nfl_service.last_complete_week(2026, 3)
+            assert got == expected, f"{label}: expected {expected}, got {got}"
+            print(f"    PASS, {label} -> week {got}")
+
+    asyncio.run(_test())
+    print("\n✅ last_complete_week tests passed.")
+
+
 if __name__ == "__main__":
     run_scoreboard_tests()
     run_news_parsing_tests()
     run_espn_news_failure_tests()
+    run_last_complete_week_tests()
     print("\n" + "=" * 50)
     print("ALL NFL SERVICE TESTS PASSED ✅")
     print("=" * 50)

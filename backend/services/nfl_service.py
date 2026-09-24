@@ -290,3 +290,18 @@ async def get_week_schedule(season: int, week: int) -> dict[str, dict]:
     # 15 minutes: game states (pre → in → post) drive live scoring on Sundays.
     _cache.set(cache_key, out, ttl_hours=0.25)
     return out
+
+
+async def last_complete_week(season: int, week: int) -> int:
+    """The most recent week whose games have all finished, so callers never offer a recap
+    of a week that is still being played.
+
+    Sleeper's own week doesn't roll over until the Tuesday after Monday night, so between
+    the final whistle and that rollover `week` is complete while Sleeper still calls it
+    current. Asking the scoreboard is the only way to tell those apart. Returns week - 1
+    when the schedule can't be read, which is the safe answer.
+    """
+    games = await get_week_schedule(season, week)
+    if games and all(g["state"] == "post" for g in games.values()):
+        return week
+    return week - 1
