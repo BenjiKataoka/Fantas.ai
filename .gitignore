@@ -50,3 +50,6 @@ memory/
 
 # graphify knowledge graph (generated, rebuild with: graphify update .)
 graphify-out/
+
+# Playwright MCP scratch output (screenshots, snapshots, console logs)
+.playwright-mcp/

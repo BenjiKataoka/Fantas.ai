@@ -20,7 +20,7 @@ export default function InjuryBadge({ status }) {
   if (!style) return null // Active, show nothing
   return (
     <Hint text={STATUS_HINT[status]}>
-      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${style}`}>
+      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${style}`}>
         {STATUS_LABEL[status]}
       </span>
     </Hint>

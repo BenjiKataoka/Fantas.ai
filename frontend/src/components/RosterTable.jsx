@@ -90,9 +90,11 @@ function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
           <ChevronRight className={`size-3.5 shrink-0 text-subtle/50 transition-transform ${isOpen ? 'rotate-90 text-brand' : ''}`} />
           <TeamAccent team={nfl_team} />
           <PlayerAvatar playerId={player_id} name={name} size="md" />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-content">{name}</span>
+          <div className="min-w-0 flex-1">
+            {/* min-w-0 + truncate: without both, a flex item refuses to shrink below its
+                text and the name runs under the injury badge on a narrow window. */}
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-medium text-content truncate" title={name}>{name}</span>
               <InjuryBadge status={injury_status} />
             </div>
             <div className="text-xs text-subtle font-mono mt-0.5">{nfl_team}</div>
@@ -152,12 +154,11 @@ export default function RosterTable({ players, newsMap = {}, startSitMap = {} })
   const bench    = players.filter(p => !p.is_starter)
 
   return (
-    <div className="rounded-xl border border-line bg-surface">
-      {/* table-fixed + colgroup lock column widths (so the expandable row never reflows
-          the table) AND size the table to exactly fit its container, no horizontal
-          scroll, so opening a card never lets you swipe past the left/right edges.
-          (A dedicated mobile pass comes after deploy.) */}
-      <table className="w-full table-fixed text-left">
+    <div className="rounded-xl border border-line bg-surface overflow-x-auto">
+      {/* table-fixed + colgroup lock column widths so the expandable row never reflows the
+          table. min-w stops nine columns from being crushed into each other on a narrow
+          window: past that the table scrolls sideways instead, the way Start/Sit does. */}
+      <table className="w-full min-w-[880px] table-fixed text-left">
         <colgroup>
           <col className="w-[21%]" /> {/* Player */}
           <col className="w-[6%]" />  {/* Pos */}

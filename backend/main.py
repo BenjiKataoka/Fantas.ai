@@ -1,7 +1,13 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Uvicorn only configures its own loggers, so without this every logger.info/warning/error
+# in services/ and routers/ is dropped: no scheduler, scraper or Gemini output anywhere.
+# Uvicorn's own loggers don't propagate to root, so nothing is logged twice.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 from config import ALLOWED_ORIGINS
 from services.scheduler_service import start_scheduler, shutdown_scheduler

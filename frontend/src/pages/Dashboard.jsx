@@ -8,6 +8,7 @@ import WeightSlider from '../components/WeightSlider'
 import AlertFeed from '../components/AlertFeed'
 import { TableSkeleton } from '../components/Skeletons'
 import PortfolioView from '../components/PortfolioView'
+import { LoadingDots } from '../components/Spinner'
 
 // ── Analyze-my-roster button ──────────────────────────────────────────────────
 // State lives in AppContext so progress survives page navigation; this is just the UI.
@@ -92,7 +93,7 @@ function SetupForm({ onComplete }) {
           className={`flex-1 ${field}`}
         />
         <button onClick={findLeagues} disabled={loading || !username.trim()} className={`px-4 py-2 text-sm ${btnPrimary}`}>
-          {loading ? '...' : 'Find'}
+          {loading ? <LoadingDots /> : 'Find'}
         </button>
       </div>
 
@@ -136,8 +137,8 @@ function TopBar({ rosterData }) {
   const weekLabel    = !rosterData ? '-' : seasonType === 'off' ? `${season} Offseason` : `Week ${week} · ${season}`
 
   return (
-    <div className="flex items-end justify-between mb-6 pb-4 border-b border-line">
-      <div className="flex items-baseline gap-4">
+    <div className="flex flex-wrap items-end justify-between gap-y-3 mb-6 pb-4 border-b border-line">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <span className="text-xl font-display font-semibold text-content tracking-tight">{weekLabel}</span>
         {rosterData && (
           <span className="text-sm text-subtle">
@@ -174,7 +175,7 @@ function WeightSidebar() {
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-line">
         <span className={`text-xs font-mono ${sumOk ? 'text-subtle' : 'text-bear'}`}>Total: {sum}%</span>
         <button onClick={() => saveWeights(weights)} disabled={!sumOk || saving} className={`px-3 py-1 text-xs ${btnPrimary}`}>
-          {saving ? 'Saving...' : 'Save'}
+          {saving ? <>Saving<LoadingDots /></> : 'Save'}
         </button>
       </div>
       {saveError && <p className="text-bear text-xs mt-2">{saveError}</p>}
@@ -277,18 +278,18 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="flex gap-6 items-start">
-        <div key={rosterData ? 'table' : 'loading'} className={`flex-1 min-w-0 ${REVEAL}`} style={{ animationDelay: '90ms' }}>
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        <div key={rosterData ? 'table' : 'loading'} className={`w-full lg:flex-1 min-w-0 ${REVEAL}`} style={{ animationDelay: '90ms' }}>
           {rosterLoading && !rosterData && <TableSkeleton rows={9} />}
           {rosterData && <RosterTable players={rosterData.roster} newsMap={newsMap} startSitMap={startSitMap} />}
         </div>
 
-        <div className={`w-56 shrink-0 flex flex-col gap-4 ${REVEAL}`} style={{ animationDelay: '180ms' }}>
+        <div className={`w-full lg:w-56 shrink-0 flex flex-col gap-4 ${REVEAL}`} style={{ animationDelay: '180ms' }}>
           <WeightSidebar />
           <div className="bg-surface border border-line rounded-xl p-5">
             <h3 className="text-sm font-display font-semibold text-content mb-3">Alerts</h3>
             {newsLoading && !newsData
-              ? <p className="text-xs text-subtle">Loading news...</p>
+              ? <p className="text-xs text-subtle">Loading news<LoadingDots /></p>
               : <AlertFeed items={newsData?.news ?? []} playerMap={playerMap} />
             }
           </div>
