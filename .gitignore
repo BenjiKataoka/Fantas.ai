@@ -44,9 +44,16 @@ Thumbs.db
 # Logs
 *.log
 
-# Markdown planning/memory files
-*.md
+# Private planning, memory and AI-assistant files. Named explicitly rather than *.md,
+# which also hid every README from a public repo.
+CLAUDE.md
+**/CLAUDE.md
+PLAN.md
+plan.md
 memory/
+.agents/
+# Vite's template README, not ours.
+frontend/README.md
 
 # graphify knowledge graph (generated, rebuild with: graphify update .)
 graphify-out/

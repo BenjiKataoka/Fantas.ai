@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://REPLACE-WITH-BACKEND-HOST/api/$1"
+      "destination": "https://benjifantasy.duckdns.org/api/$1"
     },
     {
       "source": "/((?!api/).*)",

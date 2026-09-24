@@ -1,0 +1,6 @@
+# setup.sh swaps DOMAIN for your DuckDNS name. Caddy gets and renews the HTTPS
+# certificate itself, and redirects plain http to https.
+DOMAIN {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8000
+}
