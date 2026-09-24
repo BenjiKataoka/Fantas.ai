@@ -173,7 +173,7 @@ async def get_projections(season: int, week: int) -> dict:
                 f"{SLEEPER_STATS_BASE}/projections/nfl/{season}/{week}",
                 params={
                     "season_type": "regular",
-                    "position[]": ["QB", "RB", "WR", "TE", "K"],
+                    "position[]": ["QB", "RB", "WR", "TE", "K", "DEF"],
                     "order_by": "pts_ppr",
                 },
                 headers={"User-Agent": "Mozilla/5.0"},

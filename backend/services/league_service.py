@@ -113,7 +113,7 @@ async def espn_leagues(user, season: int, db: AsyncSession) -> list[dict]:
     return list(out.values())
 
 
-RELEVANT_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
+RELEVANT_POSITIONS = {"QB", "RB", "WR", "TE", "K", "DEF"}
 
 
 def full_name(player: dict) -> str:
@@ -142,6 +142,7 @@ async def _store_roster(db: AsyncSession, user, ul: UserLeague, player_ids: list
 
     from models.player import Player
     from models.roster import MyRoster
+    from services.espn_service import DEF_ESPN_ID
     from services.projection_engine import weights_from_user
     from services.projection_service import sync_projections
     from services.utils import normalize_name
@@ -153,6 +154,8 @@ async def _store_roster(db: AsyncSession, user, ul: UserLeague, player_ids: list
             continue
         # Sleeper returns espn_id as int, cast to str for VARCHAR column
         espn_id = str(p["espn_id"]) if p.get("espn_id") is not None else None
+        if espn_id is None and p["position"] == "DEF":
+            espn_id = DEF_ESPN_ID.get(pid)   # Sleeper leaves defenses blank, ESPN derives from the team
         rows.append({
             "player_id": pid, "name": full_name(p), "position": p["position"],
             "nfl_team": p.get("team") or p.get("nfl_team"), "sleeper_id": pid,

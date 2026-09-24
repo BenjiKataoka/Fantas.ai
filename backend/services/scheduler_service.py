@@ -55,7 +55,8 @@ async def refresh_market_job() -> dict:
     async with AsyncSessionLocal() as db:
         players = await tracker_service.get_trackable_players(db)
         for pid, name in players:
-            entry = pool.get(normalize_name(name))
+            # A defense's player_id is its team abbreviation, which is how the pool keys it.
+            entry = pool.get(normalize_name(name)) or pool.get(pid)
             if not entry:
                 missed += 1
                 continue

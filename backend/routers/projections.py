@@ -109,7 +109,7 @@ async def get_projections(
         })
 
     # Sort starters first, then by position
-    position_order = {"QB": 0, "RB": 1, "WR": 2, "TE": 3, "K": 4}
+    position_order = {"QB": 0, "RB": 1, "WR": 2, "TE": 3, "K": 4, "DEF": 5}
     projections_out.sort(
         key=lambda x: (0 if x["is_starter"] else 1, position_order.get(x["position"], 9))
     )

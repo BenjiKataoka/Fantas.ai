@@ -25,7 +25,7 @@ from services.utils import extract_sleeper_pts, normalize_name
 
 logger = logging.getLogger(__name__)
 
-POSITIONS = ("QB", "RB", "WR", "TE", "K")
+POSITIONS = ("QB", "RB", "WR", "TE", "K", "DEF")
 MIN_UPGRADE = 0.5  # smaller gains are projection noise, not a reason to burn a claim
 MIN_PROJ = 1.0      # below this a free agent isn't worth a roster spot unless he's trending
 HORIZON = 4         # waiver pickups are judged on the next month, not one matchup
@@ -199,7 +199,7 @@ async def build_board(sleeper_username: str, league_id: str, user: User, db: Asy
             "week_proj": round(per_week[0], 2),
             "proj": round(sum(per_week) / len(per_week), 2),  # what the ranking and "replaces" use
             "confidence_flag": w["confidence_flag"],
-            "percent_rostered": (market.get(normalize_name(name)) or {}).get("percent_rostered"),
+            "percent_rostered": (market.get(normalize_name(name)) or market.get(pid) or {}).get("percent_rostered"),
             "adds": n_add, "drops": n_drop,
             "being_dropped": n_drop >= DROP_WARN_MIN and n_drop > n_add,
         }

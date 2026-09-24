@@ -14,7 +14,7 @@ import { LoadingDots } from '../components/Spinner'
 import { Hint } from '@/components/ui/tooltip'
 import Num from '../components/Num'
 
-const FILTERS = ['All', 'QB', 'RB', 'WR', 'TE', 'K']
+const FILTERS = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DEF']
 const POS_COLORS = { QB: 'text-pos-qb', RB: 'text-pos-rb', WR: 'text-pos-wr', TE: 'text-pos-te' }
 const ALL_LIMIT = 25
 
@@ -231,7 +231,7 @@ export default function Waivers() {
           <h1 className="text-2xl font-display font-bold text-content">Waiver wire{data ? `, Week ${data.week}` : ''}</h1>
           {data?.league_name && <p className="text-sm text-subtle mt-0.5">{data.league_name}</p>}
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {FILTERS.map(f => (
             <button
               key={f}

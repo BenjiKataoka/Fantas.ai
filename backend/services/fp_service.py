@@ -1,7 +1,7 @@
 """
 FantasyPros projection scraper.
 
-Scrapes PPR weekly projections for QB/RB/WR/TE/K.
+Scrapes PPR weekly projections for QB/RB/WR/TE/K/DST.
 Returns {normalized_player_name: projected_points}.
 Uses asyncio.sleep between position scrapes to avoid rate limiting.
 """
@@ -19,7 +19,7 @@ from services.cache_service import TTLCache
 logger = logging.getLogger(__name__)
 
 FP_BASE = "https://www.fantasypros.com/nfl/projections"
-POSITIONS = ["qb", "rb", "wr", "te", "k"]
+POSITIONS = ["qb", "rb", "wr", "te", "k", "dst"]
 
 HEADERS = {
     "User-Agent": (
@@ -40,7 +40,7 @@ async def get_fp_projections(week: int) -> dict[str, float]:
     """
     Scrapes FantasyPros PPR projections for all skill positions for a given week.
     Returns {normalized_player_name: projected_points}.
-    Sleeps 1-2s between each position to avoid rate limiting (5 positions = ~5-10s total).
+    Sleeps 1-2s between each position to avoid rate limiting (6 positions = ~6-12s total).
     Returns empty dict during offseason, FantasyPros tables are empty until season starts.
     """
     cache_key = f"fp_proj_{week}"

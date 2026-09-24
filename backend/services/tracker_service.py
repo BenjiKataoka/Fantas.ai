@@ -35,6 +35,21 @@ MAJOR_NEWS_TYPES = {"INJURY", "CONTRACT", "TRANSACTION", "DEPTH_CHART"}
 # the 4 sequential passes usually covers most of this, so the added sleep is small.
 ROSTER_PACE_SECONDS = 16.0
 
+# Team defenses are rostered and projected like anyone else, but the 4-pass profile is
+# built from career stats, ADP and player news, none of which exist for a defense. They
+# still get ESPN rank and % rostered, which is an API pull with no Gemini cost.
+NO_PROFILE_POSITIONS = ("DEF",)
+
+
+async def _analyzable_roster(db: AsyncSession, user_id: int) -> list[str]:
+    """This user's rostered players that the stock pipeline can actually profile."""
+    return list((await db.execute(
+        select(MyRoster.player_id)
+        .join(Player, Player.player_id == MyRoster.player_id)
+        .where(MyRoster.user_id == user_id, Player.position.notin_(NO_PROFILE_POSITIONS))
+        .distinct()
+    )).scalars().all())
+
 
 # ── Star / Unstar ─────────────────────────────────────────────────────────────
 
@@ -242,9 +257,7 @@ async def analyze_roster(user_id: int, db: AsyncSession, force: bool = False) ->
     already paid for. Runs as a single paced background worker to respect the
     Flash-Lite rate limit, returns immediately with the queued/skipped counts.
     """
-    player_ids = (
-        await db.execute(select(MyRoster.player_id).where(MyRoster.user_id == user_id).distinct())
-    ).scalars().all()
+    player_ids = await _analyzable_roster(db, user_id)
 
     if not player_ids:
         return {"status": "empty", "queued": 0, "skipped_fresh": 0, "total": 0}
@@ -274,11 +287,13 @@ async def analyze_roster(user_id: int, db: AsyncSession, force: bool = False) ->
     }
 
 
-async def get_trackable_players(db: AsyncSession) -> list[tuple[str, str]]:
+async def get_trackable_players(db: AsyncSession, profilable_only: bool = False) -> list[tuple[str, str]]:
     """Distinct (player_id, name) for every player anyone rosters or has starred.
 
     The scheduler refreshes exactly this set, never all of NFL, and it's deduped
-    because ADP/profiles are global (keyed by player_id).
+    because ADP/profiles are global (keyed by player_id). `profilable_only` drops the
+    positions the Gemini pipeline can't profile, so the market job keeps defenses and
+    the sentiment job skips them.
     """
     stmt = text(
         "SELECT p.player_id, p.name FROM players p "
@@ -287,7 +302,8 @@ async def get_trackable_players(db: AsyncSession) -> list[tuple[str, str]]:
         "  UNION "
         "  SELECT player_id FROM tracked_players WHERE is_active = TRUE"
         ")"
-    )
+        + (" AND p.position <> ALL(:skip)" if profilable_only else "")
+    ).bindparams(**({"skip": list(NO_PROFILE_POSITIONS)} if profilable_only else {}))
     rows = (await db.execute(stmt)).mappings().all()
     return [(r["player_id"], r["name"]) for r in rows]
 
@@ -300,7 +316,7 @@ async def get_stale_trackable_players(
     "Stale" = no complete profile, or one older than the season-aware TTL. This is the
     scheduler's work list, fresh profiles are reused, never re-analyzed.
     """
-    players = await get_trackable_players(db)
+    players = await get_trackable_players(db, profilable_only=True)
     ttl = await _season_ttl_hours(db)
     stale: list[tuple[str, str]] = []
     for pid, name in players:
@@ -330,9 +346,7 @@ async def roster_analysis_status(user_id: int, db: AsyncSession) -> dict:
 
     Lets the frontend poll a batch run to completion and fill gauges in as they land.
     """
-    player_ids = (
-        await db.execute(select(MyRoster.player_id).where(MyRoster.user_id == user_id).distinct())
-    ).scalars().all()
+    player_ids = await _analyzable_roster(db, user_id)
     if not player_ids:
         return {"total": 0, "ready": 0, "pending": 0}
 

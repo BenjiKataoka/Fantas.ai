@@ -26,6 +26,9 @@ ESPN_SLOT_MAP = {
 # In-memory cache: {key: (data, expires_at)}
 _cache = TTLCache(default_ttl_hours=6)
 
+# Fantasy-relevant skill players, plus one D/ST per team.
+POOL_LIMIT = 532
+
 
 # ESPN stat entry discriminators (in player.stats[])
 _ESPN_STAT_PROJECTED = 1   # statSourceId: 1=projected, 0=actual
@@ -76,8 +79,10 @@ async def get_espn_projections_full(
 
     filter_header = json.dumps({
         "players": {
-            "limit": 500,
-            "filterSlotIds": {"value": [0, 2, 4, 6, 17]},  # QB/RB/WR/TE/K
+            # ESPN returns exactly `limit` rows, so the 32 D/ST have to be added on top of
+            # the skill-player depth or they'd push 32 players off the tail.
+            "limit": POOL_LIMIT,
+            "filterSlotIds": {"value": [0, 2, 4, 6, 16, 17]},  # QB/RB/WR/TE/D-ST/K
             "sortDraftRanks": {"sortPriority": 100, "sortAsc": True, "value": "PPR"},
         }
     })
@@ -142,8 +147,8 @@ async def get_espn_market_pool(season: int, week: int) -> dict[str, dict]:
 
     filter_header = json.dumps({
         "players": {
-            "limit": 500,
-            "filterSlotIds": {"value": [0, 2, 4, 6, 17]},  # QB/RB/WR/TE/K
+            "limit": POOL_LIMIT,
+            "filterSlotIds": {"value": [0, 2, 4, 6, 16, 17]},  # QB/RB/WR/TE/D-ST/K
             "sortDraftRanks": {"sortPriority": 100, "sortAsc": True, "value": "PPR"},
         }
     })
@@ -163,11 +168,14 @@ async def get_espn_market_pool(season: int, week: int) -> dict[str, dict]:
     for entry in data.get("players", []):
         pl = entry.get("player", {})
         pos = _espn_position(pl.get("defaultPositionId"))
-        if pos not in ("QB", "RB", "WR", "TE", "K") or not pl.get("fullName"):
+        if pos not in ("QB", "RB", "WR", "TE", "K", "DST") or not pl.get("fullName"):
             continue
         own = pl.get("ownership") or {}
         rows.append({
             "name": pl.get("fullName"),
+            # ESPN calls it "Texans D/ST" where we call it "Houston Texans", so a D/ST is
+            # also keyed by team abbreviation, which is its player id everywhere else.
+            "team": PRO_TEAM_ID.get(pl.get("proTeamId")) if pos == "DST" else None,
             "espn_id": str(pl.get("id", "")),
             "position": pos,
             "proj": _extract_espn_proj(pl, season, week),
@@ -185,7 +193,7 @@ async def get_espn_market_pool(season: int, week: int) -> dict[str, dict]:
 
     pool: dict[str, dict] = {}
     for r in rows:
-        pool[normalize_name(r["name"])] = {
+        entry = {
             "espn_id": r["espn_id"],
             "position": r["position"],
             "position_rank": r.get("position_rank"),
@@ -193,6 +201,9 @@ async def get_espn_market_pool(season: int, week: int) -> dict[str, dict]:
             "adp": round(r["adp"], 1) if r.get("adp") is not None else None,
             "percent_rostered": round(r["percent_rostered"], 1) if r.get("percent_rostered") is not None else None,
         }
+        pool[normalize_name(r["name"])] = entry
+        if r.get("team"):
+            pool[r["team"]] = entry
 
     _cache.set(cache_key, pool, ttl_hours=6)
     logger.info(f"[ESPN] market pool: {len(pool)} players, {len(ranked)} ranked by projection (week {week})")
@@ -312,6 +323,12 @@ PRO_TEAM_ID = {
     18: "NO", 19: "NYG", 20: "NYJ", 21: "PHI", 22: "ARI", 23: "PIT", 24: "LAC", 25: "SF",
     26: "SEA", 27: "TB", 28: "WAS", 29: "CAR", 30: "JAX", 33: "BAL", 34: "HOU",
 }
+
+# Sleeper stores no espn_id for team defenses, but ESPN's D/ST id is just the negated pro
+# team id (HOU proTeamId 34 → -16034, verified 32/32), so derive it and ESPN projections
+# match a defense by id like every other player instead of falling back to a name that
+# never agrees ("Houston Texans" vs "Texans D/ST").
+DEF_ESPN_ID = {abbr: str(-(16000 + tid)) for tid, abbr in PRO_TEAM_ID.items()}
 
 
 def _cookie_headers(espn_s2: str | None, swid: str | None) -> dict:
