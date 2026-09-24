@@ -90,7 +90,7 @@ export default function Ticker() {
             const t = tier(p.weighted_proj)
             return (
               <span key={i} className="flex items-center gap-1.5 px-4 py-1.5 text-xs whitespace-nowrap border-r border-line/50">
-                <span className="font-display font-semibold tracking-wide text-content/75">{lastName(p.name)}</span>
+                <span className="font-display font-semibold tracking-wide text-content">{lastName(p.name)}</span>
                 <span className="font-mono text-content tabular-nums">{p.weighted_proj.toFixed(1)}</span>
                 <span className={`font-mono ${t.color}`}>{t.arrow}</span>
               </span>

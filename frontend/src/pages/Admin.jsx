@@ -86,7 +86,7 @@ export default function Admin() {
                 </td>
                 <td className="px-4 py-3 text-right">
                   {u.is_admin ? (
-                    <span className="text-xs text-subtle/60">-</span>
+                    <span className="text-xs text-faint">-</span>
                   ) : u.is_approved ? (
                     <button
                       onClick={() => act(u.id, false)}

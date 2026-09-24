@@ -56,7 +56,7 @@ export default function AlertFeed({ items = [], playerMap = {}, maxItems = 6, li
     .slice(0, maxItems)
 
   if (!visible.length) {
-    return <p className="text-xs text-subtle/70">No injury or roster alerts right now.</p>
+    return <p className="text-xs text-subtle">No injury or roster alerts right now.</p>
   }
 
   return (
@@ -71,13 +71,13 @@ export default function AlertFeed({ items = [], playerMap = {}, maxItems = 6, li
             <div className="flex flex-col gap-1 min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-content truncate">{label}</span>
-                <span className="text-xs text-subtle/70 shrink-0 font-mono">{relativeTime(item.published_at)}</span>
+                <span className="text-xs text-subtle shrink-0 font-mono">{relativeTime(item.published_at)}</span>
               </div>
               <p className="text-xs text-subtle leading-snug line-clamp-2">{item.headline}</p>
               {(type || lineups[item.player_id] > 1) && (
                 <span className="text-xs font-medium">
                   {type && <span className={type.cls}>{type.text}</span>}
-                  {lineups[item.player_id] > 1 && <span className="text-content/80">{type ? ' · ' : ''}Affects {lineups[item.player_id]} lineups</span>}
+                  {lineups[item.player_id] > 1 && <span className="text-content">{type ? ' · ' : ''}Affects {lineups[item.player_id]} lineups</span>}
                 </span>
               )}
             </div>

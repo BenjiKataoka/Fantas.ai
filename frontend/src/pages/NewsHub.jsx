@@ -72,7 +72,7 @@ function NewsCard({ item, playerLabel, playerName }) {
   const Headline = url ? (
     <span className="group inline-flex items-start gap-1 text-sm font-semibold text-content group-hover/card:text-brand leading-snug transition-colors">
       <span>{item.headline}</span>
-      <span className="text-subtle/50 shrink-0 mt-0.5" aria-hidden>↗</span>
+      <span className="text-faint shrink-0 mt-0.5" aria-hidden>↗</span>
     </span>
   ) : (
     <p className="text-sm font-semibold text-content leading-snug">{item.headline}</p>
@@ -101,15 +101,15 @@ function NewsCard({ item, playerLabel, playerName }) {
           </div>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-xs text-subtle/70">{formatSource(item.source)}</p>
-          <p className="text-xs text-subtle/50 font-mono">{relativeTime(item.published_at)}</p>
+          <p className="text-xs text-subtle">{formatSource(item.source)}</p>
+          <p className="text-xs text-faint font-mono">{relativeTime(item.published_at)}</p>
         </div>
       </div>
 
       {/* Raw scraped body, the article itself, always shown when present */}
       {body && (
         <div>
-          <p className={`text-xs text-content/80 leading-relaxed ${!expanded && longBody ? 'line-clamp-3' : ''}`}>
+          <p className={`text-xs text-content leading-relaxed ${!expanded && longBody ? 'line-clamp-3' : ''}`}>
             {body}
           </p>
           {longBody && (
@@ -125,7 +125,7 @@ function NewsCard({ item, playerLabel, playerName }) {
 
       {/* AI summary (full cards only) */}
       {isFull && item.summary && (
-        <p className="text-sm text-content/90 leading-relaxed border-l-2 border-brand/40 pl-3">{item.summary}</p>
+        <p className="text-sm text-content leading-relaxed border-l-2 border-brand/40 pl-3">{item.summary}</p>
       )}
 
       {/* Signal / stock badge row, full Gemini direction, or a HIGH-magnitude rule signal */}
@@ -135,7 +135,7 @@ function NewsCard({ item, playerLabel, playerName }) {
           {item.confidence_score != null && (
             <span className="text-xs text-subtle font-mono tabular-nums">{Math.round(item.confidence_score * 100)}% confidence</span>
           )}
-          {isFull && item.analysis_model && <span className="text-xs text-subtle/50 font-mono ml-auto">{item.analysis_model}</span>}
+          {isFull && item.analysis_model && <span className="text-xs text-faint font-mono ml-auto">{item.analysis_model}</span>}
         </div>
       )}
 
@@ -147,13 +147,13 @@ function NewsCard({ item, playerLabel, playerName }) {
           {item.short_term_impact && (
             <div className="bg-raised rounded-lg p-3">
               <p className="text-xs font-medium text-subtle mb-1">Short term</p>
-              <p className="text-xs text-content/80 leading-snug">{item.short_term_impact}</p>
+              <p className="text-xs text-content leading-snug">{item.short_term_impact}</p>
             </div>
           )}
           {item.long_term_impact && (
             <div className="bg-raised rounded-lg p-3">
               <p className="text-xs font-medium text-subtle mb-1">Long term</p>
-              <p className="text-xs text-content/80 leading-snug">{item.long_term_impact}</p>
+              <p className="text-xs text-content leading-snug">{item.long_term_impact}</p>
             </div>
           )}
         </div>
@@ -206,7 +206,7 @@ export default function NewsHub() {
           {newsData && (
             <p className="text-sm text-subtle mt-0.5">
               {query ? `${items.length} of ${newsData.news?.length ?? 0} items` : `${items.length} items`} · last 7 days
-              {newsData.season_type && <span className="ml-2 capitalize text-subtle/60">({newsData.season_type}season)</span>}
+              {newsData.season_type && <span className="ml-2 capitalize text-faint">({newsData.season_type}season)</span>}
             </p>
           )}
         </div>
@@ -228,7 +228,7 @@ export default function NewsHub() {
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="Search players, teams, or headlines"
-          className="w-full rounded-lg bg-surface border border-line pl-9 pr-3 py-2.5 text-sm text-content placeholder:text-subtle/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-content/25"
+          className="w-full rounded-lg bg-surface border border-line pl-9 pr-3 py-2.5 text-sm text-content placeholder:text-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-content/25"
         />
       </div>
 
@@ -264,7 +264,7 @@ export default function NewsHub() {
       {newsLoading && !newsData && <CardListSkeleton count={5} />}
 
       {!newsLoading && query && !items.length && (newsData?.news?.length ?? 0) > 0 && (
-        <div className="text-center py-12 text-subtle/70">
+        <div className="text-center py-12 text-subtle">
           <p className="text-sm">No news matches "{query}".</p>
           <button onClick={() => setQuery('')} className="text-sm text-content underline underline-offset-2 mt-2">Clear search</button>
         </div>

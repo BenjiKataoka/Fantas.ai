@@ -18,7 +18,7 @@ const SLOT_COLORS = {
 }
 
 function projColor(v) {
-  if (v == null) return 'text-subtle/40'
+  if (v == null) return 'text-faint'
   if (v >= 15)   return 'text-bull'
   if (v >= 8)    return 'text-warn'
   return 'text-bear'
@@ -65,9 +65,9 @@ function CloseDecision({ d }) {
       <div className="flex items-center gap-2 text-sm">
         <span className="text-bull font-medium">{d.start.name}</span>
         <span className="text-subtle text-xs font-mono">{d.start.adjusted_proj?.toFixed(1)}</span>
-        <span className="text-subtle/60 mx-1">over</span>
+        <span className="text-faint mx-1">over</span>
         <span className="text-subtle">{d.sit.name}</span>
-        <span className="text-subtle/60 text-xs font-mono">{d.sit.adjusted_proj?.toFixed(1)}</span>
+        <span className="text-faint text-xs font-mono">{d.sit.adjusted_proj?.toFixed(1)}</span>
       </div>
       <p className="text-xs text-warn/70 mt-1.5">{d.note}</p>
     </div>
@@ -120,7 +120,7 @@ export default function StartSit() {
             <div className="flex items-center justify-between mb-3">
               <h2 className={H2}>Recommended lineup</h2>
               {totalProj > 0 && (
-                <span className="font-mono tabular-nums text-bull text-base font-bold">{totalProj.toFixed(1)} <span className="text-subtle/60 text-xs uppercase">pts</span></span>
+                <span className="font-mono tabular-nums text-bull text-base font-bold">{totalProj.toFixed(1)} <span className="text-faint text-xs uppercase">pts</span></span>
               )}
             </div>
             <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
@@ -135,7 +135,7 @@ export default function StartSit() {
                 <tbody className="divide-y divide-line/40">
                   {sortedStarters.length > 0
                     ? sortedStarters.map(p => <LineupRow key={`${p.slot}-${p.player_id}`} p={p} />)
-                    : <tr><td colSpan={3} className="px-3 py-6 text-center text-subtle/60 text-sm">No starters could be set. Refresh projections on the Dashboard.</td></tr>
+                    : <tr><td colSpan={3} className="px-3 py-6 text-center text-faint text-sm">No starters could be set. Refresh projections on the Dashboard.</td></tr>
                   }
                 </tbody>
               </table>
@@ -182,7 +182,7 @@ export default function StartSit() {
                 {close_decisions.map((d, i) => <CloseDecision key={`${d.slot}-${i}`} d={d} />)}
               </div>
             ) : (
-              <p className="text-xs text-subtle/70">No close calls this week. Every slot has a clear starter.</p>
+              <p className="text-xs text-subtle">No close calls this week. Every slot has a clear starter.</p>
             )}
           </div>
         </div>

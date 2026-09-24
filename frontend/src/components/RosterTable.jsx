@@ -53,14 +53,14 @@ function SectionHeader({ label, count }) {
   return (
     <tr>
       <td colSpan={9} className="px-3 py-2 bg-raised text-xs font-display font-semibold text-subtle border-y border-line">
-        {label} <span className="font-mono font-normal text-subtle/60 ml-1">({count})</span>
+        {label} <span className="font-mono font-normal text-faint ml-1">({count})</span>
       </td>
     </tr>
   )
 }
 
 function StartSitCell({ rec }) {
-  if (!rec) return <span className="text-subtle/40 text-xs">-</span>
+  if (!rec) return <span className="text-faint text-xs">-</span>
   if (rec.slot) {
     return (
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-bull/10 border border-bull/30 text-bull text-xs font-semibold">
@@ -87,7 +87,7 @@ function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
       {/* Player */}
       <td className={COL_CELL}>
         <div className="flex items-center gap-2.5">
-          <ChevronRight className={`size-3.5 shrink-0 text-subtle/50 transition-transform ${isOpen ? 'rotate-90 text-brand' : ''}`} />
+          <ChevronRight className={`size-3.5 shrink-0 text-faint transition-transform ${isOpen ? 'rotate-90 text-brand' : ''}`} />
           <TeamAccent team={nfl_team} />
           <PlayerAvatar playerId={player_id} name={name} size="md" />
           <div className="min-w-0 flex-1">
@@ -128,7 +128,7 @@ function PlayerRow({ player, latestNews, startSitRec, isOpen, onToggle }) {
         {latestNews ? (
           <p className="text-xs text-subtle leading-snug line-clamp-2">{latestNews.headline}</p>
         ) : (
-          <span className="text-subtle/40 text-xs">-</span>
+          <span className="text-faint text-xs">-</span>
         )}
       </td>
 

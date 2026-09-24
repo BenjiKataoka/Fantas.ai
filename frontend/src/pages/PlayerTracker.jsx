@@ -54,7 +54,7 @@ function PlayerPicker({ players, selectedId, onSelect }) {
         ) : (
           <span className="text-subtle text-sm">Select a player...</span>
         )}
-        <span className={`ml-auto text-subtle/60 text-xs transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+        <span className={`ml-auto text-faint text-xs transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
       </button>
 
       {open && (
@@ -157,7 +157,7 @@ export default function PlayerTracker() {
   }
 
   if (!credentials) {
-    return <div className="text-center py-16 text-subtle/70 text-sm">Set up your league in Settings first.</div>
+    return <div className="text-center py-16 text-subtle text-sm">Set up your league in Settings first.</div>
   }
 
   // Per-metric trend for the selected player, in "goodness" terms (up = better).
@@ -191,7 +191,7 @@ export default function PlayerTracker() {
       </div>
 
       {list.length === 0 ? (
-        <div className="text-center py-20 text-subtle/70">
+        <div className="text-center py-20 text-subtle">
           {tab === 'rostered'
             ? <p className="text-sm">No roster loaded. Pick your league on the Dashboard.</p>
             : <>
@@ -225,7 +225,7 @@ export default function PlayerTracker() {
                   <div className="text-2xl font-mono font-bold text-content tabular-nums leading-none" style={{ color: stats.m.color }}>
                     {stats.m.value(stats.last, selected.position)}
                   </div>
-                  <div className="text-xs text-subtle/70">{stats.m.label}</div>
+                  <div className="text-xs text-subtle">{stats.m.label}</div>
                 </>
               ) : <span className="text-xs text-subtle">No data</span>}
             </div>
@@ -285,7 +285,7 @@ export default function PlayerTracker() {
           {/* Watchlist-only remove */}
           {tab === 'watchlist' && (
             <div className={`px-4 pb-4 ${REVEAL}`} style={{ animationDelay: '350ms' }}>
-              <button onClick={handleUnstar} className="text-xs text-subtle/70 hover:text-bear transition-colors">
+              <button onClick={handleUnstar} className="text-xs text-subtle hover:text-bear transition-colors">
                 Remove from watchlist
               </button>
             </div>

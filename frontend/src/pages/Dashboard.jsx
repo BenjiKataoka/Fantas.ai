@@ -146,7 +146,7 @@ function TopBar({ rosterData }) {
             {totalPts > 0 && (
               <span className="text-bull ml-3 font-mono text-base font-bold tabular-nums">{totalPts.toFixed(1)}</span>
             )}
-            {totalPts > 0 && <span className="text-subtle/60 ml-1 text-xs">projected</span>}
+            {totalPts > 0 && <span className="text-faint ml-1 text-xs">projected</span>}
           </span>
         )}
       </div>

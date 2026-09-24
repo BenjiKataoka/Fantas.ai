@@ -10,7 +10,7 @@ export function LoadingDots({ className = '' }) {
 export default function Spinner({ label = 'Loading' }) {
   return (
     <div role="status" className="flex flex-col items-center justify-center gap-3 py-16 text-subtle">
-      <LoadingDots className="text-2xl text-content/70" />
+      <LoadingDots className="text-2xl text-content" />
       <span className="text-sm">{label}</span>
     </div>
   )

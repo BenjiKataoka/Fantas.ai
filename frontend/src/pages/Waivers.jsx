@@ -72,7 +72,7 @@ function Verdict({ p, a }) {
     <div className="px-5 py-4 flex flex-wrap items-start gap-x-6 gap-y-3">
       <span className={`shrink-0 px-2 py-1 rounded border text-sm font-semibold ${v.cls}`}>{v.label}</span>
       <div className="flex-1 min-w-64 text-sm">
-        <ul className="space-y-1 text-content/90 list-disc pl-4">{a.reasons.map(r => <li key={r}>{r}</li>)}</ul>
+        <ul className="space-y-1 text-content list-disc pl-4">{a.reasons.map(r => <li key={r}>{r}</li>)}</ul>
         {a.risk && <p className="mt-2 text-subtle"><span className="text-warn">Risk:</span> {a.risk}</p>}
         <p className="mt-2 text-xs text-subtle">
           {p.replaces ? <>Projects <span className="text-bull font-mono">+{p.upgrade.toFixed(1)}</span> a week over {p.replaces.name}.</>
@@ -156,7 +156,7 @@ function LineToBeat({ lineup, weeks }) {
         {rows.map(r => (
           <li key={`${r.slot}-${r.name}`} className="flex items-baseline gap-2">
             <span className="w-11 shrink-0 font-mono text-xs text-subtle">{slotLabel(r.slot)}</span>
-            <span className="flex-1 truncate text-content/90">{r.name}</span>
+            <span className="flex-1 truncate text-content">{r.name}</span>
             <Num className="text-subtle">{r.proj.toFixed(1)}</Num>
           </li>
         ))}
@@ -175,7 +175,7 @@ function Legend({ weeks }) {
   return (
     <dl className="px-1 space-y-2 text-xs">
       {items.map(([k, v]) => (
-        <div key={k}><dt className="inline text-content/80 font-medium">{k}: </dt><dd className="inline text-subtle">{v}</dd></div>
+        <div key={k}><dt className="inline text-content font-medium">{k}: </dt><dd className="inline text-subtle">{v}</dd></div>
       ))}
     </dl>
   )
@@ -250,7 +250,7 @@ export default function Waivers() {
       {data && (
         <div className="flex flex-col gap-6">
           <div className={REVEAL}>
-            <p className="text-lg leading-relaxed text-content/90 max-w-2xl">
+            <p className="text-lg leading-relaxed text-content max-w-2xl">
               {starters === 0
                 ? `Nobody available outscores your starters over the next ${data.horizon_weeks.length} weeks. The list below is depth, sorted by projection.`
                 : `${starters === 1 ? 'One free agent outscores' : `${starters} free agents outscore`} one of your starters over the next ${data.horizon_weeks.length} weeks.`}

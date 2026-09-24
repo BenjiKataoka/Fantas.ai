@@ -16,6 +16,7 @@
   --color-line: var(--line);
   --color-content: var(--content);
   --color-subtle: var(--subtle);
+  --color-faint: var(--faint);   /* not 'muted': shadcn already owns --color-muted for surfaces */
 
   --color-brand: var(--brand);
   --color-brand-fg: var(--brand-fg);
@@ -61,8 +62,12 @@
   --surface: #ffffff;
   --raised: #eef0ed;
   --line: #dcdfdb;
+  /* Type ramp, three steps, each measured against its own surface. Opacity modifiers
+     used to stand in for the lower steps and collapsed on white: text-subtle/40 came
+     out at 1.8:1. Contrast on #ffffff: 18.4 / 8.0 / 4.7. */
   --content: #121417;
-  --subtle: #5f656d;
+  --subtle: #4b515a;
+  --faint: #6e747c;
   --brand: #121417;
   --brand-fg: #ffffff;
   --bull: #0e7a3f;
@@ -86,8 +91,10 @@
   --surface: #151c25;
   --raised: #1c2530;
   --line: #2a3440;
+  /* Contrast on #151c25: 15.2 / 8.2 / 5.0. */
   --content: #eef2f6;
-  --subtle: #8b96a3;
+  --subtle: #aab4bf;
+  --faint: #808b97;
   --brand: #eef2f6;
   --brand-fg: #0f141b;
   --bull: #3fb97a;

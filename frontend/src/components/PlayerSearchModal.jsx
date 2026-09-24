@@ -105,11 +105,11 @@ export default function PlayerSearchModal({ starredIds, onStar, onClose }) {
           {error && <p className="text-xs text-bear px-4 py-3">{error}</p>}
 
           {!error && query.length < 2 && (
-            <p className="text-xs text-subtle/70 px-4 py-4 text-center">Type at least 2 characters to search</p>
+            <p className="text-xs text-subtle px-4 py-4 text-center">Type at least 2 characters to search</p>
           )}
 
           {!error && query.length >= 2 && !searching && results.length === 0 && (
-            <p className="text-xs text-subtle/70 px-4 py-4 text-center">
+            <p className="text-xs text-subtle px-4 py-4 text-center">
               No players found. Try loading your roster first to warm the player cache.
             </p>
           )}
@@ -147,7 +147,7 @@ export default function PlayerSearchModal({ starredIds, onStar, onClose }) {
         </div>
 
         <div className="px-4 py-2.5 border-t border-line">
-          <p className="text-xs text-subtle/60">Searches all NFL players. Hit Escape to close.</p>
+          <p className="text-xs text-faint">Searches all NFL players. Hit Escape to close.</p>
         </div>
       </div>
     </div>

@@ -182,7 +182,7 @@ function Landing() {
           </button>
         </SignUpButton>
       </div>
-      <p className="text-xs text-subtle/70 mt-6">New accounts require admin approval before access.</p>
+      <p className="text-xs text-subtle mt-6">New accounts require admin approval before access.</p>
     </CenteredShell>
   )
 }

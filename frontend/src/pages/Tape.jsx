@@ -36,7 +36,7 @@ function Theater({ video, subtitle }) {
         <div className="px-5 py-4">
           <p className="font-medium text-content leading-snug">{video.title}</p>
           <p className="text-sm text-subtle mt-1">
-            {subtitle}{subtitle ? ' · ' : ''}<span className="text-subtle/80">the NFL does not allow this clip to play outside YouTube</span>
+            {subtitle}{subtitle ? ' · ' : ''}<span className="text-subtle">the NFL does not allow this clip to play outside YouTube</span>
           </p>
         </div>
       </div>
@@ -107,7 +107,7 @@ function PlayerRow({ p, activeId, onPick, dark }) {
                 className={`group w-full text-left flex items-center gap-3 px-3 py-2 transition-colors ${playing ? 'bg-raised' : 'hover:bg-raised/60'}`}
               >
                 <Thumb video={v} playing={playing} className="w-20 aspect-video" />
-                <span className={`text-sm leading-snug line-clamp-2 ${playing ? 'text-content' : 'text-content/80'}`}>
+                <span className={`text-sm leading-snug line-clamp-2 ${playing ? 'text-content' : 'text-content'}`}>
                   {v.title}
                   {!v.playable && <ExternalLink className="inline size-3 ml-1 mb-0.5 text-subtle" aria-label="opens on YouTube" />}
                 </span>
@@ -130,7 +130,7 @@ function VideoRow({ v, label, activeId, onPick }) {
     >
       <Thumb video={v} playing={playing} className="w-20 aspect-video" />
       <span className="min-w-0">
-        <span className="block text-sm text-content/90 leading-snug line-clamp-2">
+        <span className="block text-sm text-content leading-snug line-clamp-2">
           {v.title}
           {!v.playable && <ExternalLink className="inline size-3 ml-1 mb-0.5 text-subtle" aria-label="opens on YouTube" />}
         </span>
