@@ -32,6 +32,7 @@ from config import (
 )
 from database import get_db
 from models.user import User
+from services import rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -194,14 +195,20 @@ async def get_current_user(
     if not clerk_id:
         raise HTTPException(status_code=401, detail="Token missing subject")
 
-    is_admin = clerk_id in CLERK_ADMIN_IDS
-    # Prefer email from claims (if a JWT template adds it); otherwise ask Clerk's API.
-    email = claims.get("email")
-    username = claims.get("username")
-    if not email:
-        email, username = await _fetch_clerk_user(clerk_id)
+    rate_limit.check(clerk_id, request.url.path)
 
-    user = await _get_or_create_user(db, clerk_id, email, username or email.split("@")[0], is_admin)
+    is_admin = clerk_id in CLERK_ADMIN_IDS
+    # Known users skip Clerk entirely. The email lookup below is only for provisioning, and
+    # running it on every request cost ~300ms each and a Clerk API call per request (46 for
+    # 39 requests, measured), which at a dozen users trips Clerk's rate limit.
+    user = (await db.execute(select(User).where(User.clerk_id == clerk_id))).scalar_one_or_none()
+    if user is None:
+        # Prefer email from claims (if a JWT template adds it); otherwise ask Clerk's API.
+        email = claims.get("email")
+        username = claims.get("username")
+        if not email:
+            email, username = await _fetch_clerk_user(clerk_id)
+        user = await _get_or_create_user(db, clerk_id, email, username or email.split("@")[0], is_admin)
 
     # Admins are always approved, heals the case where the row was created before the
     # user was added to CLERK_ADMIN_IDS (first-admin bootstrap).
