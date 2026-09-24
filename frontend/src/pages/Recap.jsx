@@ -11,13 +11,32 @@ const SOURCE_NAMES = { sleeper: 'Sleeper', espn: 'ESPN', fp: 'FantasyPros', weig
 const POS_COLORS = { QB: 'text-pos-qb', RB: 'text-pos-rb', WR: 'text-pos-wr', TE: 'text-pos-te' }
 
 const fmt = (v) => (v == null ? '-' : v.toFixed(1))
-function Diff({ v }) {
-  if (v == null) return <Num className="text-subtle/40">-</Num>
+/**
+ * Beat or missed his projection, as a bar either side of a shared centre line.
+ * `max` is the biggest miss in the week and is shared by every row, so bar lengths
+ * compare; scaling each row to itself would make every player look equally wrong.
+ * The number keeps its own +/-3 threshold colour, since a bar cannot say "close enough".
+ */
+function Diff({ v, max }) {
+  if (v == null) return <Num className="text-faint">-</Num>
+  const pct = max > 0 ? Math.min(1, Math.abs(v) / max) * 50 : 0
+  const over = v >= 0
   const cls = v >= 3 ? 'text-bull' : v <= -3 ? 'text-bear' : 'text-subtle'
-  return <Num className={cls}>{v > 0 ? '+' : ''}{v.toFixed(1)}</Num>
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <div className="relative h-3 w-16 shrink-0" aria-hidden="true">
+        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-line" />
+        <div
+          className={`absolute top-0.5 bottom-0.5 ${over ? 'left-1/2 rounded-r-sm bg-bull' : 'right-1/2 rounded-l-sm bg-bear'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <Num className={`${cls} w-10 text-right`}>{v > 0 ? '+' : ''}{v.toFixed(1)}</Num>
+    </div>
+  )
 }
 
-function PlayerRow({ p, inBest }) {
+function PlayerRow({ p, inBest, diffMax }) {
   return (
     <tr className="border-t border-line/50">
       <td className="px-3 py-2">
@@ -32,7 +51,7 @@ function PlayerRow({ p, inBest }) {
       </td>
       <td className="px-3 py-2 text-right"><Num className="text-subtle">{fmt(p.weighted_proj)}</Num></td>
       <td className="px-3 py-2 text-right"><Num className="text-content font-medium">{fmt(p.actual)}</Num></td>
-      <td className="px-3 py-2 text-right"><Diff v={p.diff} /></td>
+      <td className="px-3 py-2 text-right"><Diff v={p.diff} max={diffMax} /></td>
     </tr>
   )
 }
@@ -41,7 +60,7 @@ function Summary({ d }) {
   const L = d.lineup
   const projGain = L.projection_lineup_points - L.your_points
   return (
-    <p className="text-lg leading-relaxed text-content/90 max-w-2xl">
+    <p className="text-lg leading-relaxed text-content max-w-2xl">
       You scored <Num className="text-content font-semibold">{L.your_points.toFixed(2)}</Num>.
       {L.points_left_on_bench > 0.5 ? (
         <> Your best lineup would have scored <Num className="text-content">{L.best_possible_points.toFixed(2)}</Num>,
@@ -118,6 +137,7 @@ export default function Recap() {
   const best = new Set(data?.lineup.best_lineup_ids || [])
   const starters = data?.players.filter(p => p.started) || []
   const bench = data?.players.filter(p => !p.started) || []
+  const diffMax = Math.max(0, ...(data?.players || []).map(p => Math.abs(p.diff ?? 0)))
 
   return (
     <div className="max-w-5xl">
@@ -160,13 +180,13 @@ export default function Recap() {
                     <th className="px-3 py-2.5 text-left font-medium">Starters</th>
                     <th className="px-3 py-2.5 text-right font-medium">Projected</th>
                     <th className="px-3 py-2.5 text-right font-medium">Actual</th>
-                    <th className="px-3 py-2.5 text-right font-medium">+/-</th>
+                    <th className="px-3 py-2.5 text-right font-medium pr-5">Missed / beat</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {starters.map(p => <PlayerRow key={p.player_id} p={p} inBest={best.has(p.player_id)} />)}
+                  {starters.map(p => <PlayerRow key={p.player_id} p={p} inBest={best.has(p.player_id)} diffMax={diffMax} />)}
                   <tr className="border-t border-line"><td colSpan={5} className="px-3 pt-4 pb-1.5 text-xs text-subtle">Bench</td></tr>
-                  {bench.map(p => <PlayerRow key={p.player_id} p={p} inBest={best.has(p.player_id)} />)}
+                  {bench.map(p => <PlayerRow key={p.player_id} p={p} inBest={best.has(p.player_id)} diffMax={diffMax} />)}
                 </tbody>
               </table>
             </div>

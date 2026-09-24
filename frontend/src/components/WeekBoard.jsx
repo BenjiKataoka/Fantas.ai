@@ -4,6 +4,7 @@ import { Check, TriangleAlert, ExternalLink } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { REVEAL, slotLabel, tiltHandlers, dotFieldHandlers } from '@/lib/utils'
 import { Hint } from '@/components/ui/tooltip'
+import CountUp from './CountUp'
 
 const PLATFORM = { SLEEPER: 'Sleeper', ESPN: 'ESPN' }
 const PLATFORM_LOGO = { SLEEPER: '/platform/sleeper.png', ESPN: '/platform/espn.png' }
@@ -119,14 +120,16 @@ export function Tile({ l, onOpen }) {
     >
       <Watermark platform={l.platform} />
       <div className="relative flex items-center justify-between gap-2">
-        <span className="font-semibold text-sm text-content truncate">{l.name}</span>
-        {l.live
-          ? <Hint text="Scores are live: players whose games have started count their real points, the rest still show projections.">
-              <span className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-bull">
-                <span className="size-1.5 rounded-full bg-bull motion-safe:animate-pulse" />Live
-              </span>
-            </Hint>
-          : <Logo src={PLATFORM_LOGO[l.platform]} alt={PLATFORM[l.platform]} className="size-4 shrink-0 rounded-sm" />}
+        <span className="font-semibold text-sm text-content truncate">
+          {l.name}<span className="sr-only"> on {PLATFORM[l.platform]}</span>
+        </span>
+        {l.live && (
+          <Hint text="Scores are live: players whose games have started count their real points, the rest still show projections.">
+            <span className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-bull">
+              <span className="size-1.5 rounded-full bg-bull motion-safe:animate-pulse" />Live
+            </span>
+          </Hint>
+        )}
       </div>
       <div className="relative">
         <div className="flex items-baseline justify-between gap-3">
@@ -134,14 +137,14 @@ export function Tile({ l, onOpen }) {
             <Logo src={l.my_logo} alt="" className="size-5 rounded-full bg-raised object-cover" />
             {l.my_name || 'You'}
           </span>
-          <span className={`font-display font-semibold text-3xl tabular-nums ${favored ? 'text-content' : 'text-subtle'}`}>{l.you.toFixed(1)}</span>
+          <span className={`font-display font-semibold text-3xl tabular-nums ${favored ? 'text-content' : 'text-subtle'}`}><CountUp value={l.you} /></span>
         </div>
         <div className="flex items-baseline justify-between gap-3">
           <span className="flex items-center gap-2 text-sm text-subtle truncate">
             <Logo src={l.opp_logo} alt="" className="size-5 rounded-full bg-raised object-cover" />
             {l.opp_name}
           </span>
-          <span className={`font-display font-semibold text-3xl tabular-nums ${favored ? 'text-subtle' : 'text-content'}`}>{l.opp != null ? l.opp.toFixed(1) : '-'}</span>
+          <span className={`font-display font-semibold text-3xl tabular-nums ${favored ? 'text-subtle' : 'text-content'}`}><CountUp value={l.opp} /></span>
         </div>
       </div>
       {pct != null && (
@@ -188,13 +191,15 @@ export function ResultTile({ r, onOpen }) {
     >
       <Watermark platform={r.platform} />
       <div className="relative flex items-center justify-between gap-2">
-        <span className="font-semibold text-sm text-content truncate">{r.name}</span>
+        <span className="font-semibold text-sm text-content truncate">
+          {r.name}<span className="sr-only"> on {PLATFORM[r.platform]}</span>
+        </span>
         {r.result && <span className={`font-display font-bold text-sm px-2 py-0.5 rounded text-ink ${chip}`}>{r.result}</span>}
       </div>
       <div className="relative flex items-baseline gap-2.5">
-        <span className="font-display font-bold text-4xl tabular-nums text-content">{r.you.toFixed(1)}</span>
+        <span className="font-display font-bold text-4xl tabular-nums text-content"><CountUp value={r.you} /></span>
         <span className="text-sm text-subtle">to</span>
-        <span className="font-display font-semibold text-2xl tabular-nums text-subtle">{r.opp != null ? r.opp.toFixed(1) : '-'}</span>
+        <span className="font-display font-semibold text-2xl tabular-nums text-subtle"><CountUp value={r.opp} /></span>
       </div>
       <p className="relative flex items-center gap-2 text-sm text-subtle truncate -mt-2">
         <Logo src={r.opp_logo} alt="" className="size-5 rounded-full bg-raised object-cover" />
