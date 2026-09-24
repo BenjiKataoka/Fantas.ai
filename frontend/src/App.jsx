@@ -138,7 +138,18 @@ function NavBar({ isAdmin }) {
     // Nine links plus the switcher only fit on a wide screen; below xl they fold into a
     // menu panel instead of stretching every page past the edge of a phone.
     <nav className="relative z-40 bg-surface/80 backdrop-blur border-b border-line px-4 sm:px-6 h-14 flex items-center gap-7">
-      <BrandMark className="text-lg mr-3" />
+      <div className="flex items-center gap-3 xl:mr-3">
+        <button
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+          aria-controls="nav-menu"
+          aria-label={open ? 'Close menu' : 'Open menu'}
+          className="xl:hidden -ml-1.5 rounded-md p-1.5 text-subtle hover:text-content hover:bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-content/30"
+        >
+          {open ? <X className="size-5" /> : <Menu className="size-5" />}
+        </button>
+        <BrandMark className="text-lg" />
+      </div>
       <div className="hidden xl:flex items-center gap-7">
         {links.map(({ to, label }) => (
           <NavLink
@@ -164,15 +175,6 @@ function NavBar({ isAdmin }) {
         </div>
         <ThemeToggle />
         <UserButton afterSignOutUrl="/" />
-        <button
-          onClick={() => setOpen(o => !o)}
-          aria-expanded={open}
-          aria-controls="nav-menu"
-          aria-label={open ? 'Close menu' : 'Open menu'}
-          className="xl:hidden rounded-md p-1.5 text-subtle hover:text-content hover:bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-content/30"
-        >
-          {open ? <X className="size-5" /> : <Menu className="size-5" />}
-        </button>
       </div>
 
       {open && (

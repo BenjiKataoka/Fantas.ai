@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     port: 3000,
     // Pin the origin. Without this, Vite silently drifts to 3001/3002 when 3000 is
-    // busy — and since Clerk's session AND localStorage league creds are per-origin,
+    // busy, and since Clerk's session AND localStorage league creds are per-origin,
     // a drifting port makes you appear signed out with your credentials wiped every
     // time. Fail loudly on a busy port instead so the origin stays stable.
     strictPort: true,

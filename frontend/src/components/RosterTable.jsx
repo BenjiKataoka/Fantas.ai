@@ -160,15 +160,15 @@ export default function RosterTable({ players, newsMap = {}, startSitMap = {} })
           window: past that the table scrolls sideways instead, the way Start/Sit does. */}
       <table className="w-full min-w-[880px] table-fixed text-left">
         <colgroup>
-          <col className="w-[21%]" /> {/* Player */}
-          <col className="w-[6%]" />  {/* Pos */}
-          <col className="w-[9%]" />  {/* Slp */}
-          <col className="w-[9%]" />  {/* ESPN */}
-          <col className="w-[9%]" />  {/* FP */}
-          <col className="w-[10%]" /> {/* Proj */}
-          <col className="w-[8%]" />  {/* Conf */}
-          <col className="w-[14%]" /> {/* News */}
-          <col className="w-[14%]" /> {/* Start/Sit */}
+          <col className="w-[21%]" /* Player */ />
+          <col className="w-[6%]" /* Pos */ />
+          <col className="w-[9%]" /* Slp */ />
+          <col className="w-[9%]" /* ESPN */ />
+          <col className="w-[9%]" /* FP */ />
+          <col className="w-[10%]" /* Proj */ />
+          <col className="w-[8%]" /* Conf */ />
+          <col className="w-[14%]" /* News */ />
+          <col className="w-[14%]" /* Start/Sit */ />
         </colgroup>
         <thead className="bg-raised border-b border-line">
           <tr>
