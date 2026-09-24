@@ -220,8 +220,10 @@ export default function PortfolioView({ onOpenLeague }) {
         )}
       </div>
       <div>
-        <div className={`bg-surface border border-line rounded-xl ${REVEAL}`} style={{ animationDelay: '90ms' }}>
-          <table className="w-full table-fixed text-sm">
+        {/* Scrolls rather than squeezes, like RosterTable: the fixed columns (w-60 alone is
+            240px) need more room than a phone has. */}
+        <div className={`bg-surface border border-line rounded-xl overflow-x-auto ${REVEAL}`} style={{ animationDelay: '90ms' }}>
+          <table className="w-full min-w-[520px] table-fixed text-sm">
             <colgroup><col /><col className="w-14" /><col className="w-24" /><col className="w-60" /></colgroup>
             <thead><tr><th className={TH}>Player</th><th className={TH}>Pos</th><th className={`${TH} text-center`}>Proj</th><th className={TH}>Your teams</th></tr></thead>
             <tbody>

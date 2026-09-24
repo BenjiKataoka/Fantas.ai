@@ -1,4 +1,4 @@
-import { TriangleAlert, Hourglass, Sun, Moon, RotateCw } from 'lucide-react'
+import { TriangleAlert, Hourglass, Sun, Moon, RotateCw, Menu, X } from 'lucide-react'
 import { useTheme, setTheme } from '@/lib/theme'
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
@@ -45,7 +45,7 @@ function BrandMark({ className = '' }) {
 const PLATFORM_LABEL = { SLEEPER: 'Sleeper', ESPN: 'ESPN' }
 
 // Value is "PLATFORM:league_id" so a Sleeper and an ESPN league can never collide.
-function LeagueSwitcher() {
+function LeagueSwitcher({ className = 'max-w-56' }) {
   const { leagues, credentials, switchLeague } = useApp()
   if (leagues.length < 2 || !credentials) return null
   const platforms = [...new Set(leagues.map(l => l.platform))]
@@ -55,7 +55,7 @@ function LeagueSwitcher() {
       aria-label="League"
       value={`${credentials.platform}:${credentials.leagueId}`}
       onChange={e => { const [platform, id] = e.target.value.split(':'); switchLeague(id, platform) }}
-      className="max-w-56 truncate rounded-md bg-raised border border-line px-2.5 py-1 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-content/30"
+      className={`${className} truncate rounded-md bg-raised border border-line px-2.5 py-1 text-sm text-content focus:outline-none focus-visible:ring-2 focus-visible:ring-content/30`}
     >
       {platforms.length > 1
         ? platforms.map(p => <optgroup key={p} label={PLATFORM_LABEL[p]}>{leagues.filter(l => l.platform === p).map(option)}</optgroup>)
@@ -124,31 +124,87 @@ function ThemeToggle() {
 
 function NavBar({ isAdmin }) {
   const links = isAdmin ? [...NAV_LINKS, { to: '/admin', label: 'Admin' }] : NAV_LINKS
+  const [open, setOpen] = useState(false)
+  const close = () => setOpen(false)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = e => e.key === 'Escape' && setOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
   return (
-    <nav className="bg-surface/80 backdrop-blur border-b border-line px-6 h-14 flex items-center gap-7">
+    // Nine links plus the switcher only fit on a wide screen; below xl they fold into a
+    // menu panel instead of stretching every page past the edge of a phone.
+    <nav className="relative z-40 bg-surface/80 backdrop-blur border-b border-line px-4 sm:px-6 h-14 flex items-center gap-7">
       <BrandMark className="text-lg mr-3" />
-      {links.map(({ to, label }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={to === '/'}
-          className={({ isActive }) =>
-            `text-sm font-medium h-14 flex items-center border-b-2 transition-colors ${
-              isActive
-                ? 'text-content border-brand'
-                : 'text-subtle border-transparent hover:text-content'
-            }`
-          }
-        >
-          {label}
-        </NavLink>
-      ))}
+      <div className="hidden xl:flex items-center gap-7">
+        {links.map(({ to, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={({ isActive }) =>
+              `text-sm font-medium h-14 flex items-center border-b-2 transition-colors ${
+                isActive
+                  ? 'text-content border-brand'
+                  : 'text-subtle border-transparent hover:text-content'
+              }`
+            }
+          >
+            {label}
+          </NavLink>
+        ))}
+      </div>
       <div className="ml-auto flex items-center gap-3">
-        <RefreshStatus />
-        <LeagueSwitcher />
+        <div className="hidden xl:flex items-center gap-3">
+          <RefreshStatus />
+          <LeagueSwitcher />
+        </div>
         <ThemeToggle />
         <UserButton afterSignOutUrl="/" />
+        <button
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+          aria-controls="nav-menu"
+          aria-label={open ? 'Close menu' : 'Open menu'}
+          className="xl:hidden rounded-md p-1.5 text-subtle hover:text-content hover:bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-content/30"
+        >
+          {open ? <X className="size-5" /> : <Menu className="size-5" />}
+        </button>
       </div>
+
+      {open && (
+        <>
+          {/* Tapping anywhere outside the panel closes it. Invisible on purpose: the panel's
+              shadow separates it, and "ink" is the page colour, so it could not dim anyway. */}
+          <button aria-hidden tabIndex={-1} onClick={close} className="xl:hidden fixed inset-0 top-14 cursor-default" />
+          <div id="nav-menu" className="xl:hidden absolute left-0 right-0 top-full bg-surface border-b border-line shadow-lg">
+            <div className="flex flex-col px-4 sm:px-6 py-2">
+              {links.map(({ to, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === '/'}
+                  onClick={close}
+                  className={({ isActive }) =>
+                    `py-3 text-base font-medium border-l-2 pl-3 transition-colors ${
+                      isActive ? 'text-content border-brand' : 'text-subtle border-transparent hover:text-content'
+                    }`
+                  }
+                >
+                  {label}
+                </NavLink>
+              ))}
+            </div>
+            <div className="flex flex-col gap-3 px-4 sm:px-6 py-4 border-t border-line">
+              <LeagueSwitcher className="w-full py-2" />
+              <RefreshStatus />
+            </div>
+          </div>
+        </>
+      )}
     </nav>
   )
 }
@@ -267,7 +323,7 @@ function AuthedApp() {
   }, [])
 
   if (status === 'loading') {
-    return <CenteredShell><Spinner label="Verifying your account..." /></CenteredShell>
+    return <CenteredShell><Spinner label="Verifying your account" /></CenteredShell>
   }
   if (status === 'pending') return <PendingScreen />
   if (status === 'error') return <ErrorScreen />
