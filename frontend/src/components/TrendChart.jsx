@@ -72,7 +72,9 @@ export default function TrendChart({ points = [], metric = 'rank', position = ''
   const worstV = m.betterHigh ? lo : hi
   const ticks = [{ v: bestV, y: padT }, { v: (lo + hi) / 2, y: padT + innerH / 2 }, { v: worstV, y: padT + innerH }]
 
-  const labelIdx = n <= 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1]
+  // First, middle and last date, deduped: with two points the middle IS the first, and
+  // drawing index 0 twice gave React two children keyed 0.
+  const labelIdx = [...new Set([0, Math.floor((n - 1) / 2), n - 1])]
   const hoverX = hover != null ? xFor(hover) : 0
 
   return (
