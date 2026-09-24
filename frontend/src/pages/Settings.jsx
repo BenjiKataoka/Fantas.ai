@@ -1,9 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getLeagues, getEspnStatus, saveEspn, removeEspn, lookupEspnLeague, addPublicEspnLeague, removeEspnLeague } from '../services/api'
 import { toast } from 'sonner'
 import { useApp } from '../context/AppContext'
 import WeightSlider from '../components/WeightSlider'
 import Spinner from '../components/Spinner'
+import { parseEspnCookies } from '@/lib/utils'
+
+// Neither espn_s2 nor SWID is HttpOnly (checked against live Set-Cookie headers,
+// 2026-09-24), so one click on espn.com can read both. This is the whole reason we don't
+// need the browser extension FantasyPros ships for the same job.
+const BOOKMARKLET = "javascript:(function(){"
+  + "var c=document.cookie,g=function(n){var m=c.match(new RegExp('(?:^|; )'+n+'=([^;]*)'));return m?m[1]:''};"
+  + "var a=g('espn_s2'),b=g('SWID');"
+  + "if(!a||!b){alert('Log in to espn.com first, then click this again.');return}"
+  + "var t='espn_s2='+a+'; SWID='+b;"
+  + "if(navigator.clipboard){navigator.clipboard.writeText(t).then("
+  + "function(){alert('Copied. Paste it into Fantas.ai settings.')},function(){prompt('Copy this:',t)})}"
+  + "else{prompt('Copy this:',t)}"
+  + "})()"
 
 const field = 'bg-raised border border-line rounded-lg px-3 py-2 text-sm text-content placeholder-subtle/60 focus:outline-none focus:border-brand'
 const btnPrimary = 'bg-brand hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-brand-fg text-sm font-semibold rounded-lg transition-all'
@@ -232,6 +246,15 @@ function ESPNSection() {
   const [busy, setBusy]           = useState(false)
   const [error, setError]         = useState(null)
   const [found, setFound]         = useState(null)
+  // React refuses to render a javascript: href, so the bookmarklet goes on via the DOM.
+  const bookmarkRef = useRef(null)
+  useEffect(() => { if (bookmarkRef.current) bookmarkRef.current.href = BOOKMARKLET }, [connected, expired])
+
+  // One paste fills both fields: the bookmarklet hands over a cookie string, not a value.
+  const onS2Change = (v) => {
+    const parsed = parseEspnCookies(v)
+    if (parsed) { setS2(parsed.espn_s2); setSwid(parsed.swid) } else { setS2(v) }
+  }
 
   // Expired cookies show the connect form again, with a note, instead of "Connected".
   useEffect(() => {
@@ -284,9 +307,14 @@ function ESPNSection() {
         <div className="flex flex-col gap-3 max-w-sm">
           {expired && <p className="text-sm text-warn">ESPN stopped accepting your saved cookies. Paste fresh ones to reconnect.</p>}
           <p className="text-sm text-subtle">
-            On espn.com, open your browser's developer tools, go to Application, then Cookies, and copy the <span className="font-mono text-content">espn_s2</span> and <span className="font-mono text-content">SWID</span> values.
+            Drag <a ref={bookmarkRef} href="#" onClick={e => e.preventDefault()}
+              className="font-medium text-content underline decoration-mark decoration-2 underline-offset-2 cursor-grab">Get ESPN cookies</a>{' '}
+            to your bookmarks bar. Then open espn.com and click it, and paste below.
           </p>
-          <input type="password" autoComplete="off" value={s2} onChange={e => setS2(e.target.value)} placeholder="espn_s2" className={field} />
+          <p className="text-xs text-faint">
+            Or copy <span className="font-mono">espn_s2</span> and <span className="font-mono">SWID</span> by hand from developer tools, Application, then Cookies.
+          </p>
+          <input type="password" autoComplete="off" value={s2} onChange={e => onS2Change(e.target.value)} placeholder="espn_s2, or paste both here" className={field} />
           <input type="password" autoComplete="off" value={swid} onChange={e => setSwid(e.target.value)} placeholder="SWID" className={field} />
           {error && <p className="text-bear text-sm">{error}</p>}
           <button onClick={connect} disabled={busy || !s2.trim() || !swid.trim()} className={`w-fit px-4 py-2 ${btnPrimary}`}>

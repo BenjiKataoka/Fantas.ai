@@ -54,3 +54,21 @@ export function relativeTime(value, now = Date.now()) {
   if (hrs < 24)  return `${hrs}h ago`
   return `${Math.floor(hrs / 24)}d ago`
 }
+
+// Pull espn_s2 and SWID out of whatever the user pasted: the bookmarklet's output, a raw
+// Cookie header, or a DevTools copy. Neither cookie is HttpOnly (checked 2026-09-24),
+// which is what makes the one-click bookmarklet possible at all.
+// Returns null unless BOTH are present, so a partial paste never half-fills the form.
+export function parseEspnCookies(text) {
+  if (!text || !/espn_s2/i.test(text)) return null
+  const grab = (name) => {
+    const m = text.match(new RegExp(`${name}\\s*[=:]\\s*"?([^;"\\s]+)`, 'i'))
+    return m ? m[1] : ''
+  }
+  const espn_s2 = grab('espn_s2')
+  let swid = grab('SWID')
+  // ESPN's SWID is a GUID in braces and people lose them in transit; the API re-adds them,
+  // but keep whatever shape we found so the field shows what was actually pasted.
+  if (swid && !swid.startsWith('{')) swid = `{${swid.replace(/[{}]/g, '')}}`
+  return espn_s2 && swid ? { espn_s2, swid } : null
+}
