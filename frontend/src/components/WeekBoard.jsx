@@ -126,7 +126,7 @@ export function Tile({ l, onOpen }) {
         {l.live && (
           <Hint text="Scores are live: players whose games have started count their real points, the rest still show projections.">
             <span className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-bull">
-              <span className="size-1.5 rounded-full bg-bull motion-safe:animate-pulse" />Live
+              <span className="live-blink size-2 rounded-full bg-bear" aria-hidden />Live
             </span>
           </Hint>
         )}

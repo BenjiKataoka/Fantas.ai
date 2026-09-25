@@ -287,8 +287,9 @@ async def get_week_schedule(season: int, week: int) -> dict[str, dict]:
             abbr = (c.get("team") or {}).get("abbreviation")
             if abbr:
                 out[ESPN_TO_SLEEPER_TEAM.get(abbr, abbr)] = {"kickoff": kickoff, "state": state}
-    # 15 minutes: game states (pre → in → post) drive live scoring on Sundays.
-    _cache.set(cache_key, out, ttl_hours=0.25)
+    # 5 minutes, matching the live score caches: a player's number switches from his
+    # projection to real points only once this says his game is under way.
+    _cache.set(cache_key, out, ttl_hours=1 / 12)
     return out
 
 

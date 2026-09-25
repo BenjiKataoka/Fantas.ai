@@ -225,8 +225,15 @@
   mask-image: radial-gradient(circle 160px at var(--mx, -999px) var(--my, -999px), #000, transparent);
 }
 
+/* The Live badge's light: a broadcast-style red that blinks while games are under way. */
+.live-blink { animation: live-blink 1.4s ease-in-out infinite; }
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.15; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .shimmer, .loading-dots > span { animation: none; }
+  .shimmer, .loading-dots > span, .live-blink { animation: none; }
   .tilt, .tilt:hover { transform: none; }
   .dot-field::after { display: none; }
 }

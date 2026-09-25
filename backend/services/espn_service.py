@@ -488,5 +488,5 @@ async def get_espn_boxscore(league_id: str, season: int, week: int, espn_s2: str
         logger.error(f"[ESPN] boxscore {league_id} week {week} status {resp.status_code}")
         return None
     data = resp.json()
-    _cache.set(cache_key, data, ttl_hours=(1 / 6) if live else 24)
+    _cache.set(cache_key, data, ttl_hours=(1 / 12) if live else 24)   # live scores: 5 min
     return data

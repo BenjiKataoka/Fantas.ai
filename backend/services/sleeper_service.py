@@ -128,7 +128,7 @@ async def get_matchups(league_id: str, week: int, live: bool = False) -> list:
             resp = await client.get(f"{SLEEPER_BASE}/league/{league_id}/matchups/{week}", timeout=10)
             resp.raise_for_status()
             data = resp.json() or []
-            _cache.set(cache_key, data, ttl_hours=(1 / 6) if live else 24)
+            _cache.set(cache_key, data, ttl_hours=(1 / 12) if live else 24)   # live scores: 5 min
             return data
     except Exception as e:
         logger.error(f"[Sleeper] get_matchups failed for league {league_id} week {week}: {e}")
