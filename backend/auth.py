@@ -44,6 +44,8 @@ DEV_USERNAME = "dev"
 
 _jwks_client_cache: Optional[PyJWKClient] = None
 
+CLOCK_SKEW_SECONDS = 5
+
 
 def _frontend_api_host() -> str:
     """
@@ -82,6 +84,11 @@ def _verify_token(token: str) -> dict:
         algorithms=["RS256"],
         issuer=_issuer(),
         options={"verify_aud": False},
+        # Clerk stamps iat in whole seconds and signs nbf 10s early to allow for clock
+        # skew. With no leeway PyJWT rejects a fresh token whose iat rounds a fraction of a
+        # second past our clock ("not yet valid (iat)"): measured on 2 of 6 fresh tokens.
+        # 5s is the default of Clerk's own backend SDK.
+        leeway=CLOCK_SKEW_SECONDS,
     )
     # Clerk: reject tokens minted for another origin (CSRF guard). Skip only if absent.
     azp = claims.get("azp")
