@@ -29,17 +29,17 @@ const H2 = 'font-display font-semibold text-xl text-content'
 function LineupRow({ p }) {
   return (
     <tr className="hover:bg-raised/50 transition-colors">
-      <td className="px-3 py-2.5">
+      <td className="px-3 py-2.5 whitespace-nowrap">
         <span className={`font-mono font-semibold text-xs uppercase tracking-wide ${SLOT_COLORS[p.slot] || 'text-subtle'}`}>
           {slotLabel(p.slot)}
         </span>
       </td>
-      <td className="px-3 py-2.5">
-        <div className="flex items-center gap-2.5">
+      <td className="px-3 py-2.5 max-w-0 w-full">
+        <div className="flex items-center gap-2.5 min-w-0">
           <PlayerAvatar playerId={p.player_id} name={p.name} size="md" />
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-content">{p.name}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-medium text-content truncate" title={p.name}>{p.name}</span>
               <InjuryBadge status={p.injury_status} />
             </div>
             <div className="text-xs text-subtle font-mono mt-0.5">{p.position} · {p.nfl_team}</div>
@@ -62,7 +62,7 @@ function CloseDecision({ d }) {
         <span className={`font-mono text-xs font-semibold uppercase ${SLOT_COLORS[d.slot] || 'text-subtle'}`}>{slotLabel(d.slot)}</span>
         <span className="text-xs text-warn/80 font-mono">margin {d.margin.toFixed(1)}</span>
       </div>
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
         <span className="text-bull font-medium">{d.start.name}</span>
         <span className="text-subtle text-xs font-mono">{d.start.adjusted_proj?.toFixed(1)}</span>
         <span className="text-faint mx-1">over</span>
@@ -115,9 +115,9 @@ export default function StartSit() {
       )}
 
       {!offseason_note && (
-        <div className="flex gap-6 items-start">
-          <div className={`flex-1 min-w-0 ${REVEAL}`} style={{ animationDelay: '90ms' }}>
-            <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <div className={`w-full lg:flex-1 min-w-0 ${REVEAL}`} style={{ animationDelay: '90ms' }}>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 mb-3">
               <h2 className={H2}>Recommended lineup</h2>
               {totalProj > 0 && (
                 <span className="font-mono tabular-nums text-bull text-base font-bold">{totalProj.toFixed(1)} <span className="text-faint text-xs uppercase">pts</span></span>
@@ -149,12 +149,12 @@ export default function StartSit() {
                     <tbody className="divide-y divide-line/40">
                       {bench.map(p => (
                         <tr key={p.player_id} className="hover:bg-raised/50 transition-colors">
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-2.5">
+                          <td className="px-3 py-2 max-w-0 w-full">
+                            <div className="flex items-center gap-2.5 min-w-0">
                               <PlayerAvatar playerId={p.player_id} name={p.name} size="sm" />
                               <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-content">{p.name}</span>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-content truncate" title={p.name}>{p.name}</span>
                                   <InjuryBadge status={p.injury_status} />
                                 </div>
                                 <div className="text-xs text-subtle font-mono mt-0.5">{p.position} · {p.nfl_team}</div>
@@ -175,7 +175,7 @@ export default function StartSit() {
             )}
           </div>
 
-          <div className={`w-72 shrink-0 ${REVEAL}`} style={{ animationDelay: '180ms' }}>
+          <div className={`w-full lg:w-72 shrink-0 order-first lg:order-none ${REVEAL}`} style={{ animationDelay: '180ms' }}>
             <h2 className={`${H2} mb-3`}>Close calls</h2>
             {close_decisions.length > 0 ? (
               <div className="flex flex-col gap-3">
