@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getLeagues, getMe, getEspnStatus, saveEspn, removeEspn, removeSleeper, lookupEspnLeague, addPublicEspnLeague, removeEspnLeague } from '../services/api'
 import { toast } from 'sonner'
 import { useApp } from '../context/AppContext'
+import { useClerk, useUser } from '@clerk/react'
 import WeightSlider from '../components/WeightSlider'
 import Spinner, { LoadingDots } from '../components/Spinner'
 import { parseEspnCookies } from '@/lib/utils'
@@ -392,6 +393,28 @@ function EspnAccount() {
   )
 }
 
+// ── Account ─────────────────────────────────────────────────────────────────
+// Replaces Clerk's avatar menu in the navbar: the two things it was for.
+function AccountSection() {
+  const { signOut, openUserProfile } = useClerk()
+  const { user } = useUser()
+  const email = user?.primaryEmailAddress?.emailAddress
+  return (
+    <Section title="Account" description={email ? `Signed in as ${email}.` : undefined}>
+      <div className="flex flex-wrap gap-3">
+        <button onClick={() => openUserProfile()}
+                className="px-3 py-1.5 text-sm text-content border border-line rounded-lg hover:bg-raised">
+          Manage account
+        </button>
+        <button onClick={() => signOut({ redirectUrl: '/' })}
+                className="px-3 py-1.5 text-sm text-subtle border border-line rounded-lg hover:text-bear hover:border-bear/40">
+          Sign out
+        </button>
+      </div>
+    </Section>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function Settings() {
   return (
@@ -400,6 +423,7 @@ export default function Settings() {
       <div className="flex flex-col gap-5">
         <WeightsSection />
         <LeaguesSection />
+        <AccountSection />
       </div>
     </div>
   )

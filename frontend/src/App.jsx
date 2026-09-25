@@ -1,9 +1,9 @@
-import { TriangleAlert, Hourglass, Sun, Moon, RotateCw, Menu, X } from 'lucide-react'
+import { TriangleAlert, Hourglass, Sun, Moon, RotateCw, Menu, X, Settings as SettingsIcon } from 'lucide-react'
 import { useTheme, setTheme } from '@/lib/theme'
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import {
-  Show, SignInButton, SignUpButton, UserButton,
+  Show, SignInButton, SignUpButton, useClerk,
   ClerkLoading, ClerkLoaded,
 } from '@clerk/react'
 import Dashboard from './pages/Dashboard'
@@ -29,7 +29,6 @@ const NAV_LINKS = [
   { to: '/waivers',  label: 'Waivers' },
   { to: '/recap',    label: 'Recap' },
   { to: '/tape',     label: 'Tape' },
-  { to: '/settings', label: 'Settings' },
 ]
 
 function BrandMark({ className = '' }) {
@@ -137,7 +136,7 @@ function NavBar({ isAdmin }) {
   return (
     // Nine links plus the switcher only fit on a wide screen; below xl they fold into a
     // menu panel instead of stretching every page past the edge of a phone.
-    <nav className="relative z-40 bg-surface/80 backdrop-blur border-b border-line px-4 sm:px-6 h-14 flex items-center gap-7">
+    <nav className="relative z-40 bg-surface/80 backdrop-blur border-b border-line px-4 sm:px-6 h-14 flex items-center gap-3 xl:gap-7">
       <div className="flex items-center gap-3 xl:mr-3">
         <button
           onClick={() => setOpen(o => !o)}
@@ -168,13 +167,22 @@ function NavBar({ isAdmin }) {
           </NavLink>
         ))}
       </div>
-      <div className="ml-auto flex items-center gap-3">
-        <div className="hidden xl:flex items-center gap-3">
-          <RefreshStatus />
-          <LeagueSwitcher />
-        </div>
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-3 min-w-0">
+        <div className="hidden xl:flex"><RefreshStatus /></div>
+        {/* The switcher stays in the bar at every width: on a phone it is the control you
+            reach for most, so it should not hide behind the menu. Narrower there. */}
+        <LeagueSwitcher className="max-w-28 sm:max-w-56" />
         <ThemeToggle />
-        <UserButton afterSignOutUrl="/" />
+        <NavLink
+          to="/settings"
+          aria-label="Settings"
+          title="Settings"
+          className={({ isActive }) =>
+            `rounded-md p-1.5 hover:text-content hover:bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-content/30 ${isActive ? 'text-content' : 'text-subtle'}`
+          }
+        >
+          <SettingsIcon className="size-4" />
+        </NavLink>
       </div>
 
       {open && (
@@ -200,8 +208,7 @@ function NavBar({ isAdmin }) {
                 </NavLink>
               ))}
             </div>
-            <div className="flex flex-col gap-3 px-4 sm:px-6 py-4 border-t border-line">
-              <LeagueSwitcher className="w-full py-2" />
+            <div className="px-4 sm:px-6 py-4 border-t border-line">
               <RefreshStatus />
             </div>
           </div>
@@ -245,12 +252,24 @@ function Landing() {
   )
 }
 
+// Clerk's avatar button is gone from the app; signing out lives in Settings, and here on
+// the approval screen, which is the one place an unapproved user can reach.
+function SignOutButton() {
+  const { signOut } = useClerk()
+  return (
+    <button onClick={() => signOut({ redirectUrl: '/' })}
+            className="rounded-md px-3 py-1.5 text-sm text-subtle border border-line hover:text-content hover:bg-raised">
+      Sign out
+    </button>
+  )
+}
+
 function PendingScreen() {
   return (
     <div className="min-h-screen bg-ink">
       <div className="bg-surface/80 border-b border-line px-6 h-14 flex items-center">
         <BrandMark className="text-lg" />
-        <div className="ml-auto"><UserButton afterSignOutUrl="/" /></div>
+        <div className="ml-auto"><SignOutButton /></div>
       </div>
       <CenteredShell>
         <Hourglass className="size-10 text-subtle mx-auto mb-4" />
