@@ -1,4 +1,4 @@
-import { TriangleAlert, Hourglass, Sun, Moon, RotateCw, Menu, X, Settings as SettingsIcon } from 'lucide-react'
+import { TriangleAlert, Hourglass, Sun, Moon, RotateCw, Menu, X, ArrowRight, Settings as SettingsIcon } from 'lucide-react'
 import { useTheme, setTheme } from '@/lib/theme'
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
@@ -252,10 +252,11 @@ function Landing() {
             Create account
           </button>
         </SignUpButton>
-        <a href="/demo" className="px-5 py-2.5 text-subtle hover:text-content text-sm font-semibold rounded-lg transition-colors">
-          Try the demo
-        </a>
       </div>
+      <a href="/demo" className="mt-6 flex items-center justify-center gap-2 w-full px-5 py-3 bg-raised hover:bg-line text-content text-sm font-semibold rounded-lg border border-line transition-colors">
+        Try the demo, no account needed
+        <ArrowRight className="size-4" />
+      </a>
       <p className="text-xs text-subtle mt-6">New accounts require admin approval before access.</p>
     </CenteredShell>
   )

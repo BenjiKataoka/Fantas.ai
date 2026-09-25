@@ -1,10 +1,12 @@
 # Fantas.ai
 
+### [Try the live demo](https://fantas-ai.vercel.app/demo), no sign-in needed
+
 A fantasy football assistant for my redraft league. It pulls every team you own across
 Sleeper and ESPN into one place, blends three projection sources into one number per
 player, and tells you who to start, who to pick up, and how last week went.
 
-![The portfolio view: every league at once, with a projected record for the week](docs/screenshots/dashboard.png)
+[![The portfolio view: every league at once, with a projected record for the week](docs/screenshots/dashboard.png)](https://fantas-ai.vercel.app/demo)
 
 **What it does**
 
@@ -14,9 +16,9 @@ player, and tells you who to start, who to pick up, and how last week went.
 - **Recap**: a finished week graded: points you left on the bench, and which projection source was closest.
 - **Player tracker**: an AI read on each player's outlook from career stats, news and ADP, tracked over the season.
 
-**Try it**: [fantas-ai.vercel.app/demo](https://fantas-ai.vercel.app/demo) runs the real app
-on one recorded week, with no sign-in. League and team names are made up; the players and
-numbers are real. The live app is invite-only for my league.
+**[Open the demo](https://fantas-ai.vercel.app/demo)**: the real app on one recorded week,
+with no sign-in. League and team names are made up; the players and numbers are real. The
+live app is invite-only for my league.
 
 ## Why I built this
 
