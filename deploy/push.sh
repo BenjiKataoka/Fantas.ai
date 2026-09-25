@@ -45,6 +45,9 @@ echo "==> Swap and restart"
 rm -rf backend.prev
 [ -d backend ] && mv backend backend.prev
 mv backend.new backend
+# Pick up any change to the unit file (setup.sh reinstalls it); without this a restart
+# silently keeps running the previous definition.
+systemctl daemon-reload
 systemctl restart fantasai
 
 for i in $(seq 1 30); do
