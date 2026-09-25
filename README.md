@@ -1,6 +1,6 @@
 # Fantas.ai
 
-### [Try the live demo](https://fantas-ai.vercel.app/demo), no sign-in needed
+### [Try the live demo](https://fantas-ai.vercel.app/demo)
 
 A fantasy football assistant for my redraft league. It pulls every team you own across
 Sleeper and ESPN into one place, blends three projection sources into one number per
