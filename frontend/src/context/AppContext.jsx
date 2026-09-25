@@ -3,10 +3,17 @@ import { useAuth } from '@clerk/react'
 import { toast } from 'sonner'
 import { getRoster, getLeagues, getEspnStatus, getSettings, updateSettings, getNews, getStartSit, analyzeRoster, getRosterAnalysis, setTokenGetter, getMe } from '../services/api'
 import { balanceWeights } from '../utils/weights'
+import { IS_DEMO } from '../demo/mode'
 
-const LS_USERNAME = 'fantasai_sleeper_username'
-const LS_LEAGUE   = 'fantasai_league_id'
-const LS_PLATFORM = 'fantasai_league_platform'
+// The demo has no Clerk: always signed in, never a token. Chosen once, so hook order is stable.
+const DEMO_AUTH = { isLoaded: true, isSignedIn: true, getToken: async () => null }
+const useAuthState = IS_DEMO ? () => DEMO_AUTH : useAuth
+
+// The demo keeps its own league choice, so opening /demo never changes a real user's.
+const LS_PREFIX   = IS_DEMO ? 'demo:' : ''
+const LS_USERNAME = `${LS_PREFIX}fantasai_sleeper_username`
+const LS_LEAGUE   = `${LS_PREFIX}fantasai_league_id`
+const LS_PLATFORM = `${LS_PREFIX}fantasai_league_platform`
 const STALE_MS    = 15 * 60 * 1000
 
 const AppContext = createContext(null)
@@ -15,7 +22,7 @@ export function AppProvider({ children }) {
   // ── Auth readiness ───────────────────────────────────────────────────────────
   // Register the Clerk JWT getter and gate all auto-fetches on it, so requests never
   // fire before a token exists (avoids 401 "Missing bearer token" on startup).
-  const { isLoaded, isSignedIn, getToken } = useAuth()
+  const { isLoaded, isSignedIn, getToken } = useAuthState()
   const authed = isLoaded && isSignedIn
   // Register synchronously during render (parent renders before any child effect fires)
   // so the token is available before the approval gate or auto-fetches call the API.

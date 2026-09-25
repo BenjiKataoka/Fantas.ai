@@ -10,6 +10,7 @@ import StockBadge from '../components/StockBadge'
 import StockSection from '../components/StockSection'
 import TrendChart, { METRICS } from '../components/TrendChart'
 import PlayerSearchModal from '../components/PlayerSearchModal'
+import { IS_DEMO } from '../demo/mode'
 
 const POS_COLORS = { QB: 'text-pos-qb', RB: 'text-pos-rb', WR: 'text-pos-wr', TE: 'text-pos-te', K: 'text-subtle' }
 const RANGES = [{ k: '1w', label: '1W' }, { k: '1m', label: '1M' }, { k: 'season', label: 'Season' }]
@@ -180,7 +181,8 @@ export default function PlayerTracker() {
       {/* Picker row */}
       <div className="flex items-center gap-2 mb-6">
         <PlayerPicker players={list} selectedId={selectedId} onSelect={setSelectedId} />
-        {tab === 'watchlist' && (
+        {/* Adding means searching every player and starring one; the demo has neither. */}
+        {tab === 'watchlist' && !IS_DEMO && (
           <button
             onClick={() => setShowModal(true)}
             className="shrink-0 px-3 py-2 bg-brand hover:brightness-110 text-brand-fg text-sm font-semibold rounded-lg transition-all"
@@ -196,8 +198,12 @@ export default function PlayerTracker() {
             ? <p className="text-sm">No roster loaded. Pick your league on the Dashboard.</p>
             : <>
                 <p className="text-sm mb-1 text-subtle">Your watchlist is empty.</p>
-                <p className="text-xs mb-5">Add players you're eyeing on the waiver wire or in trades.</p>
-                <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-brand hover:brightness-110 text-brand-fg text-sm font-semibold rounded-lg transition-all">+ Add your first player</button>
+                {IS_DEMO
+                  ? <p className="text-xs">Adding players is off in the demo.</p>
+                  : <>
+                      <p className="text-xs mb-5">Add players you're eyeing on the waiver wire or in trades.</p>
+                      <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-brand hover:brightness-110 text-brand-fg text-sm font-semibold rounded-lg transition-all">+ Add your first player</button>
+                    </>}
               </>}
         </div>
       ) : selected && (

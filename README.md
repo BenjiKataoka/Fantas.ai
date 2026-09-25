@@ -14,8 +14,19 @@ player, and tells you who to start, who to pick up, and how last week went.
 - **Recap**: a finished week graded: points you left on the bench, and which projection source was closest.
 - **Player tracker**: an AI read on each player's outlook from career stats, news and ADP, tracked over the season.
 
-**Status**: live and invite-only for my league while it's in development. A public demo
-account is coming.
+**Try it**: [fantas-ai.vercel.app/demo](https://fantas-ai.vercel.app/demo) runs the real app
+on one recorded week, with no sign-in. League and team names are made up; the players and
+numbers are real. The live app is invite-only for my league.
+
+## Why I built this
+
+I play in leagues on both Sleeper and ESPN, and keeping up with them meant jumping
+between apps just to see how my teams were doing. The companion tools that pull
+everything into one place mostly sit behind a paywall, so I built my own.
+
+Fantas.ai is one hub for all of it: every team I own on one board, with the latest on
+every player I have. One card I check every week lists my starters by kickoff time, so I
+know which games to watch before the weekend starts.
 
 ## Screenshots
 

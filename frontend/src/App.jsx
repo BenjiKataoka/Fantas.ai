@@ -20,6 +20,8 @@ import Ticker from './components/Ticker'
 import { getMe } from './services/api'
 import { useApp } from './context/AppContext'
 import { relativeTime } from '@/lib/utils'
+import { IS_DEMO } from './demo/mode'
+import DemoBanner from './demo/DemoBanner'
 
 const NAV_LINKS = [
   { to: '/',         label: 'Dashboard' },
@@ -168,21 +170,23 @@ function NavBar({ isAdmin }) {
         ))}
       </div>
       <div className="ml-auto flex items-center gap-1.5 sm:gap-3 min-w-0">
-        <div className="hidden xl:flex"><RefreshStatus /></div>
+        {!IS_DEMO && <div className="hidden xl:flex"><RefreshStatus /></div>}
         {/* The switcher stays in the bar at every width: on a phone it is the control you
             reach for most, so it should not hide behind the menu. Narrower there. */}
         <LeagueSwitcher className="max-w-28 sm:max-w-56" />
         <ThemeToggle />
-        <NavLink
-          to="/settings"
-          aria-label="Settings"
-          title="Settings"
-          className={({ isActive }) =>
-            `rounded-md p-1.5 hover:text-content hover:bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-content/30 ${isActive ? 'text-content' : 'text-subtle'}`
-          }
-        >
-          <SettingsIcon className="size-4" />
-        </NavLink>
+        {!IS_DEMO && (
+          <NavLink
+            to="/settings"
+            aria-label="Settings"
+            title="Settings"
+            className={({ isActive }) =>
+              `rounded-md p-1.5 hover:text-content hover:bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-content/30 ${isActive ? 'text-content' : 'text-subtle'}`
+            }
+          >
+            <SettingsIcon className="size-4" />
+          </NavLink>
+        )}
       </div>
 
       {open && (
@@ -208,9 +212,11 @@ function NavBar({ isAdmin }) {
                 </NavLink>
               ))}
             </div>
-            <div className="px-4 sm:px-6 py-4 border-t border-line">
-              <RefreshStatus />
-            </div>
+            {!IS_DEMO && (
+              <div className="px-4 sm:px-6 py-4 border-t border-line">
+                <RefreshStatus />
+              </div>
+            )}
           </div>
         </>
       )}
@@ -235,7 +241,7 @@ function Landing() {
       <p className="text-subtle text-sm mt-5 mb-8">
         Projections from three sources, news and sentiment tracking, and weekly start/sit calls for your redraft PPR league.
       </p>
-      <div className="flex items-center justify-center gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <SignInButton mode="modal">
           <button className="px-5 py-2.5 bg-brand hover:brightness-110 text-brand-fg text-sm font-semibold rounded-lg transition-all">
             Sign in
@@ -246,6 +252,9 @@ function Landing() {
             Create account
           </button>
         </SignUpButton>
+        <a href="/demo" className="px-5 py-2.5 text-subtle hover:text-content text-sm font-semibold rounded-lg transition-colors">
+          Try the demo
+        </a>
       </div>
       <p className="text-xs text-subtle mt-6">New accounts require admin approval before access.</p>
     </CenteredShell>
@@ -317,7 +326,7 @@ function RoutedMain({ isAdmin }) {
           <Route path="/recap"    element={<Recap />} />
           <Route path="/waivers"  element={<Waivers />} />
           <Route path="/tape"     element={<Tape />} />
-          <Route path="/settings" element={<Settings />} />
+          {!IS_DEMO && <Route path="/settings" element={<Settings />} />}
           {isAdmin && <Route path="/admin" element={<Admin />} />}
         </Routes>
       </div>
@@ -361,7 +370,22 @@ function AuthedApp() {
   )
 }
 
+// No sign-in, no approval check, no ESPN banner: the snapshot is the whole backend.
+function DemoApp() {
+  return (
+    <BrowserRouter basename="/demo">
+      <div className="min-h-screen bg-ink text-content">
+        <DemoBanner />
+        <NavBar isAdmin={false} />
+        <Ticker />
+        <RoutedMain isAdmin={false} />
+      </div>
+    </BrowserRouter>
+  )
+}
+
 export default function App() {
+  if (IS_DEMO) return <DemoApp />
   return (
     <>
       <ClerkLoading>

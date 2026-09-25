@@ -60,3 +60,7 @@ graphify-out/
 
 # Playwright MCP scratch output (screenshots, snapshots, console logs)
 .playwright-mcp/
+
+# Design specs and plans (private working docs)
+docs/superpowers/
+.superpowers/
