@@ -211,7 +211,7 @@ function ViewToggle({ view, onChange, leagueName }) {
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const {
-    credentials, saveCredentials, clearCredentials,
+    credentials, restoring, saveCredentials, refreshAll,
     rosterData, rosterLoading, rosterError,
     newsData, newsLoading,
     startSitData, leagues, switchLeague,
@@ -251,6 +251,9 @@ export default function Dashboard() {
   }, [rosterData])
 
   if (!credentials) {
+    // Still asking the server for this user's saved league: show the table's skeleton,
+    // not the picker, so a returning user never sees "pick your league" flash by.
+    if (restoring) return <TableSkeleton rows={9} />
     return <SetupForm onComplete={(username, leagueId, platform) => saveCredentials(username, leagueId, platform)} />
   }
 
@@ -274,7 +277,7 @@ export default function Dashboard() {
       {rosterError && (
         <div className="mb-4 p-3 bg-bear/10 border border-bear/30 rounded-lg text-bear text-sm">
           {rosterError}{' '}
-          <button onClick={clearCredentials} className="underline ml-1">Reset credentials</button>
+          <button onClick={() => refreshAll()} className="underline ml-1">Try again</button>
         </div>
       )}
 

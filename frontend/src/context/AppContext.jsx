@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@clerk/react'
 import { toast } from 'sonner'
-import { getRoster, getLeagues, getEspnStatus, getSettings, updateSettings, getNews, getStartSit, analyzeRoster, getRosterAnalysis, setTokenGetter } from '../services/api'
+import { getRoster, getLeagues, getEspnStatus, getSettings, updateSettings, getNews, getStartSit, analyzeRoster, getRosterAnalysis, setTokenGetter, getMe } from '../services/api'
 import { balanceWeights } from '../utils/weights'
 
 const LS_USERNAME = 'fantasai_sleeper_username'
@@ -36,6 +36,25 @@ export function AppProvider({ children }) {
     localStorage.setItem(LS_PLATFORM, platform)
     setCredentials({ username, leagueId, platform })
   }, [])
+
+  // This browser's storage is only a cache of the league choice; the server keeps the
+  // last league each user loaded. With nothing saved here (a new browser, the deployed
+  // site, cleared storage) ask the server before showing the league picker, so signing in
+  // somewhere new never means choosing your league again. `restoring` holds the picker
+  // back until the server has answered.
+  const [restoring, setRestoring] = useState(() => !credentials)
+  useEffect(() => {
+    if (!authed || credentials || !restoring) return
+    let cancelled = false
+    getMe()
+      .then(res => {
+        const p = res.data.primary_league
+        if (!cancelled && p) saveCredentials(res.data.sleeper_username || '', p.league_id, p.platform)
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setRestoring(false) })
+    return () => { cancelled = true }
+  }, [authed, credentials, restoring, saveCredentials])
 
   const clearCredentials = useCallback(() => {
     localStorage.removeItem(LS_USERNAME)
@@ -285,7 +304,7 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       // Credentials + leagues
-      credentials, saveCredentials, clearCredentials, leagues, switchLeague, reloadLeagues,
+      credentials, restoring, saveCredentials, clearCredentials, leagues, switchLeague, reloadLeagues,
       espnNeedsReconnect, refreshEspnStatus,
       // Roster
       rosterData, rosterLoading, rosterError, lastRefresh, fetchRoster, refreshAll,

@@ -22,14 +22,19 @@ from models.user import User
 from auth import get_current_user, require_admin
 from config import CLERK_ADMIN_IDS
 from services import llm_budget
+from services.league_service import resolve_user_league
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
 @router.get("/me")
-async def get_me(user: User = Depends(get_current_user)):
-    """Identity for the signed-in (approved) user. Frontend uses this to gate admin UI."""
+async def get_me(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Identity for the signed-in (approved) user. Frontend uses this to gate admin UI, and
+    to restore the league the Dashboard opens on when this browser has none saved: a new
+    browser, the deployed site (its own storage, separate from localhost), or cleared
+    storage. The server already records the last league loaded (is_primary)."""
+    primary = await resolve_user_league(db, user.id, None)
     return {
         "id": user.id,
         "email": user.email,
@@ -37,6 +42,7 @@ async def get_me(user: User = Depends(get_current_user)):
         "is_admin": user.clerk_id in CLERK_ADMIN_IDS,
         "is_approved": user.is_approved,
         "sleeper_username": user.sleeper_username,
+        "primary_league": {"league_id": primary.league_id, "platform": primary.platform} if primary else None,
     }
 
 
