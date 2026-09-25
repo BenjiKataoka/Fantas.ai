@@ -58,55 +58,6 @@ flowchart LR
 Total hosting cost is $0. The server holds no data, so if it disappears the rebuild is one
 script ([deploy/](deploy/README.md)).
 
-## Engineering decisions
-
-A few problems that turned out to be more interesting than they looked.
-
-**Three sources disagree on who a player is.** Sleeper, ESPN and FantasyPros each have
-their own ids, and names don't line up either ("Texans D/ST" vs "Houston Texans"). Sleeper
-ids are the canonical key; ESPN players are mapped by stored id first, then by normalized
-name and position. Team defenses had no ESPN id at all, so a league with a DEF slot came up
-one starter and about 8 points short. ESPN encodes defenses as `-(16000 + proTeamId)`,
-which I verified against all 32 teams before relying on it.
-
-**An access-control audit of all 18 routes that take an id.** Thirteen were scoped
-correctly. The finding was a `sleeper_username` query parameter the server trusted: one
-request with someone else's username silently rebound your account to their Sleeper
-identity and synced a stranger's roster into your dashboard, while the error path claimed
-an ownership check it never made. The username is now pinned to the account your login
-connected (anything else gets a 403), and a disconnect endpoint exists so a typo on first
-connect isn't permanent.
-
-**Measuring for rate limits found a bigger bug.** Every API request was calling Clerk's
-servers (46 calls for 39 requests) and throwing the answer away. With a dozen users that
-would have run into Clerk's own rate limits on sign-in. Now only a brand-new user triggers
-the lookup, and a typical request went from 365 ms to 251 ms. The rate limits themselves
-are keyed on the verified user, so a forged token can't spend someone else's allowance.
-
-**Third-party credentials are encrypted, and failure is recoverable.** ESPN private
-leagues need the user's session cookies. They're stored with Fernet encryption, are
-write-only through the API, and a cookie that fails to decrypt (say, after a key rotation)
-reads as missing, so the user is asked to reconnect instead of being locked out.
-
-**Fitting a 4-pass AI pipeline into a free tier.** Gemini's free tier meters each model
-separately: roughly 500 requests a day on Flash-Lite, but only about 20 on Flash. One
-player's analysis takes four calls, so a single roster on Flash would exhaust a day's
-budget. Every pass runs on Flash-Lite behind a per-model daily cap, and because a player's
-outlook doesn't depend on who asks, each analysis is cached globally and shared by every
-user who rosters him.
-
-**The API said the videos would play. They didn't.** The highlights page embeds NFL
-clips from YouTube. Both the Data API and oEmbed report all 200 recent NFL uploads as
-embeddable, but in testing, 24 of 24 game highlights and player reels were blocked on
-every third-party site, because the rights holder's block isn't what those flags describe.
-The app now checks the actual embed page for each video before showing it.
-
-**Intermittent sign-in failures came down to rounding.** A small share of fresh logins
-failed with "token is not yet valid". Clerk stamps a token's issue time in whole
-seconds, so it can land a fraction of a second ahead of the server's clock. A 5-second
-leeway, matching Clerk's own SDK, fixed it, with a test that signs real tokens a few
-seconds in the future.
-
 ## Running it locally
 
 You need Python 3.14, Node 20.19+ or 22.12+, a Postgres database (Neon's free tier works), a Gemini API
